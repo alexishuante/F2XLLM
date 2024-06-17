@@ -1,25 +1,3 @@
-!program test_spmv_parallel
-!    implicit none
-!    integer, parameter :: n = 4, nnz = 8
-!    real, dimension(nnz) :: val = [1.0, 7.0, 5.0, 3.0, 9.0, 2.0, 8.0, 6.0]
-!    integer, dimension(n+1) :: row = [1, 3, 6, 8, 9]
-!    integer, dimension(nnz) :: col = [1, 2, 1, 3, 4, 2, 3, 4]
-!    real, dimension(n) :: x = [1.0, 2.0, 3.0, 4.0], y(n)
-!    integer :: i
-!  
-!    row = [1, 3, 6, 8, 9]
-!    val = [1.0, 7.0, 5.0, 3.0, 9.0, 2.0, 8.0, 6.0]
-!    col = [1, 2, 1, 3, 4, 2, 3, 4]
-!
-!    x = [1.0, 2.0, 3.0, 4.0]
-!    call spmv_parallel(n, nnz, val, row, col, x, y)
-!  
-!    print *, 'Resulting vector y:'
-!    do i = 1, n
-!      print *, y(i)
-!    end do
-!  end program test_spmv_parallel
-
 program main
     implicit none
     integer, parameter :: n = 4, nnz = 8
