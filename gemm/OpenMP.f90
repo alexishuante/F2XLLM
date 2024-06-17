@@ -1,3 +1,4 @@
+
 program main
     implicit none
     integer, parameter :: m = 3, n = 3, k = 3, lda = 3, ldb = 3, ldc = 3
@@ -5,6 +6,7 @@ program main
     real(kind=8), dimension(ldb, n) :: b
     real(kind=8), dimension(ldc, n) :: c
     real(kind=8) :: alpha, beta
+    integer :: i
 
     ! Initialize alpha, beta, a, b, and c here...
     alpha = 1.0
@@ -15,9 +17,11 @@ program main
 
     call gemm_parallel(m, n, k, alpha, a, lda, b, ldb, beta, c, ldc)
 
-    ! Print the result
-    print *, 'Result matrix C:'
-    print *, c
+    ! Output the resulting matrix C
+    print *, 'Resulting matrix C:'
+    do i = 1, m
+      print '(3F8.2)', C(i, :)
+    end do
 end program main
 
 subroutine gemm_parallel(m, n, k, alpha, a, lda, b, ldb, beta, c, ldc)

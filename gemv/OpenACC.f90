@@ -1,17 +1,19 @@
 program test_gemv_parallel
     implicit none
-    integer, parameter :: n = 4
+    integer, parameter :: n = 15
     real :: A(n, n), x(n), y(n)
     integer :: i, j
 
     ! Initialize matrix A and vector x with some values
-    do i = 1, n
-        x(i) = i
-        do j = 1, n
-            A(i, j) = i + j
-        end do
-    end do
-
+    ! do i = 1, n
+    !    x(i) = i
+    !    do j = 1, n
+    !        A(i, j) = i + j
+    !    end do
+    ! end do
+    A = 3.0
+    x = 5.0
+    y = 0.0
     ! Call the gemv_parallel subroutine
     call gemv_parallel(n, A, x, y)
 

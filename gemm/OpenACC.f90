@@ -8,22 +8,10 @@ program test_gemm_parallel
     real(kind=8) :: alpha = 1.0, beta = 0.0
     integer :: i, j
   
-    ! Initialize matrices A and B with some values
-    do i = 1, m
-      do j = 1, k
-        A(i, j) = i * 0.5 + j
-      end do
-    end do
-  
-    do i = 1, k
-      do j = 1, n
-        B(i, j) = j * 0.2 + i
-      end do
-    end do
-  
-    ! Initialize matrix C with zeros
+    A = reshape([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0], [lda, k])
+    B = reshape([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0], [ldb, n])
     C = 0.0
-  
+
     ! Call the gemm_parallel subroutine
     call gemm_parallel(m, n, k, alpha, A, lda, B, ldb, beta, C, ldc)
   

@@ -1,20 +1,32 @@
 program test_jacobi_parallel
     implicit none
-    integer, parameter :: n = 10, niter = 100
+    integer, parameter :: n = 4, niter = 10
     real(kind=8), allocatable :: u(:,:,:), unew(:,:,:)
-  
+    integer :: i, j, k, counter 
     allocate(u(n, n, n), unew(n, n, n))
+    counter = 1
+
+  ! Initialize the grid with specific values
+  do k = 1, n
+    do j = 1, n
+      do i = 1, n
+        u(i, j, k) = counter
+        counter = counter + 1
+      end do
+    end do
+  end do
+        
+  unew = u      
+
+  call jacobi_parallel(u, unew, n, niter)
+        
   
-    ! Initialize arrays with some values
-    u = 1.0
-    unew = 0.0
-  
-    call jacobi_parallel(u, unew, n, niter)
-  
-    ! Optionally print some of the results to check correctness
-    print *, 'Sample of updated u(5,5,5):', u(5,5,5)
-  
-    deallocate(u, unew)
+
+  ! Print the final value of u and unew
+  print *, "Final value of u:"
+  print *, u
+
+  deallocate(u, unew)
   end program test_jacobi_parallel
 
 subroutine jacobi_parallel(u, unew, n, niter)
