@@ -1,4 +1,4 @@
-! Test Comment
+! Test Comments test
 PROGRAM main
     IMPLICIT NONE
     INTEGER, PARAMETER :: n = 500000000
