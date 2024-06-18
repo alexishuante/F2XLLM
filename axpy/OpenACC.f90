@@ -1,6 +1,6 @@
 PROGRAM main
     IMPLICIT NONE
-    INTEGER, PARAMETER :: n = 10
+    INTEGER, PARAMETER :: n = 500000000
     REAL, DIMENSION(n) :: x, y
     REAL :: a
     INTEGER :: i
@@ -14,9 +14,9 @@ PROGRAM main
     CALL saxpy(n, a, x, y)
 
     ! Print the results
-    DO i = 1, n
-        PRINT *, "y(", i, ") = ", y(i)
-    END DO
+    !DO i = 1, n
+    !    PRINT *, "y(", i, ") = ", y(i)
+    !END DO
 
 END PROGRAM main
 
