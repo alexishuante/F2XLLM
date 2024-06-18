@@ -6,7 +6,7 @@ PROGRAM main
     REAL :: a
     INTEGER :: i
 
-    ! Initialize the scalar and vectors
+    ! Initialize the scalar and vectorss
     a = 2.0
     x = 3.0
     y = 0.0
