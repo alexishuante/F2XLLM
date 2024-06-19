@@ -1,14 +1,13 @@
 '''
 Step 1: prompts.txt must contain multiple prompts each one separated by a white space.
-Step 2: The code then proceeds to prompt Llama-3 for one prompt included in prompts.txt 10 times.
-Step 3: After Llama-3 responds 10 times, we store the responses on a txt file. 
+Step 2: The code then proceeds to prompt ChatGPT for one prompt included in prompts.txt 10 times.
+Step 3: After ChatGPT responds 10 times, we store the responses on a txt file.
 Step 4: Steps 2 and 3 are repeated for every prompt.
 '''
 
 from openai import OpenAI
 
-client = OpenAI(api_key = 'API KEY')  #REPLACE API KEY
-
+client = OpenAI(api_key = ' REPLACE API KEY')  #REPLACE API KEY
 
 messages = []
 message = ''
@@ -30,7 +29,7 @@ num_iter = 10
 
 for i, each_message in enumerate(messages):
     # Open a file to store the responses
-    with open('responsesPrompt' + str(i+1) + '.txt', 'w') as f:
+    with open('Prompt' + str(i+1) + '_responses_gpt3.5turbo.txt', 'w') as f:
     #Loop through and generate responses
         for j in range(num_iter):
             response = client.chat.completions.create(
@@ -41,7 +40,8 @@ for i, each_message in enumerate(messages):
             f.write(f'Output {j+1}:\n{response_content}\n\n')  # Write the response to the file
             print(f'Iteration {j+1}: {response_content}')
 
+        print('\n')
+        print('All responses saved to Prompt' + str(i+1) + '_responses_gpt3.5turbo.txt')
+        print('\n')
 
-        print('All responses saved to responsesPrompt' + str(i+1) + '.txt')
-
-print('Work Done')
+print('-------------------WORK DONE---------------------')
