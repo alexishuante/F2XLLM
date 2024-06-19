@@ -26,18 +26,19 @@ with open('prompts.txt', 'r') as f:
 
 num_iter = 10
     
-
+ai = MetaAI() # No need to Reset conversation context (in this code, llama-3 does not remember previous conversations)
 for i, each_message in enumerate(messages):
     # Open a file to store the responses
-    with open('responsesPrompt' + str(i+1) + '.txt', 'w') as f:
+    with open('Prompt' + str(i+1) + '_responses_llama3.txt', 'w') as f:
     #Loop through and generate responses
         for j in range(num_iter):
-            ai = MetaAI() # Reset conversation context
             response = ai.prompt(message=each_message) # Prompt and get a response
             response_message = response['message'] #get message only instead of message, sources, and media
             f.write(f'Output {j+1}:\n{response_message}\n\n')  # Write the response to the file
             print(f'Iteration {j+1}: {response_message}')
 
-        print('All responses saved to responsesPrompt' + str(i+1) + '.txt')
+        print('\n')
+        print('All responses saved to Prompt' + str(i+1) + '_responses_llama3.txt')
+        print('\n')
 
-print('Work Done')
+print('-------------------WORK DONE---------------------')
