@@ -1,0 +1,192 @@
+Give me a version of C/C++ OpenMP of the next Fortran OpenMP code that implements a axpy operation
+subroutine saxpy_parallel(n, a, x, y)
+    implicit none
+    integer, intent(in) :: n
+    real, intent(in) :: a
+    real, intent(in) :: x(n)
+    real, intent(inout) :: y(n)
+    integer :: i
+    !$OMP PARALLEL DO
+    do i = 1, n
+        y(i) = a * x(i) + y(i)
+    end do
+    !$OMP END PARALLEL DO
+end subroutine saxpy_parallel
+
+Give me a version of C/C++ OpenMP of the next Fortran OpenACC code that implements an axpy operation
+subroutine saxpy(n, a, x, y)
+    implicit none
+    integer, intent(in) :: n
+    real, intent(in) :: a
+    real, intent(in) :: x(n)
+    real, intent(inout) :: y(n)
+    integer :: i
+    !$acc kernels
+    do i = 1, n
+        y(i) = a * x(i) + y(i)
+    end do
+    !$acc end kernels
+end subroutine saxpy
+
+Give me a version of C/C++ OpenMP of the next Fortran OpenMP code that implements a GEMV operation
+subroutine gemv_parallel(n, A, x, y)
+    implicit none
+    integer, intent(in) :: n
+    real, intent(in) :: A(n, n)
+    real, intent(in) :: x(n)
+    real, intent(out) :: y(n)
+    integer :: i, j
+    real :: sum
+    !$OMP PARALLEL DO PRIVATE(j, sum)
+do i = 1, n
+    sum = 0.0
+    do j = 1, n
+        sum = sum + A(i, j) * x(j)
+    end do
+    y(i) = sum
+end do
+!$OMP END PARALLEL DO
+end subroutine gemv_parallel
+
+Give me a version of C/C++ OpenMP of the next Fortran OpenACC code that implements a GEMV operation
+subroutine gemv_parallel(n, A, x, y)
+    implicit none
+    integer, intent(in) :: n
+    real, intent(in) :: A(n, n)
+    real, intent(in) :: x(n)
+    real, intent(out) :: y(n)
+    integer :: i, j
+    real :: sum
+    !$ACC PARALLEL LOOP
+    do i = 1, n
+        sum = 0.0
+        do j = 1, n
+            sum = sum + A(i, j) * x(j)
+        end do
+        y(i) = sum
+    end do
+    !$ACC END PARALLEL LOOP
+end subroutine gemv_parallel
+
+Give me a version of C/C++ OpenMP of the next Fortran OpenMP code that implements a GEMM operation
+subroutine gemm_parallel(m, n, k, alpha, a, lda, b, ldb, beta, c, ldc)
+    implicit none
+    integer, intent(in) :: m, n, k, lda, ldb, ldc
+    real(kind=8), intent(in) :: alpha, beta
+    real(kind=8), intent(in) :: a(lda, k), b(ldb, n)
+    real(kind=8), intent(inout) :: c(ldc, n)
+    integer :: i, j, l
+    real(kind=8) :: temp
+    !$OMP PARALLEL DO PRIVATE(i, j, l, temp) SCHEDULE(STATIC)
+    do j = 1, n
+      do i = 1, m
+        temp = 0.0
+        do l = 1, k
+          temp = temp + a(i, l) * b(l, j)
+        end do
+        c(i, j) = alpha * temp + beta * c(i, j)
+      end do
+    end do
+    !$OMP END PARALLEL DO
+  end subroutine gemm_parallel
+
+Give me a version of C/C++ OpenMP of the next Fortran OpenACC code that implements a GEMM operation
+subroutine gemm_parallel(m, n, k, alpha, a, lda, b, ldb, beta, c, ldc)
+    implicit none
+    integer, intent(in) :: m, n, k, lda, ldb, ldc
+    real(kind=8), intent(in) :: alpha, beta
+    real(kind=8), intent(in) :: a(lda, k), b(ldb, n)
+    real(kind=8), intent(inout) :: c(ldc, n)
+    integer :: i, j, l
+    real(kind=8) :: temp
+    !$ACC PARALLEL LOOP COLLAPSE(2) PRIVATE(i, j, l, temp)
+    do j = 1, n
+      do i = 1, m
+        temp = 0.0
+        do l = 1, k
+          temp = temp + a(i, l) * b(l, j)
+        end do
+        c(i, j) = alpha * temp + beta * c(i, j)
+      end do
+    end do
+    !$ACC END PARALLEL LOOP
+  end subroutine gemm_parallel
+
+Give me a version of C/C++ OpenMP of the next Fortran OpenMP code that implements a Jacobi operation
+subroutine jacobi_parallel(u, unew, n, niter, nthreads)
+  implicit none
+  integer, intent(in) :: n, niter, nthreads
+  real(kind=8), dimension(n, n, n), intent(inout) :: u, unew
+  integer :: i, j, k, iter
+  !$OMP PARALLEL NUM_THREADS(nthreads) PRIVATE(i, j, k, iter)
+  do iter = 1, niter
+    !$OMP DO SCHEDULE(STATIC)
+    do k = 2, n - 1
+      do j = 2, n - 1
+        do i = 2, n - 1
+          unew(i, j, k) = 0.125 * (u(i-1, j, k) + u(i+1, j, k) + u(i,j-1, k) &
+            + u(i, j+1, k) + u(i, j, k-1) + u(i, j, k+1) + u(i, j, k))
+        end do
+      end do
+    end do
+    !$OMP END DO
+    !$OMP BARRIER
+    u(:, :, :) = unew(:, :, :)
+  end do
+  !$OMP END PARALLEL
+end subroutine jacobi_parallel
+
+Give me a version of C/C++ OpenMP of the next Fortran OpenACC code that implements a Jacobi operation
+subroutine jacobi_parallel(u, unew, n, niter)
+    implicit none
+    integer, intent(in) :: n, niter
+    real(kind=8), dimension(n, n, n), intent(inout) :: u, unew
+    integer :: i, j, k, iter
+    do iter = 1, niter
+      !$ACC PARALLEL LOOP COLLAPSE(3) PRIVATE(i, j, k)
+      do k = 2, n - 1
+        do j = 2, n - 1
+          do i = 2, n - 1
+            unew(i, j, k) = 0.125 * (u(i-1, j, k) + u(i+1, j, k) + u(i, j-1, k) &
+              + u(i, j+1, k) + u(i, j, k-1) + u(i, j, k+1) + u(i, j, k))
+          end do
+        end do
+      end do
+      !$ACC END PARALLEL LOOP
+      u(:, :, :) = unew(:, :, :)
+    end do
+  end subroutine jacobi_parallel
+
+Give me a version of C/C++ OpenMP of the next Fortran OpenMP code that implements a SpMV operation 
+subroutine spmv_parallel(n, nnz, val, row, col, x, y)
+    integer, intent(in) :: n, nnz
+    real, intent(in) :: val(nnz), x(n)
+    integer, intent(in) :: row(n+1), col(nnz)
+    real, intent(out) :: y(n)
+    integer i, j
+    !$OMP PARALLEL DO DEFAULT(NONE) SHARED(n, nnz, val, row, col, x, y) PRIVATE(i, j)
+    do i = 1, n
+      y(i) = 0.0
+      do j = row(i), row(i+1)-1
+        y(i) = y(i) + val(j) * x(col(j))
+      enddo
+    enddo
+    !$OMP END PARALLEL DO
+  end subroutine spmv_parallel
+
+Give me a version of C/C++ OpenMP of the next Fortran OpenACC code that implements a SpMV operation 
+subroutine spmv_parallel(n, nnz, val, row, col, x, y)
+    integer, intent(in) :: n, nnz
+    real, intent(in) :: val(nnz), x(n)
+    integer, intent(in) :: row(n+1), col(nnz)
+    real, intent(out) :: y(n)
+    integer i, j
+    !$ACC PARALLEL LOOP DEFAULT(PRESENT) COPYIN(val, row, col, x) COPYOUT(y)
+    do i = 1, n
+      y(i) = 0.0
+      do j = row(i), row(i+1)-1
+        y(i) = y(i) + val(j) * x(col(j))
+      enddo
+    enddo
+    !$ACC END PARALLEL LOOP
+  end subroutine spmv_parallel
