@@ -13,14 +13,10 @@ PROGRAM main
     use       params 
     implicit  none 
     integer   natom, ngauss
-    integer   i
-    real(8),  allocatable ::  xpnt( : )
-    real(8),  allocatable ::  coef( : )
-    real(8),  allocatable ::  geom( : , : )
-    real(8)   j, erep
-    real(8)   :: temp_xpnt(3)
-    real(8)   :: temp_coef(3) 
-    real(8)   :: temp_geom(24) 
+    real(8)   erep
+    real(8)   :: txpnt(3)
+    real(8)   :: tcoef(3) 
+    real(8)   :: tgeom(24) 
     
     ! initialize input variables
     ngauss = 3
@@ -28,9 +24,9 @@ PROGRAM main
     erep = 0
 
     ! Input data
-    data temp_xpnt / 6.3624214, 1.1589230, 0.3136498 /
-    data temp_coef / 0.154328967295, 0.535328142282, 0.444634542185 /
-    data temp_geom / 0.0000, 0.0000, 0.0000, &
+    data txpnt / 6.3624214, 1.1589230, 0.3136498 /
+    data tcoef / 0.154328967295, 0.535328142282, 0.444634542185 /
+    data tgeom / 0.0000, 0.0000, 0.0000, &
                      0.0000, 0.0000, 1.4000, &
                      0.0000, 1.4000, 0.0000, &
                      0.0000, 1.4000, 1.4000, &
@@ -39,44 +35,41 @@ PROGRAM main
                      1.4000, 1.4000, 0.0000, &       
                      1.4000, 1.4000, 1.4000 /
 
+    ! Compute Hartree-Fock kernel
+    call basic_hf_proxy(ngauss, natom, txpnt, tcoef, tgeom, erep)
+
+    ! Print results
+    print *, '2e- energy= ', erep*0.5d0   
+END PROGRAM main
+
+subroutine basic_hf_proxy(ngauss, natom, txpnt, tcoef, tgeom, erep)
+    use        params 
+    implicit   none 
+    integer    ngauss, natom
+    integer    i,j,ij, ib,jb,kb,lb, nn,kl,k,l, nnnn,ijkl,n   
+    real(8)    txpnt(3), tcoef(3), tgeom(24)
+    real(8)    aij,dij,xij,yij,zij, akl,dkl, aijkl,tt,f0t, eri,erep 
+
+    real(8),   allocatable ::  xpnt( : )
+    real(8),   allocatable ::  coef( : )
+    real(8),   allocatable ::  geom( : , : )
+    real(8),   allocatable ::  fock( : , : )
+    real(8),   allocatable ::  dens( : , : )
+    real(8),   allocatable ::  schwarz( : ) 
+    
     ! Initialize the gaussian exponents, contraction coefficients, cartesian coordinates of each atom
     allocate( xpnt(ngauss) )
     allocate( coef( ngauss ) )  
     allocate( geom( 3, natom ) )
 
-    xpnt = temp_xpnt
-    coef = temp_coef
+    xpnt = txpnt
+    coef = tcoef
     do i = 1, natom*3
-    j = ceiling(real(i) / 3.0)
-    geom(1, i) = temp_geom(i)
-    geom(2, i) = j
+    j = mod(i - 1, 3) + 1
+    k = ceiling(real(i) / 3.0)
+    geom(j, k) = tgeom(i)
     end do
 
-    ! Compute Hartree-Fock kernel
-    call basic_hf_proxy(ngauss, natom, xpnt, coef, geom, erep)
-
-    ! Print results
-    print *, '2e- energy= ', erep*0.5d0  
-
-    ! Clean up
-    deallocate( xpnt )  
-    deallocate( coef )  
-    deallocate( geom )  
-END PROGRAM main
-
-subroutine basic_hf_proxy(ngauss, natom, xpnt, coef, geom, erep)
-    use        params 
-    implicit   none 
-    integer    ngauss, natom
-    real(8)    xpnt(*), coef(*), geom(3,*), erep
-    integer    i,j,ij, ib,jb,kb,lb, nn,kl,k,l  
-    real(8)    aij,dij,xij,yij,zij, akl,dkl, aijkl,tt,f0t, eri 
-    integer    nnnn,ijkl,n   
-
-    real(8),   allocatable ::  fock( : , : )
-    real(8),   allocatable ::  dens( : , : )
-    real(8),   allocatable ::  schwarz( : ) 
-    
     ! Build density matrix from fake density 
     allocate( dens( natom, natom ) )  
     do  i  =  1,  natom  
@@ -217,6 +210,9 @@ subroutine basic_hf_proxy(ngauss, natom, xpnt, coef, geom, erep)
     deallocate( dens )  
     deallocate( fock ) 
     deallocate( schwarz ) 
+    deallocate( xpnt )  
+    deallocate( coef )  
+    deallocate( geom ) 
 end subroutine basic_hf_proxy
 
 subroutine ssss( i, j, k, l, ngauss, xpnt, coef, geom, eri )
