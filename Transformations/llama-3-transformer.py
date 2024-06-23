@@ -1,7 +1,7 @@
 '''
 Step 1: prompts.txt must contain multiple prompts each one separated by a white space.
 Step 2: The code then proceeds to prompt Llama-3 for one prompt included in prompts.txt 10 times.
-Step 3: Efter Llama-3 responds 10 times, we store the responses on a txt file, and the code block from each response in another txt file.
+Step 3: After Llama-3 responds 10 times, we store the responses on a txt file, and the code block from each response in another txt file.
 Step 4: Steps 2 and 3 are repeated for every prompt.
 '''
 
