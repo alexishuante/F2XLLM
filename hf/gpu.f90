@@ -115,7 +115,8 @@ subroutine basic_hf_proxy(ngauss, natom, txpnt, tcoef, tgeom, erep)
     ! Integrals are screened to avoid small terms.
     nnnn = ((nn**2)+nn)/2  
 
-    !$OMP PARALLEL DO PRIVATE(ib,jb,kb,lb,ijkl,ij,i,j,kl,k,l,n,aij,dij,xij,yij,zij,akl,dkl,aijkl,tt,f0t,eri)
+    !$OMP TARGET MAP(TO:nnnn,ngauss,geom,xpnt,coef,dens,schwarz) MAP(TOFROM:fock)
+    !$OMP TEAMS DISTRIBUTE 
 
     do  ijkl  =  1,  nnnn 
     ! decompose triangular ijkl index into ij>=kl
@@ -197,8 +198,9 @@ subroutine basic_hf_proxy(ngauss, natom, txpnt, tcoef, tgeom, erep)
 
     end if  
     end do  
-    !$OMP END PARALLEL DO
-
+    !$OMP END TEAMS DISTRIBUTE
+    !$OMP END TARGET 
+    
     !  Trace Fock with the density and print the 2e- energy.
     erep  =  0.0d0
     do  i  =  1,  natom  

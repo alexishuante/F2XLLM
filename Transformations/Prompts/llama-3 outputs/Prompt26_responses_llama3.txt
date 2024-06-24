@@ -1,0 +1,263 @@
+Output 1:
+Here is the equivalent C++ code using HIP (for AMD GPUs) and OpenACC (for NVIDIA GPUs) to implement the GEMM operation:
+#include <hip/hip_runtime.h>
+#include <openacc.h>
+
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int i, j, l;
+  double temp;
+
+  #pragma acc parallel loop collapse(2) private(i, j, l, temp)
+  for (j = 0; j < n; j++) {
+    for (i = 0; i < m; i++) {
+      temp = 0.0;
+      for (l = 0; l < k; l++) {
+        temp += a[i + l * lda] * b[l + j * ldb];
+      }
+      c[i + j * ldc] = alpha * temp + beta * c[i + j * ldc];
+    }
+  }
+}
+Note that HIP and OpenACC are both parallel programming models that allow you to run code on GPUs. HIP is specific to AMD GPUs, while OpenACC is supported by NVIDIA, AMD, and other vendors. The code above uses the same OpenACC directive as your Fortran code, but the syntax is slightly different due to C++ syntax rules.
+Also, the array indexing is changed to reflect the C++ convention of row-major ordering, whereas Fortran uses column-major ordering by default.
+You can compile this code with a HIP-enabled compiler (such as hipcc) or an OpenACC-enabled compiler (such as pgcc) and run it on a GPU.
+
+
+Output 2:
+Here is a version of the code in C++ with HIP:
+#include <hip/hip_runtime.h>
+
+void gemm_parallel(int m, int n, int k, float alpha, float *a, int lda, float *b, int ldb, float beta, float *c, int ldc) {
+  hipLaunchKernel(gemm_kernel, dim3(1), dim3(256), 0, 0, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+}
+
+__global__ void gemm_kernel(int m, int n, int k, float alpha, float *a, int lda, float *b, int ldb, float beta, float *c, int ldc) {
+  int tx = threadIdx.x;
+  int ty = threadIdx.y;
+  int bx = blockIdx.x;
+  int by = blockIdx.y;
+  int i = ty + by * blockDim.y;
+  int j = tx + bx * blockDim.x;
+  float temp = 0.0;
+
+  __shared__ float sa[256][32];
+  __shared__ float sb[32][256];
+
+  for (int l = 0; l < k; l += 32) {
+    sa[tx][ty] = a[i * lda + l + tx];
+    sb[tx][ty] = b[l * ldb + j + ty];
+    __syncthreads();
+    for (int n = 0; n < 32; n++) {
+      temp += sa[tx][n] * sb[n][ty];
+    }
+    __syncthreads();
+  }
+
+  c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+}
+Note that this code uses the HIP runtime API to launch a kernel on the GPU, and the kernel is written in CUDA C++. The kernel uses shared memory to tile the matrices and reduce global memory access.
+Also, the HIP runtime API is used to launch the kernel, which is similar to OpenACC's !$ACC PARALLEL LOOP directive.
+You can compile this code with a HIP-capable compiler, such as hipcc, and run it on a GPU that supports HIP.
+
+
+Output 3:
+Here is the equivalent C/C++ code with HIP (for AMD GPUs) that implements the GEMM operation:
+#include <hip/hip_runtime.h>
+
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  hipLaunchKernel(gemm_kernel, dim3(1), dim3(m, n), 0, 0, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+}
+
+__global__ void gemm_kernel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+  if (i < m && j < n) {
+    double temp = 0.0;
+    for (int l = 0; l < k; l++) {
+      temp += a[i * lda + l] * b[l * ldb + j];
+    }
+    c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+  }
+}
+Note that this code uses the HIP runtime API to launch a kernel on the GPU, and the kernel is written in CUDA C++ syntax. The gemm_parallel function is the host-side wrapper that launches the kernel, and the gemm_kernel function is the device-side kernel that performs the GEMM operation.
+Also, note that this code uses double precision floating point numbers, as in the original Fortran code. If you want to use single precision, you can replace double with float in the code.
+You can compile this code with the HIP compiler (hipcc) and run it on an AMD GPU that supports HIP.
+
+
+Output 4:
+Here is a version of the code in C++ with HIP:
+#include <hip/hip_runtime.h>
+
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  hipLaunchKernel(gemm_kernel, dim3(1), dim3(1), 0, 0, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+}
+
+__global__ void gemm_kernel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+  if (i < m && j < n) {
+    double temp = 0.0;
+    for (int l = 0; l < k; l++) {
+      temp += a[i * lda + l] * b[l * ldb + j];
+    }
+    c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+  }
+}
+Note that this code uses the HIP runtime API to launch a kernel on the GPU, and the __global__ keyword to define the kernel function that runs on the GPU. The kernel function is launched with a 2D block and grid layout to cover the entire matrix, and each thread computes a single element of the output matrix.
+Also, the lda, ldb, and ldc parameters are used to specify the leading dimensions of the matrices a, b, and c, respectively, as in the Fortran code.
+You can compile this code with a HIP-capable compiler, such as the AMD ROCm compiler, and run it on a GPU that supports HIP.
+
+
+Output 5:
+Here is the equivalent C/C++ code with HIP:
+#include <hip/hip_runtime.h>
+
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  hipLaunchKernel(gemm_kernel, dim3(1), dim3(m, n), 0, 0, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+}
+
+__global__ void gemm_kernel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+  if (i < m && j < n) {
+    double temp = 0.0;
+    for (int l = 0; l < k; l++) {
+      temp += a[i * lda + l] * b[l * ldb + j];
+    }
+    c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+  }
+}
+Note: HIP is a C++ runtime API, so I've written the code in C++.
+Also, the HIP kernel launch is asynchronous, so you'll need to add error checking and synchronization code as needed.
+You can compile this code with a command like:
+hipcc -arch <GPU_arch> gemm.cpp -o gemm
+Replace <GPU_arch> with the architecture of your GPU (e.g. "sm_60" for a Volta GPU).
+
+
+Output 6:
+Here is a version of the code in C++ with HIP:
+#include <hip/hip_runtime.h>
+
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  hipLaunchKernel(GEMMKernel, dim3(1), dim3(1), 0, 0, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+}
+
+__global__ void GEMMKernel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+  if (i < m && j < n) {
+    double temp = 0.0;
+    for (int l = 0; l < k; l++) {
+      temp += a[i * lda + l] * b[l * ldb + j];
+    }
+    c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+  }
+}
+Note that this code uses the HIP runtime API to launch a kernel on the GPU. The kernel is written in CUDA C++ and uses blocks and threads to parallelize the computation. The GEMMKernel function is launched with a single block and a single thread, but you can modify the block and thread dimensions to achieve better parallelism.
+Also, note that this code assumes that the matrices a, b, and c are stored in column-major order, which is the default for Fortran. If your matrices are stored in row-major order, you'll need to modify the indexing accordingly.
+You can compile this code with a HIP-capable compiler, such as hipcc, and run it on a GPU that supports HIP.
+
+
+Output 7:
+Here is a version of the code in C/C++ with HIP (for AMD GPUs) that implements the GEMM operation:
+#include <hip/hip_runtime.h>
+
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int i, j, l;
+  double temp;
+  hipLaunchKernel((gemm_kernel), dim3(m, n), dim3(1, 1), 0, 0, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+}
+
+__global__ void gemm_kernel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+  if (i < m && j < n) {
+    double temp = 0.0;
+    for (int l = 0; l < k; l++) {
+      temp += a[i * lda + l] * b[l * ldb + j];
+    }
+    c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+  }
+}
+Note that this code uses the HIP runtime API to launch a kernel on the GPU. The kernel is executed in parallel by multiple threads, each computing a single element of the output matrix c. The blockIdx and threadIdx variables are used to compute the global thread ID, which is used to access the input matrices a and b and the output matrix c.
+Also, note that this is a basic implementation and you may need to optimize it for your specific use case. For example, you may want to use shared memory to reduce global memory access, or use a more efficient matrix layout.
+You can compile this code using the HIP compiler (hipcc) and run it on an AMD GPU.
+
+
+Output 8:
+Here's the equivalent C/C++ code with HIP:
+#include <hip/hip_runtime.h>
+
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  hipLaunchKernelGGL((gemm_kernel), dim3(1), dim3(m, n), 0, 0, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+}
+
+__global__ void gemm_kernel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+  if (i < m && j < n) {
+    double temp = 0.0;
+    for (int l = 0; l < k; l++) {
+      temp += a[i * lda + l] * b[l * ldb + j];
+    }
+    c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+  }
+}
+Note that HIP uses a different parallelization model than OpenACC, so the code is structured differently. The gemm_parallel function launches a HIP kernel, which is executed on the GPU. The gemm_kernel function is executed by each thread on the GPU and performs the actual GEMM operation.
+Also, note that HIP uses double as the default floating-point type, so I've removed the real(kind=8) qualifiers. If you need to use a different floating-point type, you can modify the code accordingly.
+
+
+Output 9:
+Here's the equivalent C++ code using HIP:
+#include <hip/hip_runtime.h>
+
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  hipLaunchKernel(gemm_kernel, dim3(1), dim3(1), 0, 0, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+}
+
+__global__ void gemm_kernel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+  if (i < m && j < n) {
+    double temp = 0.0;
+    for (int l = 0; l < k; l++) {
+      temp += a[i * lda + l] * b[l * ldb + j];
+    }
+    c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+  }
+}
+Note that HIP uses a different parallelization model than OpenACC, so the code is organized differently. Instead of using a PARALLEL LOOP directive, HIP uses a __global__ kernel function that is launched with a grid of blocks, each containing a number of threads. The blockIdx and threadIdx variables are used to compute the global index of the thread, which is used to access the matrices.
+Also, note that HIP uses a different memory model than Fortran, so the matrices are passed as pointers to device memory, and the lda, ldb, and ldc parameters are used to specify the leading dimensions of the matrices.
+You can compile this code using the HIP compiler (hipcc) and run it on a HIP-enabled device (such as an AMD GPU).
+
+
+Output 10:
+Here's the equivalent C/C++ code with HIP (for AMD GPUs) that implements the GEMM operation:
+#include <hip/hip_runtime.h>
+
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int i, j, l;
+  double temp;
+
+  hipLaunchKernelGGL((gemm_kernel), dim3(1), dim3(m, n), 0, 0, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+
+  hipDeviceSynchronize();
+}
+
+__global__ void gemm_kernel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+
+  if (i < m && j < n) {
+    double temp = 0.0;
+    for (int l = 0; l < k; l++) {
+      temp += a[i * lda + l] * b[l * ldb + j];
+    }
+    c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+  }
+}
+Note that this code uses the HIP runtime API to launch the kernel on the AMD GPU. The kernel function gemm_kernel is executed in parallel by multiple threads, each computing a single element of the output matrix c.
+Also, the hipLaunchKernelGGL function is used to launch the kernel, which takes the kernel function, grid dimensions, block dimensions, and kernel arguments as inputs.
+You'll need to compile this code with the HIP compiler (hipcc) and link it with the HIP runtime library (-lhip) to run it on an AMD GPU.
+
+
