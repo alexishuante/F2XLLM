@@ -63,7 +63,7 @@ with open('prompts.txt', 'r') as f:
             message += line
     if message:
         messages.append(message.strip())  # Add last message
-num_iter = 3
+num_iter = 10
 
 ai = MetaAI()  # No need to Reset conversation context (in this code, llama-3 does not remember previous conversations)
 for i, each_message in enumerate(messages):
