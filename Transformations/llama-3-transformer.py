@@ -1,3 +1,4 @@
+
 '''
 Step 1: prompts.txt must contain multiple prompts each one separated by a white space.
 Step 2: The code then proceeds to prompt Llama-3 for one prompt included in prompts.txt 10 times.
@@ -8,13 +9,47 @@ Step 4: Steps 2 and 3 are repeated for every prompt.
 import re
 from meta_ai_api import MetaAI
 
-# Explanation of this code pattern:
-#\b\w+: Matches a word boundary followed by one or more word characters, representing the return type (like int, float, void, etc.).
-# \s+: Matches one or more whitespace characters.
-# \w+: Matches the function name, which is one or more word characters.
-# \s*\([^)]*\): Matches zero or more whitespaces followed by parentheses that might include function parameters ([^)]* matches any character except a closing parenthesis, repeated any number of times).
-# \s*{[^}]*}: Matches zero or more whitespaces followed by a curly brace containing the function body ([^}]* matches any character except a closing brace, repeated any number of times).
-code_block_pattern = r"\b\w+\s+\w+\s*\([^)]*\)\s*{[^}]*}"
+# Improved function to extract __global__ functions, considering nested braces
+def extract_global_functions(code):
+    pattern = re.compile(r'__global__\s+\w+\s+\w+\s*\([^)]*\)\s*{')
+    matches = pattern.finditer(code)
+    functions = []
+
+    for match in matches:
+        start = match.start()
+        brace_count = 0
+        for i in range(start, len(code)):
+            if code[i] == '{':
+                brace_count += 1
+            elif code[i] == '}':
+                brace_count -= 1
+                if brace_count == 0:
+                    functions.append(code[start:i+1])
+                    break
+
+    return functions
+
+# Improved function to extract regular functions, considering nested braces
+def extract_regular_functions(code):
+    pattern = re.compile(r'\b\w+\s+\w+\s*\([^)]*\)\s*{')
+    matches = pattern.finditer(code)
+    functions = []
+
+    for match in matches:
+        start = match.start()
+        brace_count = 0
+        for i in range(start, len(code)):
+            if code[i] == '{':
+                brace_count += 1
+            elif code[i] == '}':
+                brace_count -= 1
+                if brace_count == 0:
+                    functions.append(code[start:i+1])
+                    break
+
+    return functions
+
+
 
 messages = []
 message = ''
@@ -28,8 +63,7 @@ with open('prompts.txt', 'r') as f:
             message += line
     if message:
         messages.append(message.strip())  # Add last message
-
-num_iter = 10
+num_iter = 3
 
 ai = MetaAI()  # No need to Reset conversation context (in this code, llama-3 does not remember previous conversations)
 for i, each_message in enumerate(messages):
@@ -43,11 +77,14 @@ for i, each_message in enumerate(messages):
             response_message = response['message']  # Get message only instead of message, sources, and media
             response_file.write(f'Output {j+1}:\n{response_message}\n\n')  # Write the response to the file
 
-            # Extract and save the first code block
-            matches = re.findall(code_block_pattern, response_message) #Find the code pattern in the response_message
-            if matches:
-                code_only = matches[0].strip()  # Extract and clean the first code #Sometimes the LLM may give multiple codes, just extract the first one.
-                code_file.write(f'Code Block {j+1}:\n{code_only}\n\n') # Write the code in the txt file
+            # Extract and save the first function and the global function
+            regular_matches = extract_regular_functions(response_message)
+            global_matches = extract_global_functions(response_message)
+            code_file.write(f"Code Block {j+1}:\n")
+            if regular_matches:
+                code_file.write(f"{regular_matches[0].strip()}\n\n")  # Write the first regular function
+            if global_matches:
+                code_file.write(f"{global_matches[0].strip()}\n\n")  # Write the first __global__ function
             print(f'Iteration {j+1}: {response_message}')
 
         print('\n')
