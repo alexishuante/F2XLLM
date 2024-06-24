@@ -1,0 +1,285 @@
+Output 1:
+Here is the equivalent C/C++ OpenACC code for the given Fortran OpenACC code:
+#include <accel.h>
+
+void jacobi_parallel(double ***u, double ***unew, int n, int niter) {
+  int i, j, k, iter;
+
+  #pragma acc parallel loop collapse(3) private(i, j, k)
+  for (iter = 1; iter <= niter; iter++) {
+    for (k = 2; k < n - 1; k++) {
+      for (j = 2; j < n - 1; j++) {
+        for (i = 2; i < n - 1; i++) {
+          unew[k][j][i] = 0.125 * (u[k][j][i-1] + u[k][j][i+1] + u[k][j-1][i] +
+                                     u[k][j+1][i] + u[k-1][j][i] + u[k+1][j][i] + u[k][j][i]);
+        }
+      }
+    }
+  }
+  #pragma acc end parallel loop
+
+  #pragma acc parallel loop collapse(3) private(i, j, k)
+  for (k = 0; k < n; k++) {
+    for (j = 0; j < n; j++) {
+      for (i = 0; i < n; i++) {
+        u[k][j][i] = unew[k][j][i];
+      }
+    }
+  }
+}
+Note that in C/C++, we need to use pointers for multidimensional arrays, and we also need to include the accel.h header file to use OpenACC directives. Additionally, the loop indices are declared inside the loop, and the private clause is used to specify that each thread should have its own copy of the indices.
+
+
+Output 2:
+Here is the equivalent C/C++ OpenACC code for the given Fortran OpenACC code:
+void jacobi_parallel(double ***u, double ***unew, int n, int niter) {
+  int i, j, k, iter;
+  #pragma acc parallel loop collapse(3) private(i, j, k)
+  for (iter = 1; iter <= niter; iter++) {
+    for (k = 2; k < n - 1; k++) {
+      for (j = 2; j < n - 1; j++) {
+        for (i = 2; i < n - 1; i++) {
+          unew[k][j][i] = 0.125 * (u[k][j][i-1] + u[k][j][i+1] + u[k][j-1][i] +
+                                     u[k][j+1][i] + u[k-1][j][i] + u[k+1][j][i] + u[k][j][i]);
+        }
+      }
+    }
+  }
+  #pragma acc end parallel loop
+  // Copy data from unew back to u
+  #pragma acc parallel loop collapse(3) private(i, j, k)
+  for (k = 0; k < n; k++) {
+    for (j = 0; j < n; j++) {
+      for (i = 0; i < n; i++) {
+        u[k][j][i] = unew[k][j][i];
+      }
+    }
+  }
+}
+Note that in C/C++, multidimensional arrays are typically represented as pointers to pointers, so the array u is declared as double ***u. Also, the collapse(3) clause is used to collapse the three nested loops into a single loop, and the private(i, j, k) clause is used to specify that the loop indices i, j, and k are private to each thread.
+Also, the data copy from unew to u is done using another parallel loop, to avoid race conditions.
+
+
+Output 3:
+Here is the equivalent C/C++ OpenACC code for the given Fortran OpenACC code:
+#include <accel.h>
+
+void jacobi_parallel(double ***u, double ***unew, int n, int niter) {
+  int i, j, k, iter;
+  #pragma acc data copy(u[:n][:n][:n]), copy(unew[:n][:n][:n])
+  for (iter = 1; iter <= niter; iter++) {
+    #pragma acc parallel loop collapse(3) private(i, j, k)
+    for (k = 2; k < n - 1; k++) {
+      for (j = 2; j < n - 1; j++) {
+        for (i = 2; i < n - 1; i++) {
+          unew[k][j][i] = 0.125 * (u[k][j][i-1] + u[k][j][i+1] + u[k][j-1][i] +
+                                     u[k][j+1][i] + u[k-1][j][i] + u[k+1][j][i] + u[k][j][i]);
+        }
+      }
+    }
+    #pragma acc end parallel loop
+    #pragma acc update host(u[:n][:n][:n])
+    #pragma acc copyout(unew[:n][:n][:n], u[:n][:n][:n])
+  }
+}
+Note that in C/C++, we need to use pointers for the 3D arrays, and we use accel.h for the OpenACC directives. Also, the array indexing is different in C/C++ compared to Fortran, so we need to adjust the indices accordingly. Additionally, we use #pragma acc update host to update the host array u with the new values computed on the device, and #pragma acc copyout to copy the updated values from unew back to u.
+
+
+Output 4:
+Here is the equivalent C/C++ OpenACC code for the given Fortran OpenACC code that implements a Jacobi operation:
+void jacobi_parallel(double ***u, double ***unew, int n, int niter) {
+  int i, j, k, iter;
+  for (iter = 1; iter <= niter; iter++) {
+    #pragma acc parallel loop collapse(3) private(i, j, k)
+    for (k = 2; k < n - 1; k++) {
+      for (j = 2; j < n - 1; j++) {
+        for (i = 2; i < n - 1; i++) {
+          unew[k][j][i] = 0.125 * (u[k][j][i-1] + u[k][j][i+1] + u[k][j-1][i] +
+                                 u[k][j+1][i] + u[k-1][j][i] + u[k+1][j][i] + u[k][j][i]);
+        }
+      }
+    }
+    #pragma acc end parallel loop
+    for (k = 0; k < n; k++) {
+      for (j = 0; j < n; j++) {
+        for (i = 0; i < n; i++) {
+          u[k][j][i] = unew[k][j][i];
+        }
+      }
+    }
+  }
+}
+Note that in C/C++, 3D arrays are represented as pointers to pointers to pointers (***), and array indices are accessed in reverse order compared to Fortran. Also, the intent and kind attributes from the Fortran code are not directly applicable in C/C++.
+
+
+Output 5:
+Here is a version of the code in C/C++ using OpenACC:
+#pragma acc routine seq
+void jacobi_parallel(float *u, float *unew, int n, int niter) {
+  for (int iter = 0; iter < niter; ++iter) {
+    #pragma acc parallel loop collapse(3) present(u, unew)
+    for (int k = 1; k < n - 1; ++k) {
+      for (int j = 1; j < n - 1; ++j) {
+        for (int i = 1; i < n - 1; ++i) {
+          int idx = i + j * n + k * n * n;
+          unew[idx] = 0.125f * (u[idx - 1] + u[idx + 1] + u[idx - n] + u[idx + n] +
+                                 u[idx - n * n] + u[idx + n * n] + u[idx]);
+        }
+      }
+    }
+    #pragma acc host_data use_device(u, unew)
+    {
+      #pragma acc parallel loop collapse(3) present(u, unew)
+      for (int k = 1; k < n - 1; ++k) {
+        for (int j = 1; j < n - 1; ++j) {
+          for (int i = 1; i < n - 1; ++i) {
+            int idx = i + j * n + k * n * n;
+            u[idx] = unew[idx];
+          }
+        }
+      }
+    }
+  }
+}
+Note that I've assumed float precision for the arrays u and unew, but you can change it to double if needed. Also, I've used #pragma acc routine seq to ensure that the routine is executed sequentially on the host, as OpenACC doesn't support parallelization of routines on the host.
+I've also used present clause to ensure that the arrays u and unew are present on the device, and use_device clause to specify that the arrays should be accessed on the device.
+Finally, I've used idx to calculate the index of the array elements, assuming a 3D array with n elements in each dimension.
+
+
+Output 6:
+Here is the equivalent C/C++ OpenACC code for the given Fortran OpenACC code:
+void jacobi_parallel(double ***u, double ***unew, int n, int niter) {
+  int i, j, k, iter;
+  for (iter = 1; iter <= niter; iter++) {
+    #pragma acc parallel loop collapse(3) private(i, j, k)
+    for (k = 2; k < n - 1; k++) {
+      for (j = 2; j < n - 1; j++) {
+        for (i = 2; i < n - 1; i++) {
+          unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] + u[i][j-1][k] +
+                                 u[i][j+1][k] + u[i][j][k-1] + u[i][j][k+1] + u[i][j][k]);
+        }
+      }
+    }
+    #pragma acc end parallel loop
+    for (i = 0; i < n; i++) {
+      for (j = 0; j < n; j++) {
+        for (k = 0; k < n; k++) {
+          u[i][j][k] = unew[i][j][k];
+        }
+      }
+    }
+  }
+}
+Note that in C/C++, we need to use pointers (or references) for multidimensional arrays, and we need to explicitly copy the data from unew back to u after the parallel loop.
+
+
+Output 7:
+Here is the equivalent C/C++ OpenACC code for the given Fortran OpenACC code that implements a Jacobi operation:
+void jacobi_parallel(double ***u, double ***unew, int n, int niter) {
+  int i, j, k, iter;
+  #pragma acc parallel loop collapse(3) private(i, j, k)
+  for (iter = 1; iter <= niter; iter++) {
+    for (k = 2; k < n - 1; k++) {
+      for (j = 2; j < n - 1; j++) {
+        for (i = 2; i < n - 1; i++) {
+          unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] + u[i][j-1][k] +
+                                     u[i][j+1][k] + u[i][j][k-1] + u[i][j][k+1] + u[i][j][k]);
+        }
+      }
+    }
+  }
+  #pragma acc parallel loop collapse(3)
+  for (k = 0; k < n; k++) {
+    for (j = 0; j < n; j++) {
+      for (i = 0; i < n; i++) {
+        u[i][j][k] = unew[i][j][k];
+      }
+    }
+  }
+}
+Note that in C/C++, we need to use pointers for 3D arrays, and we also need to explicitly allocate memory for the arrays. Also, the array indices start from 0 in C/C++, unlike in Fortran where they start from 1.
+
+
+Output 8:
+Here is the equivalent C/C++ OpenACC code for the given Fortran OpenACC code:
+#pragma acc routine seq
+void jacobi_parallel(float *u, float *unew, int n, int niter) {
+  int i, j, k, iter;
+  for (iter = 1; iter <= niter; iter++) {
+    #pragma acc parallel loop collapse(3) private(i, j, k)
+    for (k = 2; k < n - 1; k++) {
+      for (j = 2; j < n - 1; j++) {
+        for (i = 2; i < n - 1; i++) {
+          int idx = i + j * n + k * n * n;
+          unew[idx] = 0.125f * (u[idx - 1] + u[idx + 1] + u[idx - n] +
+                                 u[idx + n] + u[idx - n * n] + u[idx + n * n] + u[idx]);
+        }
+      }
+    }
+    #pragma acc end parallel loop
+    #pragma acc parallel loop collapse(3) private(i, j, k)
+    for (k = 0; k < n * n * n; k++) {
+      u[k] = unew[k];
+    }
+  }
+}
+Note that I've assumed float as the data type, but you can change it to double or any other type as needed. Also, I've used idx to calculate the index in the 3D array, assuming row-major ordering. If your array is column-major, you'll need to adjust the index calculation accordingly.
+
+
+Output 9:
+Here is the equivalent C/C++ OpenACC code for the given Fortran OpenACC code:
+#pragma acc routine seq
+void jacobi_parallel(float *u, float *unew, int n, int niter) {
+  int i, j, k, iter;
+  for (iter = 1; iter <= niter; iter++) {
+    #pragma acc parallel loop collapse(3) private(i, j, k)
+    for (k = 2; k < n - 1; k++) {
+      for (j = 2; j < n - 1; j++) {
+        for (i = 2; i < n - 1; i++) {
+          unew[(i * n * n) + (j * n) + k] = 0.125f * (
+            u[(i - 1) * n * n + j * n + k] + u[(i + 1) * n * n + j * n + k] +
+            u[i * n * n + (j - 1) * n + k] + u[i * n * n + (j + 1) * n + k] +
+            u[i * n * n + j * n + (k - 1)] + u[i * n * n + j * n + (k + 1)] +
+            u[i * n * n + j * n + k]);
+        }
+      }
+    }
+    #pragma acc end parallel loop
+    #pragma acc copy(u[:n * n * n], unew[:n * n * n])
+  }
+}
+Note that in C/C++, arrays are 0-based, so the indexing is adjusted accordingly. Also, the copy directive is used to copy the data from unew back to u after the parallel loop.
+
+
+Output 10:
+Here is the equivalent C/C++ OpenACC code for the given Fortran OpenACC code:
+#pragma acc routine seq
+void jacobi_parallel(float *u, float *unew, int n, int niter) {
+  int i, j, k, iter;
+  for (iter = 1; iter <= niter; iter++) {
+    #pragma acc parallel loop collapse(3) private(i, j, k)
+    for (k = 2; k < n - 1; k++) {
+      for (j = 2; j < n - 1; j++) {
+        for (i = 2; i < n - 1; i++) {
+          unew[(i * n * n) + (j * n) + k] = 0.125f * (
+            u[(i - 1) * n * n + j * n + k] + u[(i + 1) * n * n + j * n + k] +
+            u[i * n * n + (j - 1) * n + k] + u[i * n * n + (j + 1) * n + k] +
+            u[i * n * n + j * n + (k - 1)] + u[i * n * n + j * n + (k + 1)] +
+            u[i * n * n + j * n + k]);
+        }
+      }
+    }
+    #pragma acc end parallel loop
+    #pragma acc parallel loop collapse(3) private(i, j, k)
+    for (k = 0; k < n; k++) {
+      for (j = 0; j < n; j++) {
+        for (i = 0; i < n; i++) {
+          u[(i * n * n) + (j * n) + k] = unew[(i * n * n) + (j * n) + k];
+        }
+      }
+    }
+  }
+}
+Note that in C/C++, arrays are 0-based, so the indexing is adjusted accordingly. Also, the kind=8 in Fortran is equivalent to float in C/C++. The private clause is used to specify that the loop indices are private to each thread, and the collapse clause is used to specify that the three nested loops should be collapsed into a single loop. The #pragma acc end parallel loop directive is used to mark the end of the parallel loop.
+
+
