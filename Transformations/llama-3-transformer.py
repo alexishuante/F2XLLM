@@ -29,9 +29,10 @@ def extract_global_functions(code):
 
     return functions
 
-# Improved function to extract regular functions, considering nested braces
+
+# Improved function to extract regular functions, including those starting with extern "C" and excluding __global__ and int main
 def extract_regular_functions(code):
-    pattern = re.compile(r'\b\w+\s+\w+\s*\([^)]*\)\s*{')
+    pattern = re.compile(r'(?<!__global__\s)(extern\s+"C"\s+)?\b(?!int\s+main\b)\w+\s+\w+\s*\([^)]*\)\s*{')
     matches = pattern.finditer(code)
     functions = []
 
@@ -49,8 +50,6 @@ def extract_regular_functions(code):
 
     return functions
 
-
-
 messages = []
 message = ''
 with open('prompts.txt', 'r') as f:
@@ -63,14 +62,16 @@ with open('prompts.txt', 'r') as f:
             message += line
     if message:
         messages.append(message.strip())  # Add last message
+
 num_iter = 10
 
 ai = MetaAI()  # No need to Reset conversation context (in this code, llama-3 does not remember previous conversations)
 for i, each_message in enumerate(messages):
-    print('----------- PROMPT', i + 1, '-----------\n')
+    prompt_number = str(i + 1).zfill(3)
+    print(f'----------- PROMPT {prompt_number} -----------\n')
     # Open a file to store the responses
-    with open('Prompt' + str(i+1) + '_responses_llama3.txt', 'w') as response_file, \
-         open('Prompt' + str(i+1) + '_code_blocks_llama3.txt', 'w') as code_file:
+    with open(f'Prompt{prompt_number}_responses_llama3.txt', 'w') as response_file, \
+            open(f'Prompt{prompt_number}_code_blocks_llama3.txt', 'w') as code_file:
         # Loop through and generate responses
         for j in range(num_iter):
             response = ai.prompt(message=each_message)  # Prompt and get a response
@@ -88,8 +89,8 @@ for i, each_message in enumerate(messages):
             print(f'Iteration {j+1}: {response_message}')
 
         print('\n')
-        print('All responses saved to Prompt' + str(i+1) + '_responses_llama3.txt')
-        print('All code blocks saved to Prompt' + str(i+1) + '_code_blocks_llama3.txt')
+        print(f'All responses saved to Prompt{prompt_number}_responses_llama3.txt')
+        print(f'All code blocks saved to Prompt{prompt_number}_code_blocks_llama3.txt')
         print('\n')
 
 print('-------------------WORK DONE---------------------')
