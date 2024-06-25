@@ -1,0 +1,336 @@
+Output 1:
+Here is a version of the code in C/C++ using OpenACC:
+#include <accel.h>
+#include <iostream>
+
+void jacobi_parallel(double ***u, double ***unew, int n, int niter, int nthreads) {
+  int i, j, k, iter;
+
+  #pragma acc parallel num_gangs(nthreads) private(i, j, k, iter)
+  {
+    #pragma acc loop gang
+    for (iter = 1; iter <= niter; iter++) {
+      #pragma acc loop gang collapse(3)
+      for (k = 2; k < n - 1; k++) {
+        for (j = 2; j < n - 1; j++) {
+          for (i = 2; i < n - 1; i++) {
+            unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] + u[i][j-1][k] +
+                                       u[i][j+1][k] + u[i][j][k-1] + u[i][j][k+1] + u[i][j][k]);
+          }
+        }
+      }
+
+      #pragma acc barrier
+      #pragma acc loop gang collapse(3)
+      for (k = 2; k < n - 1; k++) {
+        for (j = 2; j < n - 1; j++) {
+          for (i = 2; i < n - 1; i++) {
+            u[i][j][k] = unew[i][j][k];
+          }
+        }
+      }
+    }
+  }
+}
+Note that in C/C++, we need to use pointers to pointers to pointers (***u, ***unew) to represent the 3D array, and we use the acc parallel directive to specify the parallelization. The loop gang directive is used to distribute the iterations across the gangs (or teams of threads), and the loop collapse(3) directive is used to collapse the three nested loops into a single loop. The barrier directive is used to ensure that all threads have finished updating the unew array before copying it back to the u array.
+Also, note that in OpenACC, the number of threads (nthreads) is specified using the num_gangs clause, and the private clause is used to specify the private variables for each thread.
+
+
+Output 2:
+Here is the equivalent C/C++ OpenACC code for the given Fortran OpenMP code:
+void jacobi_parallel(double ***u, double ***unew, int n, int niter, int nthreads) {
+  int i, j, k, iter;
+  #pragma acc parallel num_gangs(nthreads) private(i, j, k, iter)
+  {
+    #pragma acc loop gang
+    for (iter = 1; iter <= niter; iter++) {
+      #pragma acc loop gang collapse(3)
+      for (k = 2; k < n - 1; k++) {
+        for (j = 2; j < n - 1; j++) {
+          for (i = 2; i < n - 1; i++) {
+            unew[k][j][i] = 0.125 * (u[k][j][i-1] + u[k][j][i+1] + u[k][j-1][i] +
+              u[k][j+1][i] + u[k-1][j][i] + u[k+1][j][i] + u[k][j][i]);
+          }
+        }
+      }
+      #pragma acc barrier
+      #pragma acc loop gang collapse(3)
+      for (k = 0; k < n; k++) {
+        for (j = 0; j < n; j++) {
+          for (i = 0; i < n; i++) {
+            u[k][j][i] = unew[k][j][i];
+          }
+        }
+      }
+    }
+  }
+}
+Note that in C/C++, multidimensional arrays are typically represented as pointers to pointers, so the u and unew arrays are declared as double ***. Also, the acc loop gang directive is used to distribute the loops across the gangs (or teams) of threads, and the acc loop gang collapse(3) directive is used to collapse the three nested loops into a single loop that can be parallelized.
+Keep in mind that this is just one possible way to implement the Jacobi operation in C/C++ using OpenACC, and there may be other approaches that are equally valid.
+
+
+Output 3:
+Here is the equivalent C/C++ OpenACC code for the given Fortran OpenMP code:
+#pragma acc routine seq
+void jacobi_parallel(double ***u, double ***unew, int n, int niter, int nthreads) {
+  int i, j, k, iter;
+  #pragma acc parallel num_gangs(nthreads) vector_length(1) private(i, j, k, iter)
+  {
+    #pragma acc loop gang
+    for (iter = 1; iter <= niter; iter++) {
+      #pragma acc loop gang collapse(3)
+      for (k = 2; k < n - 1; k++) {
+        for (j = 2; j < n - 1; j++) {
+          for (i = 2; i < n - 1; i++) {
+            unew[k][j][i] = 0.125 * (u[k][j][i-1] + u[k][j][i+1] + u[k][j-1][i] +
+                                       u[k][j+1][i] + u[k-1][j][i] + u[k+1][j][i] + u[k][j][i]);
+          }
+        }
+      }
+      #pragma acc wait
+      #pragma acc loop gang collapse(3)
+      for (k = 2; k < n - 1; k++) {
+        for (j = 2; j < n - 1; j++) {
+          for (i = 2; i < n - 1; i++) {
+            u[k][j][i] = unew[k][j][i];
+          }
+        }
+      }
+    }
+  }
+}
+Note that OpenACC does not have an explicit barrier equivalent to OpenMP, but the #pragma acc wait directive ensures that all gangs have finished the previous loop before moving on to the next one. Also, the vector_length clause is set to 1 since the loop iterations are independent and do not share data.
+
+
+Output 4:
+Here is a version of the Fortran OpenMP code rewritten in C/C++ using OpenACC:
+void jacobi_parallel(double ***u, double ***unew, int n, int niter, int nthreads) {
+  int i, j, k, iter;
+  #pragma acc parallel num_gangs(nthreads) private(i, j, k, iter)
+  {
+    #pragma acc loop gang
+    for (iter = 1; iter <= niter; iter++) {
+      #pragma acc loop gang collapse(3)
+      for (k = 2; k < n - 1; k++) {
+        for (j = 2; j < n - 1; j++) {
+          for (i = 2; i < n - 1; i++) {
+            unew[k][j][i] = 0.125 * (u[k][j][i-1] + u[k][j][i+1] + u[k][j-1][i] +
+              u[k][j+1][i] + u[k-1][j][i] + u[k+1][j][i] + u[k][j][i]);
+          }
+        }
+      }
+      #pragma acc barrier
+      #pragma acc loop gang collapse(3)
+      for (k = 0; k < n; k++) {
+        for (j = 0; j < n; j++) {
+          for (i = 0; i < n; i++) {
+            u[k][j][i] = unew[k][j][i];
+          }
+        }
+      }
+    }
+  }
+}
+Note that I've used the acc loop gang directive to parallelize the loops, and acc loop gang collapse(3) to collapse the three inner loops into a single parallel loop. I've also used acc barrier to ensure that all threads have finished computing the new values before updating the original array.
+Also, I've assumed that the u and unew arrays are already allocated and initialized on the host, and that they are pointers to 3D arrays of double values. If this is not the case, you may need to modify the code accordingly.
+Keep in mind that OpenACC is a directive-based parallel programming model, and it may require some modifications to the original code to achieve optimal performance.
+
+
+Output 5:
+Here is a version of the Fortran OpenMP code that implements a Jacobi operation, translated into C/C++ with OpenACC:
+#include <accel.h>
+
+void jacobi_parallel(double ***u, double ***unew, int n, int niter, int nthreads) {
+  int i, j, k, iter;
+  #pragma acc parallel num_gangs(nthreads) private(i, j, k, iter)
+  {
+    #pragma acc loop gang
+    for (iter = 1; iter <= niter; iter++) {
+      #pragma acc loop gang collapse(3)
+      for (k = 2; k < n - 1; k++) {
+        for (j = 2; j < n - 1; j++) {
+          for (i = 2; i < n - 1; i++) {
+            unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] + u[i][j-1][k] +
+              u[i][j+1][k] + u[i][j][k-1] + u[i][j][k+1] + u[i][j][k]);
+          }
+        }
+      }
+      #pragma acc barrier
+      #pragma acc loop gang collapse(3)
+      for (k = 0; k < n; k++) {
+        for (j = 0; j < n; j++) {
+          for (i = 0; i < n; i++) {
+            u[i][j][k] = unew[i][j][k];
+          }
+        }
+      }
+    }
+  }
+}
+Note that I've assumed u and unew are 3D arrays of double values, and that the nthreads variable is used to set the number of gangs (or teams) in the OpenACC parallel region. Also, I've used the gang parallelism to distribute the iterations across the team, and the collapse(3) clause to collapse the three nested loops into a single loop. Finally, I've used the barrier directive to ensure that all threads finish the computation before updating the u array.
+
+
+Output 6:
+Here is the equivalent C/C++ OpenACC code for the given Fortran OpenMP code:
+#pragma acc routine seq
+void jacobi_parallel(float *u, float *unew, int n, int niter) {
+  int i, j, k, iter;
+  for (iter = 1; iter <= niter; ++iter) {
+    #pragma acc parallel loop gang vector present(u, unew)
+    for (k = 2; k < n - 1; ++k) {
+      for (j = 2; j < n - 1; ++j) {
+        for (i = 2; i < n - 1; ++i) {
+          unew[(k * n * n) + (j * n) + i] = 0.125f * (
+            u[(k * n * n) + (j * n) + (i - 1)] + u[(k * n * n) + (j * n) + (i + 1)] +
+            u[(k * n * n) + ((j - 1) * n) + i] + u[(k * n * n) + ((j + 1) * n) + i] +
+            u[((k - 1) * n * n) + (j * n) + i] + u[((k + 1) * n * n) + (j * n) + i] +
+            u[(k * n * n) + (j * n) + i]);
+        }
+      }
+    }
+    #pragma acc wait
+    #pragma acc parallel loop gang vector present(u, unew)
+    for (k = 0; k < n * n * n; ++k) {
+      u[k] = unew[k];
+    }
+  }
+}
+Note that OpenACC does not support the direct translation of the NUM_THREADS clause. Instead, the number of threads is determined by the device and the runtime. Also, the PRIVATE clause is not needed in OpenACC as variables are private by default. The SCHEDULE(STATIC) clause is also not directly supported, but the gang vector clause can be used to achieve a similar effect. Finally, the BARRIER clause is not needed in OpenACC as the wait directive is used to ensure that all threads have finished the parallel loop before proceeding.
+
+
+Output 7:
+Here is a version of the Fortran OpenMP code implemented in C/C++ using OpenACC:
+void jacobi_parallel(double *u, double *unew, int n, int niter, int nthreads) {
+  int i, j, k, iter;
+  #pragma acc parallel num_gangs(nthreads) private(i, j, k, iter)
+  {
+    #pragma acc loop gang
+    for (iter = 1; iter <= niter; iter++) {
+      #pragma acc loop gang collapse(3)
+      for (k = 2; k < n - 1; k++) {
+        for (j = 2; j < n - 1; j++) {
+          for (i = 2; i < n - 1; i++) {
+            unew[i + j*n + k*n*n] = 0.125 * (u[i-1 + j*n + k*n*n] + u[i+1 + j*n + k*n*n] +
+              u[i + (j-1)*n + k*n*n] + u[i + (j+1)*n + k*n*n] +
+              u[i + j*n + (k-1)*n*n] + u[i + j*n + (k+1)*n*n] + u[i + j*n + k*n*n]);
+          }
+        }
+      }
+      #pragma acc barrier
+      #pragma acc loop gang collapse(3)
+      for (k = 0; k < n; k++) {
+        for (j = 0; j < n; j++) {
+          for (i = 0; i < n; i++) {
+            u[i + j*n + k*n*n] = unew[i + j*n + k*n*n];
+          }
+        }
+      }
+    }
+  }
+}
+Note that in C/C++, arrays are 0-based, so the indices are adjusted accordingly. Also, the num_gangs clause is used to specify the number of gangs (similar to threads in OpenMP), and the gang loop schedule is used to distribute the iterations across the gangs. The collapse clause is used to collapse the three nested loops into a single loop, which can be parallelized. The barrier directive is used to ensure that all iterations of the loop are completed before the values are copied back to the u array.
+
+
+Output 8:
+Here is the equivalent C/C++ OpenACC code for the given Fortran OpenMP code:
+void jacobi_parallel(double ***u, double ***unew, int n, int niter, int nthreads) {
+  int i, j, k, iter;
+  #pragma acc parallel num_gangs(nthreads) private(i, j, k, iter)
+  {
+    #pragma acc loop gang
+    for (iter = 1; iter <= niter; iter++) {
+      #pragma acc loop gang collapse(3)
+      for (k = 2; k < n - 1; k++) {
+        for (j = 2; j < n - 1; j++) {
+          for (i = 2; i < n - 1; i++) {
+            unew[k][j][i] = 0.125 * (u[k][j][i-1] + u[k][j][i+1] + u[k][j-1][i] +
+                                       u[k][j+1][i] + u[k-1][j][i] + u[k+1][j][i] + u[k][j][i]);
+          }
+        }
+      }
+      #pragma acc barrier
+      #pragma acc loop gang collapse(3)
+      for (k = 0; k < n; k++) {
+        for (j = 0; j < n; j++) {
+          for (i = 0; i < n; i++) {
+            u[k][j][i] = unew[k][j][i];
+          }
+        }
+      }
+    }
+  }
+}
+Note that I've assumed u and unew are 3D arrays of doubles, and used the *** notation to represent the 3D array. Also, I've used the num_gangs clause to specify the number of threads, and the private clause to specify the private variables. The loop gang directive is used to distribute the loops across the threads, and the barrier directive is used to ensure synchronization between the iterations.
+Please note that OpenACC is a directive-based parallel programming model, and it requires a compiler that supports OpenACC, such as PGI or Cray compilers. Also, the code assumes that the arrays u and unew are already allocated and initialized.
+
+
+Output 9:
+Here is a version of the code in C/C++ using OpenACC:
+void jacobi_parallel(double ***u, double ***unew, int n, int niter, int nthreads) {
+  int i, j, k, iter;
+  #pragma acc parallel num_gangs(nthreads) private(i, j, k, iter)
+  {
+    #pragma acc loop gang
+    for (iter = 1; iter <= niter; iter++) {
+      #pragma acc loop tile(2, 2, 2)
+      for (k = 2; k < n - 1; k++) {
+        for (j = 2; j < n - 1; j++) {
+          for (i = 2; i < n - 1; i++) {
+            unew[k][j][i] = 0.125 * (u[k][j][i-1] + u[k][j][i+1] + u[k][j-1][i] +
+                                       u[k][j+1][i] + u[k-1][j][i] + u[k+1][j][i] + u[k][j][i]);
+          }
+        }
+      }
+      #pragma acc wait
+      #pragma acc loop gang
+      for (k = 0; k < n; k++) {
+        for (j = 0; j < n; j++) {
+          for (i = 0; i < n; i++) {
+            u[k][j][i] = unew[k][j][i];
+          }
+        }
+      }
+    }
+  }
+}
+Note that in OpenACC, the num_gangs clause is used to specify the number of gangs (or teams) to use, and the private clause is used to specify the variables that should be privatized. The loop directive is used to specify the loops that should be parallelized, and the tile clause is used to specify the tile size. The wait directive is used to ensure that all threads have finished updating the unew array before the u array is updated.
+Also, note that in C/C++, 3D arrays are typically represented as pointers to pointers to pointers, so the syntax is a bit different from Fortran.
+
+
+Output 10:
+Here is the equivalent C/C++ OpenACC code for the given Fortran OpenMP code:
+#include <iostream>
+#include <OpenACC.h>
+
+void jacobi_parallel(double ***u, double ***unew, int n, int niter, int nthreads) {
+  int i, j, k, iter;
+
+  #pragma acc parallel num_gangs(nthreads) vector_length(1) copy(u, unew)
+  {
+    #pragma acc loop gang
+    for (iter = 1; iter <= niter; ++iter) {
+      #pragma acc loop gang collapse(3)
+      for (k = 2; k < n - 1; ++k) {
+        for (j = 2; j < n - 1; ++j) {
+          for (i = 2; i < n - 1; ++i) {
+            unew[k][j][i] = 0.125 * (u[k][j][i-1] + u[k][j][i+1] + u[k][j-1][i] +
+                                     u[k][j+1][i] + u[k-1][j][i] + u[k+1][j][i] + u[k][j][i]);
+          }
+        }
+      }
+      #pragma acc barrier
+      #pragma acc loop gang collapse(3)
+      for (k = 0; k < n; ++k) {
+        for (j = 0; j < n; ++j) {
+          for (i = 0; i < n; ++i) {
+            u[k][j][i] = unew[k][j][i];
+          }
+        }
+      }
+    }
+  }
+}
+Note that OpenACC is a directive-based programming model, similar to OpenMP. It is used for parallel programming on GPUs and other accelerators. The #pragma acc directives are used to specify which parts of the code should be executed on the accelerator. The copy clause in the parallel directive is used to copy the u and unew arrays to the accelerator. The gang and vector_length clauses specify the parallelization strategy. The loop directives specify which loops should be parallelized. The barrier directive is used to synchronize the threads.
+Also, note that in C/C++, 3D arrays are typically represented as pointers to pointers to pointers, rather than a single pointer to a contiguous block of memory. This is why the u and unew parameters are declared as double *** rather than double *.
+
+
