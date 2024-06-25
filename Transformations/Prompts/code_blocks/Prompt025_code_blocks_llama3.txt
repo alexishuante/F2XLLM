@@ -1,0 +1,222 @@
+Code Block 1:
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int i, j, l;
+  double temp;
+  
+  hipLaunchKernel(gemm_parallel_kernel, dim3(1), dim3(1), 0, 0, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+  
+  hipDeviceSynchronize();
+}
+
+__global__ void gemm_parallel_kernel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+  
+  if (i < m && j < n) {
+    double temp = 0.0;
+    for (int l = 0; l < k; l++) {
+      temp += a[i * lda + l] * b[l * ldb + j];
+    }
+    c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+  }
+}
+
+Code Block 2:
+void gemm_parallel(int m, int n, int k, float alpha, float *a, int lda, float *b, int ldb, float beta, float *c, int ldc) {
+  hipLaunchKernel(gemm_kernel, dim3(1), dim3(1), 0, 0, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+}
+
+__global__ void gemm_kernel(int m, int n, int k, float alpha, float *a, int lda, float *b, int ldb, float beta, float *c, int ldc) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+  if (i < m && j < n) {
+    float temp = 0.0;
+    for (int l = 0; l < k; l++) {
+      temp += a[i * lda + l] * b[l * ldb + j];
+    }
+    c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+  }
+}
+
+Code Block 3:
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int i, j, l;
+  double temp;
+
+  #pragma omp parallel for private(i, j, l, temp) schedule(static)
+  for (j = 0; j < n; j++) {
+    for (i = 0; i < m; i++) {
+      temp = 0.0;
+      for (l = 0; l < k; l++) {
+        temp += a[i * lda + l] * b[l * ldb + j];
+      }
+      c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+    }
+  }
+}
+
+Code Block 4:
+void gemm_parallel(int m, int n, int k, float alpha, float *a, int lda, float *b, int ldb, float beta, float *c, int ldc) {
+  int i, j, l;
+  float temp;
+
+  hipLaunchKernel(gemm_kernel, dim3(1), dim3(m, n), 0, 0, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+}
+
+__global__ void gemm_kernel(int m, int n, int k, float alpha, float *a, int lda, float *b, int ldb, float beta, float *c, int ldc) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+
+  if (i < m && j < n) {
+    float temp = 0.0f;
+    for (int l = 0; l < k; l++) {
+      temp += a[i * lda + l] * b[l * ldb + j];
+    }
+    c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+  }
+}
+
+Code Block 5:
+void gemm_parallel(int m, int n, int k, float alpha, float *a, int lda, float *b, int ldb, float beta, float *c, int ldc) {
+  hipLaunchKernel(gemm_kernel, dim3(1), dim3(256), 0, 0, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+}
+
+__global__ void gemm_kernel(int m, int n, int k, float alpha, float *a, int lda, float *b, int ldb, float beta, float *c, int ldc) {
+  int tx = threadIdx.x;
+  int ty = blockIdx.x * blockDim.x + tx;
+  int stride_x = blockDim.x * gridDim.x;
+
+  for (int j = ty; j < n; j += stride_x) {
+    float temp = 0.0;
+    for (int l = 0; l < k; l++) {
+      temp += a[tx * lda + l] * b[l * ldb + j];
+    }
+    c[tx * ldc + j] = alpha * temp + beta * c[tx * ldc + j];
+  }
+}
+
+Code Block 6:
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int i, j, l;
+  double temp;
+  hipLaunchKernelGGL((gemm_kernel), dim3(1), dim3(1), 0, 0, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+}
+
+__global__ void gemm_kernel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+  if (i < m && j < n) {
+    double temp = 0.0;
+    for (int l = 0; l < k; l++) {
+      temp += a[i * lda + l] * b[l * ldb + j];
+    }
+    c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+  }
+}
+
+Code Block 7:
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int i, j, l;
+  double temp;
+  #pragma omp parallel for private(i, j, l, temp) schedule(static)
+  for (j = 0; j < n; j++) {
+    for (i = 0; i < m; i++) {
+      temp = 0.0;
+      for (l = 0; l < k; l++) {
+        temp += hipDevicePtr(a)[i * lda + l] * hipDevicePtr(b)[l * ldb + j];
+      }
+      hipDevicePtr(c)[i * ldc + j] = alpha * temp + beta * hipDevicePtr(c)[i * ldc + j];
+    }
+  }
+}
+
+Code Block 8:
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  hipLaunchKernel(gemm_kernel, dim3(1), dim3(256), 0, 0, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+}
+
+__global__ void gemm_kernel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+  if (i < m && j < n) {
+    double temp = 0.0;
+    for (int l = 0; l < k; l++) {
+      temp += a[i * lda + l] * b[l * ldb + j];
+    }
+    c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+  }
+}
+
+Code Block 9:
+void gemm_parallel(int m, int n, int k, float alpha, float *a, int lda, float *b, int ldb, float beta, float *c, int ldc) {
+  int blockSize = 16;
+  int numBlocksX = (m + blockSize - 1) / blockSize;
+  int numBlocksY = (n + blockSize - 1) / blockSize;
+
+  hipLaunchKernel(gemm_kernel, dim3(numBlocksX, numBlocksY), dim3(blockSize, blockSize), 0, 0,
+    m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+
+  hipDeviceSynchronize();
+}
+
+__global__ void gemm_kernel(int m, int n, int k, float alpha, float *a, int lda, float *b, int ldb, float beta, float *c, int ldc) {
+  int tx = threadIdx.x;
+  int ty = threadIdx.y;
+  int bx = blockIdx.x;
+  int by = blockIdx.y;
+  int i = bx * blockDim.x + tx;
+  int j = by * blockDim.y + ty;
+
+  __shared__ float s_a[16][16];
+  __shared__ float s_b[16][16];
+
+  float temp = 0.0;
+
+  for (int l = 0; l < k; l += 16) {
+    if (i < m && l + tx < k) {
+      s_a[tx][ty] = a[i * lda + l + tx];
+    } else {
+      s_a[tx][ty] = 0.0;
+    }
+    if (j < n && l + ty < k) {
+      s_b[tx][ty] = b[(l + ty) * ldb + j];
+    } else {
+      s_b[tx][ty] = 0.0;
+    }
+    __syncthreads();
+
+    for (int k = 0; k < 16; k++) {
+      temp += s_a[tx][k] * s_b[k][ty];
+    }
+    __syncthreads();
+  }
+
+  if (i < m && j < n) {
+    c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+  }
+}
+
+Code Block 10:
+void gemm_parallel(int m, int n, int k, float alpha, float *a, int lda, float *b, int ldb, float beta, float *c, int ldc) {
+  int i, j, l;
+  float temp;
+
+  hipLaunchKernelGGL(gemm_kernel, dim3(1), dim3(m, n), 0, 0, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+
+  // hipKernelLaunch is asynchronous, so we need to synchronize
+  hipDeviceSynchronize();
+}
+
+__global__ void gemm_kernel(int m, int n, int k, float alpha, float *a, int lda, float *b, int ldb, float beta, float *c, int ldc) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+
+  if (i < m && j < n) {
+    float temp = 0.0;
+    for (int l = 0; l < k; l++) {
+      temp += a[i * lda + l] * b[l * ldb + j];
+    }
+    c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+  }
+}
+

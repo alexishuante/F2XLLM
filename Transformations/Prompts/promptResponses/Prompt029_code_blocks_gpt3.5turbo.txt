@@ -1,0 +1,412 @@
+Code Block 1:
+void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    float *d_val, *d_x, *d_y;
+    int *d_row, *d_col;
+    
+    // Allocate memory on GPU
+    hipMalloc(&d_val, nnz * sizeof(float));
+    hipMalloc(&d_row, (n+1) * sizeof(int));
+    hipMalloc(&d_col, nnz * sizeof(int));
+    hipMalloc(&d_x, n * sizeof(float));
+    hipMalloc(&d_y, n * sizeof(float));
+    
+    // Copy data from host to device
+    hipMemcpy(d_val, val, nnz * sizeof(float), hipMemcpyHostToDevice);
+    hipMemcpy(d_row, row, (n+1) * sizeof(int), hipMemcpyHostToDevice);
+    hipMemcpy(d_col, col, nnz * sizeof(int), hipMemcpyHostToDevice);
+    hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
+    
+    // Launch kernel
+    int blockSize = 256;
+    int numBlocks = (n + blockSize - 1) / blockSize;
+    spmv_kernel<<<numBlocks, blockSize>>>(n, nnz, d_val, d_row, d_col, d_x, d_y);
+    
+    // Copy result back to host
+    hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
+    
+    // Free memory on GPU
+    hipFree(d_val);
+    hipFree(d_row);
+    hipFree(d_col);
+    hipFree(d_x);
+    hipFree(d_y);
+}
+
+__global__ void spmv_kernel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    
+    if (i < n) {
+        y[i] = 0.0;
+        for (int j = row[i]; j < row[i+1]; j++) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+
+Code Block 2:
+void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    float *d_val, *d_x, *d_y;
+    int *d_row, *d_col;
+    
+    hipMalloc(&d_val, nnz * sizeof(float));
+    hipMalloc(&d_row, (n+1) * sizeof(int));
+    hipMalloc(&d_col, nnz * sizeof(int));
+    hipMalloc(&d_x, n * sizeof(float));
+    hipMalloc(&d_y, n * sizeof(float));
+    
+    hipMemcpy(d_val, val, nnz * sizeof(float), hipMemcpyHostToDevice);
+    hipMemcpy(d_row, row, (n+1) * sizeof(int), hipMemcpyHostToDevice);
+    hipMemcpy(d_col, col, nnz * sizeof(int), hipMemcpyHostToDevice);
+    hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
+    
+    int block_size = 256;
+    int grid_size = (n + block_size - 1) / block_size;
+    
+    spmv_kernel<<<grid_size, block_size>>>(n, nnz, d_val, d_row, d_col, d_x, d_y);
+    
+    hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
+    
+    hipFree(d_val);
+    hipFree(d_row);
+    hipFree(d_col);
+    hipFree(d_x);
+    hipFree(d_y);
+}
+
+__global__ void spmv_kernel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    if(i < n) {
+        y[i] = 0.0;
+        for(int j = row[i]; j < row[i+1]; j++) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+
+Code Block 3:
+extern "C" void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    float *d_val, *d_x, *d_y;
+    int *d_row, *d_col;
+    
+    // Allocate memory on device
+    hipMalloc(&d_val, nnz * sizeof(float));
+    hipMalloc(&d_row, (n+1) * sizeof(int));
+    hipMalloc(&d_col, nnz * sizeof(int));
+    hipMalloc(&d_x, n * sizeof(float));
+    hipMalloc(&d_y, n * sizeof(float));
+    
+    // Copy data from host to device
+    hipMemcpy(d_val, val, nnz * sizeof(float), hipMemcpyHostToDevice);
+    hipMemcpy(d_row, row, (n+1) * sizeof(int), hipMemcpyHostToDevice);
+    hipMemcpy(d_col, col, nnz * sizeof(int), hipMemcpyHostToDevice);
+    hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
+    
+    // Launch kernel
+    dim3 threadsPerBlock(256);
+    dim3 numBlocks((n + 255) / 256);
+    spmv_kernel<<<numBlocks, threadsPerBlock>>>(n, nnz, d_val, d_row, d_col, d_x, d_y);
+    
+    // Copy result back to host
+    hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
+    
+    // Free memory on device
+    hipFree(d_val);
+    hipFree(d_row);
+    hipFree(d_col);
+    hipFree(d_x);
+    hipFree(d_y);
+}
+
+__global__ void spmv_kernel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    if (i < n) {
+        y[i] = 0.0f;
+        for (int j = row[i]; j < row[i+1]; j++) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+
+Code Block 4:
+void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    float *d_val, *d_x, *d_y;
+    int *d_row, *d_col;
+    
+    hipMalloc(&d_val, nnz * sizeof(float));
+    hipMalloc(&d_x, n * sizeof(float));
+    hipMalloc(&d_y, n * sizeof(float));
+    hipMalloc(&d_row, (n+1) * sizeof(int));
+    hipMalloc(&d_col, nnz * sizeof(int));
+    
+    hipMemcpy(d_val, val, nnz * sizeof(float), hipMemcpyHostToDevice);
+    hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
+    hipMemcpy(d_row, row, (n+1) * sizeof(int), hipMemcpyHostToDevice);
+    hipMemcpy(d_col, col, nnz * sizeof(int), hipMemcpyHostToDevice);
+    
+    int blockSize = 256;
+    int numBlocks = (n + blockSize - 1) / blockSize;
+    
+    spmv_cuda<<<numBlocks, blockSize>>>(n, nnz, d_val, d_row, d_col, d_x, d_y);
+    
+    hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
+    
+    hipFree(d_val);
+    hipFree(d_x);
+    hipFree(d_y);
+    hipFree(d_row);
+    hipFree(d_col);
+}
+
+__global__ void spmv_cuda(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    int i = blockDim.x * blockIdx.x + threadIdx.x;
+    
+    if (i < n) {
+        y[i] = 0.0;
+        
+        for (int j = row[i]; j < row[i+1]; j++) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+
+Code Block 5:
+void spmv_parallel(int n, int nnz, float* val, int* row, int* col, float* x, float* y) {
+    float *d_val, *d_x, *d_y;
+    int *d_row, *d_col;
+
+    hipMalloc(&d_val, nnz * sizeof(float));
+    hipMalloc(&d_row, (n + 1) * sizeof(int));
+    hipMalloc(&d_col, nnz * sizeof(int));
+    hipMalloc(&d_x, n * sizeof(float));
+    hipMalloc(&d_y, n * sizeof(float));
+
+    hipMemcpy(d_val, val, nnz * sizeof(float), hipMemcpyHostToDevice);
+    hipMemcpy(d_row, row, (n + 1) * sizeof(int), hipMemcpyHostToDevice);
+    hipMemcpy(d_col, col, nnz * sizeof(int), hipMemcpyHostToDevice);
+    hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
+
+    int block_size = 256;
+    int grid_size = (n + block_size - 1) / block_size;
+
+    spmv_parallel_kernel <<<grid_size, block_size>>>(n, nnz, d_val, d_row, d_col, d_x, d_y);
+
+    hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
+
+    hipFree(d_val);
+    hipFree(d_row);
+    hipFree(d_col);
+    hipFree(d_x);
+    hipFree(d_y);
+}
+
+__global__
+void spmv_parallel_kernel(int n, int nnz, float* val, int* row, int* col, float* x, float* y) {
+    int thread_id = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (thread_id < n) {
+        y[thread_id] = 0.0;
+        for (int j = row[thread_id]; j < row[thread_id+1]; j++) {
+            y[thread_id] += val[j] * x[col[j]];
+        }
+    }
+}
+
+Code Block 6:
+void spmv_parallel(int n, int nnz, float* val, int* row, int* col, float* x, float* y) {
+    float *d_val, *d_x, *d_y;
+    int *d_row, *d_col;
+
+    hipMalloc(&d_val, sizeof(float) * nnz);
+    hipMalloc(&d_row, sizeof(int) * (n+1));
+    hipMalloc(&d_col, sizeof(int) * nnz);
+    hipMalloc(&d_x, sizeof(float) * n);
+    hipMalloc(&d_y, sizeof(float) * n);
+
+    hipMemcpy(d_val, val, sizeof(float) * nnz, hipMemcpyHostToDevice);
+    hipMemcpy(d_row, row, sizeof(int) * (n+1), hipMemcpyHostToDevice);
+    hipMemcpy(d_col, col, sizeof(int) * nnz, hipMemcpyHostToDevice);
+    hipMemcpy(d_x, x, sizeof(float) * n, hipMemcpyHostToDevice);
+
+    hipLaunchKernelGGL(spmv_kernel, dim3((n+255)/256), dim3(256), 0, 0, n, nnz, d_val, d_row, d_col, d_x, d_y);
+
+    hipMemcpy(y, d_y, sizeof(float) * n, hipMemcpyDeviceToHost);
+
+    hipFree(d_val);
+    hipFree(d_row);
+    hipFree(d_col);
+    hipFree(d_x);
+    hipFree(d_y);
+}
+
+__global__ void spmv_kernel(int n, int nnz, float* val, int* row, int* col, float* x, float* y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = 0.0f;
+        for (int j = row[i]; j < row[i+1]; j++) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+
+Code Block 7:
+extern "C" void spmv_parallel_host(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    float *d_val, *d_x, *d_y;
+    int *d_row, *d_col;
+    
+    hipMalloc(&d_val, nnz * sizeof(float));
+    hipMemcpy(d_val, val, nnz * sizeof(float), hipMemcpyHostToDevice);
+    
+    hipMalloc(&d_row, (n + 1) * sizeof(int));
+    hipMemcpy(d_row, row, (n + 1) * sizeof(int), hipMemcpyHostToDevice);
+    
+    hipMalloc(&d_col, nnz * sizeof(int));
+    hipMemcpy(d_col, col, nnz * sizeof(int), hipMemcpyHostToDevice);
+    
+    hipMalloc(&d_x, n * sizeof(float));
+    hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
+    
+    hipMalloc(&d_y, n * sizeof(float));
+    
+    int blockSize = 256;
+    int gridSize = (n + blockSize - 1) / blockSize;
+    
+    hipLaunchKernelGGL(spmv_parallel, dim3(gridSize), dim3(blockSize), 0, 0, n, nnz, d_val, d_row, d_col, d_x, d_y);
+    
+    hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
+    
+    hipFree(d_val);
+    hipFree(d_row);
+    hipFree(d_col);
+    hipFree(d_x);
+    hipFree(d_y);
+}
+
+__global__ void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = 0.0;
+        for (int j = row[i]; j < row[i + 1]; j++) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+
+Code Block 8:
+extern "C" void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    float *d_val, *d_x, *d_y;
+    int *d_row, *d_col;
+
+    hipMalloc(&d_val, nnz * sizeof(float));
+    hipMalloc(&d_x, n * sizeof(float));
+    hipMalloc(&d_y, n * sizeof(float));
+    hipMalloc(&d_row, (n+1) * sizeof(int));
+    hipMalloc(&d_col, nnz * sizeof(int));
+
+    hipMemcpy(d_val, val, nnz * sizeof(float), hipMemcpyHostToDevice);
+    hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
+    hipMemcpy(d_row, row, (n+1) * sizeof(int), hipMemcpyHostToDevice);
+    hipMemcpy(d_col, col, nnz * sizeof(int), hipMemcpyHostToDevice);
+
+    int block_size = 256;
+    int grid_size = (n + block_size - 1) / block_size;
+
+    spmv_kernel<<<grid_size, block_size>>>(n, nnz, d_val, d_row, d_col, d_x, d_y);
+
+    hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
+
+    hipFree(d_val);
+    hipFree(d_x);
+    hipFree(d_y);
+    hipFree(d_row);
+    hipFree(d_col);
+}
+
+__global__ void spmv_kernel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    if (i < n) {
+        y[i] = 0.0f;
+        for (int j = row[i]; j < row[i+1]; j++) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+
+Code Block 9:
+void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y){
+    float *d_val, *d_x, *d_y;
+    int *d_row, *d_col;
+
+    hipMalloc(&d_val, nnz * sizeof(float));
+    hipMalloc(&d_row, (n+1) * sizeof(int));
+    hipMalloc(&d_col, nnz * sizeof(int));
+    hipMalloc(&d_x, n * sizeof(float));
+    hipMalloc(&d_y, n * sizeof(float));
+
+    hipMemcpy(d_val, val, nnz * sizeof(float), hipMemcpyHostToDevice);
+    hipMemcpy(d_row, row, (n+1) * sizeof(int), hipMemcpyHostToDevice);
+    hipMemcpy(d_col, col, nnz * sizeof(int), hipMemcpyHostToDevice);
+    hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
+
+    int blocks = (n + 255) / 256;
+    spmv_kernel<<<blocks, 256>>>(n, nnz, d_val, d_row, d_col, d_x, d_y);
+
+    hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
+
+    hipFree(d_val);
+    hipFree(d_row);
+    hipFree(d_col);
+    hipFree(d_x);
+    hipFree(d_y);
+}
+
+__global__ void spmv_kernel(int n, int nnz, float *val, int *row, int *col, float *x, float *y){
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    if(tid < n){
+        y[tid] = 0.0;
+        for(int j = row[tid]; j < row[tid+1]; j++){
+            y[tid] += val[j] * x[col[j]];
+        }
+    }
+}
+
+Code Block 10:
+void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    float *d_val, *d_x, *d_y;
+    int *d_row, *d_col;
+
+    hipMalloc(&d_val, nnz * sizeof(float));
+    hipMalloc(&d_row, (n+1) * sizeof(int));
+    hipMalloc(&d_col, nnz * sizeof(int));
+    hipMalloc(&d_x, n * sizeof(float));
+    hipMalloc(&d_y, n * sizeof(float));
+
+    hipMemcpy(d_val, val, nnz * sizeof(float), hipMemcpyHostToDevice);
+    hipMemcpy(d_row, row, (n+1) * sizeof(int), hipMemcpyHostToDevice);
+    hipMemcpy(d_col, col, nnz * sizeof(int), hipMemcpyHostToDevice);
+    hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
+
+    hipLaunchKernelGGL(spmv_kernel, dim3((n+255)/256), dim3(256), 0, 0, n, nnz, d_val, d_row, d_col, d_x, d_y);
+
+    hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
+
+    hipFree(d_val);
+    hipFree(d_row);
+    hipFree(d_col);
+    hipFree(d_x);
+    hipFree(d_y);
+}
+
+__global__ void spmv_kernel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = 0.0f;
+        for (int j = row[i]; j < row[i+1]; j++) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+

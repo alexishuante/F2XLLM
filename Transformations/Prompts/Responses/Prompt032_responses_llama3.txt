@@ -1,0 +1,398 @@
+Output 1:
+Here is the equivalent code in C/C++ with CUDA:
+#include <cuda_runtime.h>
+
+void saxpy(int n, float a, float *x, float *y) {
+  int i;
+  float *x_d, *y_d;
+
+  // Allocate memory on the GPU
+  cudaMalloc((void **)&x_d, n * sizeof(float));
+  cudaMalloc((void **)&y_d, n * sizeof(float));
+
+  // Copy data from host to device
+  cudaMemcpy(x_d, x, n * sizeof(float), cudaMemcpyHostToDevice);
+  cudaMemcpy(y_d, y, n * sizeof(float), cudaMemcpyHostToDevice);
+
+  // Launch the kernel
+  saxpy_kernel<<<(n + 255) / 256, 256>>>(n, a, x_d, y_d);
+
+  // Copy result back to host
+  cudaMemcpy(y, y_d, n * sizeof(float), cudaMemcpyDeviceToHost);
+
+  // Free memory on the GPU
+  cudaFree(x_d);
+  cudaFree(y_d);
+}
+
+__global__ void saxpy_kernel(int n, float a, float *x, float *y) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n) {
+    y[i] = a * x[i] + y[i];
+  }
+}
+Note that this code uses the CUDA runtime API to allocate memory on the GPU, copy data between host and device, and launch the kernel. The saxpy_kernel function is the actual kernel that performs the AXPY operation.
+You can compile this code with nvcc and run it on a CUDA-enabled device.
+Also, you can use cuBLAS library which is optimized for NVIDIA GPUs, it has a implementation of AXPY operation.
+#include <cuda_runtime.h>
+#include <cublas_v2.h>
+
+void saxpy(int n, float a, float *x, float *y) {
+  cublasHandle_t handle;
+  cublasCreate(&handle);
+  cublasSaxpy(handle, n, &a, x, 1, y, 1);
+  cublasDestroy(handle);
+}
+You can use this code as a reference, but it's important to note that you need to have the cuBLAS library installed and configured on your system.
+
+
+Output 2:
+Here's the equivalent C/C++ with CUDA code for the given Fortran OpenACC code:
+#include <cuda_runtime.h>
+
+void saxpy(int n, float a, float *x, float *y) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < n) {
+        y[idx] = a * x[idx] + y[idx];
+    }
+}
+
+int main() {
+    int n = 1000;
+    float a = 2.0;
+    float *x, *y;
+    cudaMalloc((void **)&x, n * sizeof(float));
+    cudaMalloc((void **)&y, n * sizeof(float));
+
+    // Initialize x and y arrays on the GPU
+    // ...
+
+    saxpy<<<(n + 255) / 256, 256>>>(n, a, x, y);
+
+    cudaDeviceSynchronize();
+
+    // Use the resulting y array on the GPU
+    // ...
+
+    cudaFree(x);
+    cudaFree(y);
+
+    return 0;
+}
+Note that this code uses the CUDA runtime API to launch the saxpy kernel on the GPU. The kernel is executed by multiple threads in parallel, each processing a different element of the arrays. The blockIdx.x and threadIdx.x variables are used to compute the global index idx of the element being processed by each thread.
+Also, note that this is a simple example and you may want to add error checking and handle memory allocation and deallocation in a more robust way.
+
+
+Output 3:
+Here is a version of the code you provided in C/C++ with CUDA:
+#include <cuda_runtime.h>
+
+void saxpy(int n, float a, float *x, float *y) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < n) {
+    y[idx] = a * x[idx] + y[idx];
+  }
+}
+
+int main() {
+  int n = 1024;
+  float a = 2.0;
+  float *x, *y;
+  cudaMalloc((void **)&x, n * sizeof(float));
+  cudaMalloc((void **)&y, n * sizeof(float));
+
+  // Initialize x and y arrays on the GPU
+  // ...
+
+  saxpy<<<ceil(n/256), 256>>>(n, a, x, y);
+
+  cudaDeviceSynchronize();
+
+  // Check for errors
+  // ...
+
+  cudaFree(x);
+  cudaFree(y);
+
+  return 0;
+}
+Note that this code uses the CUDA runtime API and assumes that the x and y arrays are already allocated and initialized on the GPU. The saxpy function is launched on the GPU using a block size of 256 threads, and the number of blocks is calculated based on the size of the input array n.
+Also, the saxpy function uses the idx variable to access the elements of the x and y arrays, which is calculated based on the block and thread indices.
+You can also use CUDA's thrust library to implement the saxpy operation, it will take care of the memory management and kernel launch for you:
+#include <thrust/saxpy.h>
+#include <thrust/device_vector.h>
+
+int main() {
+  int n = 1024;
+  float a = 2.0;
+  thrust::device_vector<float> x(n);
+  thrust::device_vector<float> y(n);
+
+  // Initialize x and y vectors
+  // ...
+
+  thrust::saxpy(a, x, y);
+
+  return 0;
+}
+This way you don't need to worry about the memory management and kernel launch, and the code will be more concise.
+
+
+Output 4:
+Here is the equivalent code in C/C++ with CUDA:
+#include <cuda_runtime.h>
+
+void saxpy(int n, float a, float *x, float *y) {
+  int i;
+  float *x_d, *y_d;
+  
+  // Allocate memory on the device
+  cudaMalloc((void **)&x_d, n * sizeof(float));
+  cudaMalloc((void **)&y_d, n * sizeof(float));
+  
+  // Copy data from host to device
+  cudaMemcpy(x_d, x, n * sizeof(float), cudaMemcpyHostToDevice);
+  cudaMemcpy(y_d, y, n * sizeof(float), cudaMemcpyHostToDevice);
+  
+  // Launch the kernel
+  saxpy_kernel<<<(n + 255) / 256, 256>>>(n, a, x_d, y_d);
+  
+  // Copy result back to host
+  cudaMemcpy(y, y_d, n * sizeof(float), cudaMemcpyDeviceToHost);
+  
+  // Free device memory
+  cudaFree(x_d);
+  cudaFree(y_d);
+}
+
+__global__ void saxpy_kernel(int n, float a, float *x, float *y) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n) {
+    y[i] = a * x[i] + y[i];
+  }
+}
+Note that this code uses the CUDA runtime API to manage memory and launch the kernel. The saxpy_kernel function is the equivalent of the OpenACC kernel, and is launched using the <<< >>> syntax. The blockIdx.x and threadIdx.x variables are used to compute the global thread index, which is used to access the x and y arrays.
+Also, note that this is a simple implementation and you may want to add error checking and handling code to make it more robust.
+
+
+Output 5:
+Here is the equivalent code in C/C++ with CUDA:
+#include <cuda_runtime.h>
+
+void saxpy(int n, float a, float *x, float *y) {
+  int i;
+  float *x_d, *y_d;
+  cudaMalloc((void **)&x_d, n * sizeof(float));
+  cudaMalloc((void **)&y_d, n * sizeof(float));
+  cudaMemcpy(x_d, x, n * sizeof(float), cudaMemcpyHostToDevice);
+  cudaMemcpy(y_d, y, n * sizeof(float), cudaMemcpyHostToDevice);
+  cudaKernel<<<1, n>>>(n, a, x_d, y_d);
+  cudaMemcpy(y, y_d, n * sizeof(float), cudaMemcpyDeviceToHost);
+  cudaFree(x_d);
+  cudaFree(y_d);
+}
+
+__global__ void cudaKernel(int n, float a, float *x, float *y) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n) {
+    y[i] = a * x[i] + y[i];
+  }
+}
+Note that this code uses the CUDA runtime API to manage memory and launch the kernel. The cudaKernel function is the equivalent of the OpenACC kernel, and is launched using the <<<>>> syntax. The blockIdx.x * blockDim.x + threadIdx.x calculation is used to compute the global thread index, which is equivalent to the i variable in the OpenACC kernel.
+Also, note that this is a very basic implementation and you may want to add error checking and optimize the kernel launch configuration for your specific use case.
+You can also use cuBLAS library which is optimized for NVIDIA GPUs, it provides a saxpy function that is much faster than the one you can write.
+#include <cublas_v2.h>
+
+void saxpy(int n, float a, float *x, float *y) {
+  cublasHandle_t handle;
+  cublasCreate(&handle);
+  cublasSaxpy(handle, n, &a, x, 1, y, 1);
+  cublasDestroy(handle);
+}
+You can use this function to perform the saxpy operation, it will be much faster than the custom implementation.
+
+
+Output 6:
+Here is a version of the Fortran OpenACC code implemented in C/C++ with CUDA:
+#include <cuda_runtime.h>
+
+void saxpy(int n, float a, float *x, float *y) {
+  int i;
+  float *x_d, *y_d;
+  
+  // Allocate device memory
+  cudaMalloc((void **)&x_d, n * sizeof(float));
+  cudaMalloc((void **)&y_d, n * sizeof(float));
+  
+  // Copy host memory to device
+  cudaMemcpy(x_d, x, n * sizeof(float), cudaMemcpyHostToDevice);
+  cudaMemcpy(y_d, y, n * sizeof(float), cudaMemcpyHostToDevice);
+  
+  // Launch kernel
+  saxpy_kernel<<<(n + 255) / 256, 256>>>(n, a, x_d, y_d);
+  
+  // Copy device memory to host
+  cudaMemcpy(y, y_d, n * sizeof(float), cudaMemcpyDeviceToHost);
+  
+  // Free device memory
+  cudaFree(x_d);
+  cudaFree(y_d);
+}
+
+__global__ void saxpy_kernel(int n, float a, float *x, float *y) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n) {
+    y[i] = a * x[i] + y[i];
+  }
+}
+Note: This implementation assumes a CUDA-compatible device is available. Also, error checking for CUDA API calls is omitted for brevity.
+The saxpy function allocates device memory, copies host memory to device, launches the kernel, and copies the result back to host memory. The saxpy_kernel kernel performs the AXPY operation in parallel.
+You can compile this code with nvcc and link it with your application.
+
+
+Output 7:
+Here is the equivalent code in C/C++ with CUDA:
+#include <cuda_runtime.h>
+
+void saxpy(int n, float a, float *x, float *y) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < n) {
+    y[idx] = a * x[idx] + y[idx];
+  }
+}
+
+int main() {
+  int n = 1000;
+  float a = 2.0;
+  float *x, *y;
+  cudaMalloc((void **)&x, n * sizeof(float));
+  cudaMalloc((void **)&y, n * sizeof(float));
+
+  saxpy<<<(n + 255) / 256, 256>>>(n, a, x, y);
+
+  cudaFree(x);
+  cudaFree(y);
+  return 0;
+}
+Note that this code uses the CUDA runtime API to launch a kernel on the GPU. The saxpy function is the equivalent of the Fortran subroutine, and the main function sets up the data and launches the kernel.
+Also, note that the kernel is launched with a block size of 256 and a grid size that is calculated based on the size of the input data. This is a common technique to ensure that the kernel is launched with a sufficient number of blocks to fully utilize the GPU.
+You can compile this code with nvcc and run it on a CUDA-enabled GPU.
+
+
+Output 8:
+Here is a version of the Fortran OpenACC code implemented in C/C++ with CUDA:
+#include <cuda_runtime.h>
+
+__global__ void saxpy(int n, float a, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+void saxpy_host(int n, float a, float *x, float *y) {
+    int blockSize = 256;
+    int numBlocks = (n + blockSize - 1) / blockSize;
+    saxpy<<<numBlocks, blockSize>>>(n, a, x, y);
+    cudaDeviceSynchronize();
+}
+Note that this code assumes that the x and y arrays are already allocated and copied to the device. You will need to add additional code to handle memory allocation, data transfer, and error checking.
+Also, the saxpy_host function is a wrapper that calls the saxpy kernel on the device. The blockSize and numBlocks variables are used to define the block and grid sizes for the kernel launch.
+You can call the saxpy_host function from your C/C++ program, passing in the necessary arguments. For example:
+int main() {
+    int n = 1024;
+    float a = 2.0f;
+    float *x, *y;
+    // Allocate and initialize x and y arrays
+    saxpy_host(n, a, x, y);
+    // Check the result
+    return 0;
+}
+This code will perform the AXPY operation on the device using CUDA.
+
+
+Output 9:
+Here's the equivalent code in C/C++ with CUDA:
+#include <cuda_runtime.h>
+
+void saxpy(int n, float a, float *x, float *y) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < n) {
+    y[idx] = a * x[idx] + y[idx];
+  }
+}
+
+int main() {
+  int n = 1000;
+  float a = 2.0;
+  float *x, *y;
+  cudaMalloc((void **)&x, n * sizeof(float));
+  cudaMalloc((void **)&y, n * sizeof(float));
+
+  // Initialize x and y arrays on the GPU
+
+  saxpy<<<(n + 255) / 256, 256>>>(n, a, x, y);
+
+  cudaDeviceSynchronize();
+
+  // Retrieve and print the results from the GPU
+
+  cudaFree(x);
+  cudaFree(y);
+  return 0;
+}
+Note that this code uses the CUDA runtime API to launch the kernel on the GPU. The saxpy function is the equivalent of the Fortran subroutine, and it performs the AXPY operation on the GPU. The main function allocates memory on the GPU, initializes the arrays, launches the kernel, and retrieves the results.
+Also, note that this is a simple example and you may want to add error checking and handling for more robustness.
+
+
+Output 10:
+Here is a version of the code in C/C++ with CUDA:
+#include <cuda_runtime.h>
+
+void saxpy(int n, float a, float *x, float *y) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < n) {
+    y[idx] = a * x[idx] + y[idx];
+  }
+}
+
+int main() {
+  int n = 1000;
+  float a = 2.0;
+  float *x, *y;
+  cudaMalloc((void **)&x, n * sizeof(float));
+  cudaMalloc((void **)&y, n * sizeof(float));
+  // Initialize x and y arrays here
+  saxpy<<<(n + 255) / 256, 256>>>(n, a, x, y);
+  cudaDeviceSynchronize();
+  cudaFree(x);
+  cudaFree(y);
+  return 0;
+}
+Note that this code uses the CUDA runtime API to launch a kernel on the GPU. The saxpy function is the kernel that performs the AXPY operation. The main function allocates memory on the GPU, initializes the x and y arrays, launches the kernel, and then frees the memory.
+You can compile this code with nvcc and run it on a CUDA-enabled GPU.
+Also, you can use OpenACC with C/C++ to offload the computation to the GPU, here is an example:
+#include <openacc.h>
+
+void saxpy(int n, float a, float *x, float *y) {
+  #pragma acc kernels
+  for (int i = 0; i < n; i++) {
+    y[i] = a * x[i] + y[i];
+  }
+}
+
+int main() {
+  int n = 1000;
+  float a = 2.0;
+  float *x, *y;
+  x = (float *)malloc(n * sizeof(float));
+  y = (float *)malloc(n * sizeof(float));
+  // Initialize x and y arrays here
+  saxpy(n, a, x, y);
+  free(x);
+  free(y);
+  return 0;
+}
+You can compile this code with a OpenACC enabled compiler, such as pgcc or gcc with OpenACC support.
+
+

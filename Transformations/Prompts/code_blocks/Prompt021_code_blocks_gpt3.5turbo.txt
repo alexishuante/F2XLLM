@@ -1,0 +1,225 @@
+Code Block 1:
+extern "C" void saxpy_parallel(int n, float a, float *x, float *y) {
+    float *d_x, *d_y;
+    hipMalloc(&d_x, n * sizeof(float));
+    hipMalloc(&d_y, n * sizeof(float));
+
+    hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
+    hipMemcpy(d_y, y, n * sizeof(float), hipMemcpyHostToDevice);
+
+    int block_size = 256;
+    int grid_size = (n + block_size - 1) / block_size;
+
+    hipLaunchKernelGGL(axpy_kernel, dim3(grid_size), dim3(block_size), 0, 0, n, a, d_x, d_y);
+
+    hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
+
+    hipFree(d_x);
+    hipFree(d_y);
+}
+
+__global__ void axpy_kernel(int n, float a, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+Code Block 2:
+extern "C" void saxpy_parallel(int n, float a, float* x, float* y) {
+    hipLaunchKernelGGL(saxpy_kernel, dim3((n+255)/256), dim3(256), 0, 0, n, a, x, y);
+}
+
+__global__ void saxpy_kernel(int n, float a, float* x, float* y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+Code Block 3:
+extern "C" void saxpy_parallel(int n, float a, float* x, float* y) {
+    int blockSize = 256;
+    int numBlocks = (n + blockSize - 1) / blockSize;
+
+    hipLaunchKernelGGL(saxpy_kernel, dim3(numBlocks), dim3(blockSize), 0, 0, n, a, x, y);
+}
+
+__global__
+void saxpy_kernel(int n, float a, float* x, float* y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+Code Block 4:
+void saxpy_parallel(int n, float a, float* x, float* y) {
+        float *d_x, *d_y;
+        hipMalloc((void**)&d_x, n * sizeof(float));
+        hipMalloc((void**)&d_y, n * sizeof(float));
+        hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
+        hipMemcpy(d_y, y, n * sizeof(float), hipMemcpyHostToDevice);
+
+        int block_size = 256;
+        int grid_size = (n + block_size - 1) / block_size;
+
+        saxpy_kernel<<<grid_size, block_size>>>(n, a, d_x, d_y);
+
+        hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
+        hipFree(d_x);
+        hipFree(d_y); 
+    }
+
+__global__ void saxpy_kernel(int n, float a, float* x, float* y) {
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    if (index < n) {
+        y[index] = a * x[index] + y[index];
+    }
+}
+
+Code Block 5:
+void saxpy_parallel_wrapper(int n, float a, float* x, float* y)
+{
+    float *d_x, *d_y;
+    hipMalloc(&d_x, n * sizeof(float));
+    hipMalloc(&d_y, n * sizeof(float));
+
+    hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
+    hipMemcpy(d_y, y, n * sizeof(float), hipMemcpyHostToDevice);
+
+    int blockSize = 256;
+    int numBlocks = (n + blockSize - 1) / blockSize;
+
+    hipLaunchKernelGGL(saxpy_parallel, dim3(numBlocks), dim3(blockSize), 0, 0, n, a, d_x, d_y);
+
+    hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
+
+    hipFree(d_x);
+    hipFree(d_y);
+}
+
+__global__ void saxpy_parallel(int n, float a, float* x, float* y)
+{
+    int i = blockDim.x * blockIdx.x + threadIdx.x;
+    if (i < n)
+    {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+Code Block 6:
+void saxpy_parallel(int n, float a, float *x, float *y)
+{
+    float *d_x, *d_y;
+    
+    hipMalloc(&d_x, n * sizeof(float));
+    hipMalloc(&d_y, n * sizeof(float));
+    
+    hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
+    hipMemcpy(d_y, y, n * sizeof(float), hipMemcpyHostToDevice);
+    
+    int blockSize = 256;
+    int gridSize = (n + blockSize - 1) / blockSize;
+    
+    hipLaunchKernelGGL(saxpy_parallel, dim3(gridSize), dim3(blockSize), 0, 0, n, a, d_x, d_y);
+    
+    hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
+
+    hipFree(d_x);
+    hipFree(d_y);
+}
+
+__global__ void saxpy_parallel(int n, float a, float *x, float *y)
+{
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if (tid < n)
+    {
+        y[tid] = a * x[tid] + y[tid];
+    }
+}
+
+Code Block 7:
+extern "C" void saxpy_parallel(int n, float a, float *x, float *y) {
+    int blockSize = 256;
+    int numBlocks = (n + blockSize - 1) / blockSize;
+    
+    hipLaunchKernelGGL(saxpy_parallel, dim3(numBlocks), dim3(blockSize), 0, 0, n, a, x, y);
+}
+
+__global__ void saxpy_parallel(int n, float a, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+Code Block 8:
+void saxpy_parallel(int n, float a, float *x, float *y) {
+    hipLaunchKernelGGL(saxpy_kernel, dim3((n+255)/256), dim3(256), 0, 0, n, a, x, y);
+}
+
+__global__ void saxpy_kernel(int n, float a, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+Code Block 9:
+void saxpy_parallel(int n, float a, float *x, float *y) {
+    float *d_x, *d_y;
+
+    hipMalloc(&d_x, n * sizeof(float));
+    hipMalloc(&d_y, n * sizeof(float));
+
+    hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
+    hipMemcpy(d_y, y, n * sizeof(float), hipMemcpyHostToDevice);
+
+    int blockSize = 256;
+    int gridSize = (n + blockSize - 1) / blockSize;
+
+    hipLaunchKernelGGL(hip_saxpy_parallel, dim3(gridSize), dim3(blockSize), 0, 0, n, a, d_x, d_y);
+
+    hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
+
+    hipFree(d_x);
+    hipFree(d_y);
+}
+
+__global__ void hip_saxpy_parallel(int n, float a, float *x, float *y) {
+    int i = blockDim.x * blockIdx.x + threadIdx.x;
+    
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+Code Block 10:
+void saxpy_parallel(int n, float a, float* x, float* y) {
+    float *d_x, *d_y;
+    hipMalloc(&d_x, n * sizeof(float));
+    hipMalloc(&d_y, n * sizeof(float));
+
+    hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
+    hipMemcpy(d_y, y, n * sizeof(float), hipMemcpyHostToDevice);
+
+    int blockSize = 256;
+    int gridSize = (n + blockSize - 1) / blockSize;
+
+    hipLaunchKernelGGL(saxpy_kernel, dim3(gridSize), dim3(blockSize), 0, 0, n, a, d_x, d_y);
+
+    hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
+
+    hipFree(d_x);
+    hipFree(d_y);
+}
+
+__global__ void saxpy_kernel(int n, float a, float* x, float* y) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < n) {
+        y[idx] = a * x[idx] + y[idx];
+    }
+}
+
