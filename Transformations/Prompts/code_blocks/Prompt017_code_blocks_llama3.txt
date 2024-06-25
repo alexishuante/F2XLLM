@@ -1,0 +1,287 @@
+Code Block 1:
+void jacobi_parallel(double *u, double *unew, int n, int niter, int nthreads) {
+  #pragma acc kernels loop independent copy(u[:n*n*n], unew[:n*n*n])
+  for (int iter = 1; iter <= niter; ++iter) {
+    #pragma acc loop gang vector(128)
+    for (int k = 2; k < n - 1; ++k) {
+      #pragma acc loop gang vector(128)
+      for (int j = 2; j < n - 1; ++j) {
+        #pragma acc loop gang vector(128)
+        for (int i = 2; i < n - 1; ++i) {
+          unew[i + j*n + k*n*n] = 0.125 * (u[(i-1) + j*n + k*n*n] + u[(i+1) + j*n + k*n*n] +
+                                            u[i + (j-1)*n + k*n*n] + u[i + (j+1)*n + k*n*n] +
+                                            u[i + j*n + (k-1)*n*n] + u[i + j*n + (k+1)*n*n] +
+                                            u[i + j*n + k*n*n]);
+        }
+      }
+    }
+    #pragma acc wait
+    #pragma acc copy(u[:n*n*n], unew[:n*n*n])
+  }
+}
+
+Code Block 2:
+void jacobi_parallel(double *u, double *unew, int n, int niter, int nthreads) {
+  int i, j, k, iter;
+  #pragma acc parallel num_gangs(nthreads) private(i, j, k, iter)
+  {
+    #pragma acc loop gang
+    for (iter = 1; iter <= niter; iter++) {
+      #pragma acc loop gang collapse(3)
+      for (k = 2; k < n - 1; k++) {
+        for (j = 2; j < n - 1; j++) {
+          for (i = 2; i < n - 1; i++) {
+            unew[i + j*n + k*n*n] = 0.125 * (u[i-1 + j*n + k*n*n] + u[i+1 + j*n + k*n*n] +
+                                              u[i + (j-1)*n + k*n*n] + u[i + (j+1)*n + k*n*n] +
+                                              u[i + j*n + (k-1)*n*n] + u[i + j*n + (k+1)*n*n] +
+                                              u[i + j*n + k*n*n]);
+          }
+        }
+      }
+      #pragma acc wait
+      #pragma acc loop gang collapse(3)
+      for (k = 0; k < n; k++) {
+        for (j = 0; j < n; j++) {
+          for (i = 0; i < n; i++) {
+            u[i + j*n + k*n*n] = unew[i + j*n + k*n*n];
+          }
+        }
+      }
+    }
+  }
+}
+
+Code Block 3:
+void jacobi_parallel(double ***u, double ***unew, int n, int niter, int nthreads) {
+  int i, j, k, iter;
+  
+  #pragma acc parallel num_gangs(nthreads) private(i, j, k, iter)
+  {
+    #pragma acc loop gang
+    for (iter = 1; iter <= niter; iter++) {
+      #pragma acc loop tile(2) collapse(3)
+      for (k = 2; k < n - 1; k++) {
+        for (j = 2; j < n - 1; j++) {
+          for (i = 2; i < n - 1; i++) {
+            unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] + u[i][j-1][k] +
+                                       u[i][j+1][k] + u[i][j][k-1] + u[i][j][k+1] + u[i][j][k]);
+          }
+        }
+      }
+      #pragma acc wait
+      #pragma acc loop gang
+      for (k = 0; k < n; k++) {
+        #pragma acc loop tile(2) collapse(2)
+        for (j = 0; j < n; j++) {
+          for (i = 0; i < n; i++) {
+            u[i][j][k] = unew[i][j][k];
+          }
+        }
+      }
+    }
+  }
+}
+
+Code Block 4:
+void jacobi_parallel(float *u, float *unew, int n, int niter, int nthreads) {
+  int i, j, k, iter;
+  #pragma acc parallel num_gangs(nthreads) vector_length(32) \
+    private(i, j, k, iter)
+  {
+    #pragma acc loop gang
+    for (iter = 1; iter <= niter; iter++) {
+      #pragma acc loop gang collapse(3)
+      for (k = 2; k < n - 1; k++) {
+        for (j = 2; j < n - 1; j++) {
+          for (i = 2; i < n - 1; i++) {
+            unew[i + j * n + k * n * n] = 0.125f * (
+              u[(i - 1) + j * n + k * n * n] + u[(i + 1) + j * n + k * n * n] +
+              u[i + (j - 1) * n + k * n * n] + u[i + (j + 1) * n + k * n * n] +
+              u[i + j * n + (k - 1) * n * n] + u[i + j * n + (k + 1) * n * n] +
+              u[i + j * n + k * n * n]);
+          }
+        }
+      }
+      #pragma acc wait
+      #pragma acc loop gang collapse(3)
+      for (k = 0; k < n * n * n; k++) {
+        u[k] = unew[k];
+      }
+    }
+  }
+}
+
+Code Block 5:
+void jacobi_parallel(double ***u, double ***unew, int n, int niter, int nthreads) {
+  int i, j, k, iter;
+  #pragma acc parallel num_gangs(nthreads) private(i, j, k, iter)
+  {
+    #pragma acc loop gang
+    for (iter = 1; iter <= niter; iter++) {
+      #pragma acc loop gang collapse(3)
+      for (k = 2; k < n - 1; k++) {
+        for (j = 2; j < n - 1; j++) {
+          for (i = 2; i < n - 1; i++) {
+            unew[k][j][i] = 0.125 * (u[k][j][i-1] + u[k][j][i+1] + u[k][j-1][i] +
+                                       u[k][j+1][i] + u[k-1][j][i] + u[k+1][j][i] + u[k][j][i]);
+          }
+        }
+      }
+      #pragma acc barrier
+      #pragma acc loop gang collapse(3)
+      for (k = 0; k < n; k++) {
+        for (j = 0; j < n; j++) {
+          for (i = 0; i < n; i++) {
+            u[k][j][i] = unew[k][j][i];
+          }
+        }
+      }
+    }
+  }
+}
+
+Code Block 6:
+void jacobi_parallel(double ***u, double ***unew, int n, int niter, int nthreads) {
+  int i, j, k, iter;
+  #pragma acc parallel num_gangs(nthreads) private(i, j, k, iter)
+  {
+    #pragma acc loop gang
+    for (iter = 1; iter <= niter; iter++) {
+      #pragma acc loop gang collapse(3)
+      for (k = 2; k < n - 1; k++) {
+        for (j = 2; j < n - 1; j++) {
+          for (i = 2; i < n - 1; i++) {
+            unew[k][j][i] = 0.125 * (u[k][j][i-1] + u[k][j][i+1] + u[k][j-1][i] +
+              u[k][j+1][i] + u[k-1][j][i] + u[k+1][j][i] + u[k][j][i]);
+          }
+        }
+      }
+      #pragma acc barrier
+      #pragma acc loop gang collapse(3)
+      for (k = 0; k < n; k++) {
+        for (j = 0; j < n; j++) {
+          for (i = 0; i < n; i++) {
+            u[k][j][i] = unew[k][j][i];
+          }
+        }
+      }
+    }
+  }
+}
+
+Code Block 7:
+void jacobi_parallel(double ***u, double ***unew, int n, int niter, int nthreads) {
+  int i, j, k, iter;
+  #pragma acc parallel num_gangs(nthreads) private(i, j, k, iter)
+  {
+    #pragma acc loop gang
+    for (iter = 1; iter <= niter; iter++) {
+      #pragma acc loop tile(2, 2, 2)
+      for (k = 2; k < n - 1; k++) {
+        for (j = 2; j < n - 1; j++) {
+          for (i = 2; i < n - 1; i++) {
+            unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] + u[i][j-1][k] +
+                                       u[i][j+1][k] + u[i][j][k-1] + u[i][j][k+1] + u[i][j][k]);
+          }
+        }
+      }
+      #pragma acc wait
+      #pragma acc loop gang
+      for (k = 0; k < n; k++) {
+        for (j = 0; j < n; j++) {
+          for (i = 0; i < n; i++) {
+            u[i][j][k] = unew[i][j][k];
+          }
+        }
+      }
+    }
+  }
+}
+
+Code Block 8:
+void jacobi_parallel(double ***u, double ***unew, int n, int niter, int nthreads) {
+  int i, j, k, iter;
+  #pragma acc parallel num_gangs(nthreads) private(i, j, k, iter)
+  {
+    #pragma acc loop gang
+    for (iter = 1; iter <= niter; iter++) {
+      #pragma acc loop gang collapse(3)
+      for (k = 2; k < n - 1; k++) {
+        for (j = 2; j < n - 1; j++) {
+          for (i = 2; i < n - 1; i++) {
+            unew[k][j][i] = 0.125 * (u[k][j][i-1] + u[k][j][i+1] + u[k][j-1][i] +
+              u[k][j+1][i] + u[k-1][j][i] + u[k+1][j][i] + u[k][j][i]);
+          }
+        }
+      }
+      #pragma acc barrier
+      #pragma acc loop gang collapse(3)
+      for (k = 0; k < n; k++) {
+        for (j = 0; j < n; j++) {
+          for (i = 0; i < n; i++) {
+            u[k][j][i] = unew[k][j][i];
+          }
+        }
+      }
+    }
+  }
+}
+
+Code Block 9:
+void jacobi_parallel(double ***u, double ***unew, int n, int niter, int nthreads) {
+  int i, j, k, iter;
+  #pragma acc parallel num_gangs(nthreads) private(i, j, k, iter)
+  {
+    #pragma acc loop gang
+    for (iter = 1; iter <= niter; iter++) {
+      #pragma acc loop gang collapse(3)
+      for (k = 2; k < n - 1; k++) {
+        for (j = 2; j < n - 1; j++) {
+          for (i = 2; i < n - 1; i++) {
+            unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] + u[i][j-1][k] +
+              u[i][j+1][k] + u[i][j][k-1] + u[i][j][k+1] + u[i][j][k]);
+          }
+        }
+      }
+      #pragma acc barrier
+      #pragma acc loop gang collapse(3)
+      for (k = 0; k < n; k++) {
+        for (j = 0; j < n; j++) {
+          for (i = 0; i < n; i++) {
+            u[i][j][k] = unew[i][j][k];
+          }
+        }
+      }
+    }
+  }
+}
+
+Code Block 10:
+void jacobi_parallel(double ***u, double ***unew, int n, int niter, int nthreads) {
+  int i, j, k, iter;
+  #pragma acc parallel num_gangs(nthreads) private(i, j, k, iter)
+  {
+    #pragma acc loop gang
+    for (iter = 1; iter <= niter; iter++) {
+      #pragma acc loop gang collapse(3)
+      for (k = 2; k < n - 1; k++) {
+        for (j = 2; j < n - 1; j++) {
+          for (i = 2; i < n - 1; i++) {
+            unew[k][j][i] = 0.125 * (u[k][j][i-1] + u[k][j][i+1] + u[k][j-1][i] +
+                                       u[k][j+1][i] + u[k-1][j][i] + u[k+1][j][i] + u[k][j][i]);
+          }
+        }
+      }
+      #pragma acc barrier
+      #pragma acc loop gang collapse(3)
+      for (k = 0; k < n; k++) {
+        for (j = 0; j < n; j++) {
+          for (i = 0; i < n; i++) {
+            u[k][j][i] = unew[k][j][i];
+          }
+        }
+      }
+    }
+  }
+}
+

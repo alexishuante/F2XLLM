@@ -1,0 +1,876 @@
+Output 1:
+Sure, the following C++ code snippet uses HIP to implement a Generalized Matrix Multiplication (GEMM) operation. HIP (Heterogeneous-computing Interface for Portability) allows you to write portable code that can run on both AMD GPUs and NVIDIA GPUs.
+
+Below is the equivalent GEMM operation in C++ using HIP:
+
+```cpp
+#include <hip/hip_runtime.h>
+#include <iostream>
+
+const int TILE_DIM = 16;
+
+__global__ void gemm_kernel(int m, int n, int k, double alpha, const double *a, int lda, const double *b, int ldb, double beta, double *c, int ldc) {
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if(row < m && col < n) {
+        double temp = 0.0;
+        for(int l = 0; l < k; l++) {
+            temp += a[row * lda + l] * b[l * ldb + col];
+        }
+        c[row * ldc + col] = alpha * temp + beta * c[row * ldc + col];
+    }
+}
+
+void gemm_parallel(int m, int n, int k, double alpha, const double *a, int lda, const double *b, int ldb, double beta, double *c, int ldc) {
+    // Device pointers
+    double *d_a, *d_b, *d_c;
+    
+    // Allocate device memory
+    hipMalloc(&d_a, m * k * sizeof(double));
+    hipMalloc(&d_b, k * n * sizeof(double));
+    hipMalloc(&d_c, m * n * sizeof(double));
+    
+    // Copy data to device
+    hipMemcpy(d_a, a, m * k * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_b, b, k * n * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_c, c, m * n * sizeof(double), hipMemcpyHostToDevice);
+    
+    // Launch kernel
+    dim3 blockDim(TILE_DIM, TILE_DIM);
+    dim3 gridDim((n + TILE_DIM - 1) / TILE_DIM, (m + TILE_DIM - 1) / TILE_DIM);
+    
+    hipLaunchKernelGGL(gemm_kernel, gridDim, blockDim, 0, 0, m, n, k, alpha, d_a, lda, d_b, ldb, beta, d_c, ldc);
+    
+    // Copy result back to host
+    hipMemcpy(c, d_c, m * n * sizeof(double), hipMemcpyDeviceToHost);
+    
+    // Free device memory
+    hipFree(d_a);
+    hipFree(d_b);
+    hipFree(d_c);
+}
+
+int main() {
+    int m = 4, n = 4, k = 4;
+    double alpha = 1.0, beta = 1.0;
+    
+    double a[4 * 4] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
+    double b[4 * 4] = {16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1};
+    double c[4 * 4] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
+    
+    gemm_parallel(m, n, k, alpha, a, 4, b, 4, beta, c, 4);
+    
+    for(int i = 0; i < m; i++) {
+        for(int j = 0; j < n; j++) {
+            std::cout << c[i * n + j] << " ";
+        }
+        std::cout << std::endl;
+    }
+    
+    return 0;
+}
+```
+
+### Explanation:
+1. **Kernel Function (`gemm_kernel`)**:
+   - The kernel function performs the matrix multiplication and applies the `alpha` and `beta` scalars.
+   - Each thread computes one element of the result matrix `c`.
+
+2. **Host Function (`gemm_parallel`)**:
+   - Allocate memory on the GPU.
+   - Transfer data from the host to the GPU.
+   - Launch the kernel function.
+   - Transfer the result from the GPU back to the host.
+   - Free the allocated GPU memory.
+
+3. **Main Function**:
+   - Demonstrates the usage of the `gemm_parallel` function by defining matrices `a`, `b`, and `c` with dimensions and values.
+   - Invokes `gemm_parallel` and prints the result.
+
+Before running this code, ensure your environment is set up correctly to compile and run HIP programs. This typically involves setting up the HIP SDK from AMD or using ROCm (Radeon Open Compute) on supported systems.
+
+Output 2:
+The following C++ code uses the HIP (Heterogeneous-Compute Interface for Portability) library to implement a Generalized Matrix Multiplication (GEMM) operation. The HIP library is designed for executing GPU code across different types of hardware, including AMD and NVIDIA GPUs.
+
+```cpp
+#include <hip/hip_runtime.h>
+#include <iostream>
+
+constexpr int BLOCK_SIZE = 16;
+
+__global__ void gemm_kernel(int m, int n, int k, 
+                            double alpha, const double* __restrict__ a, int lda, 
+                            const double* __restrict__ b, int ldb, 
+                            double beta, double* __restrict__ c, int ldc) {
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (row < m && col < n) {
+        double temp = 0.0;
+        for (int i = 0; i < k; ++i) {
+            temp += a[row * lda + i] * b[i * ldb + col];
+        }
+        c[row * ldc + col] = alpha * temp + beta * c[row * ldc + col];
+    }
+}
+
+void gemm_parallel(int m, int n, int k, double alpha, const double* a, int lda, 
+                   const double* b, int ldb, double beta, double* c, int ldc) {
+    // Device pointers
+    double *d_a, *d_b, *d_c;
+
+    // Allocate device memory
+    hipMalloc(&d_a, m * k * sizeof(double));
+    hipMalloc(&d_b, k * n * sizeof(double));
+    hipMalloc(&d_c, m * n * sizeof(double));
+
+    // Copy data to device
+    hipMemcpy(d_a, a, m * k * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_b, b, k * n * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_c, c, m * n * sizeof(double), hipMemcpyHostToDevice);
+
+    // Define block and grid dimensions
+    dim3 blockSize(BLOCK_SIZE, BLOCK_SIZE);
+    dim3 gridSize((n + BLOCK_SIZE - 1) / BLOCK_SIZE, (m + BLOCK_SIZE - 1) / BLOCK_SIZE);
+
+    // Launch the GEMM kernel
+    hipLaunchKernelGGL(gemm_kernel, gridSize, blockSize, 0, 0, 
+                       m, n, k, alpha, d_a, lda, d_b, ldb, beta, d_c, ldc);
+
+    // Copy results back to host
+    hipMemcpy(c, d_c, m * n * sizeof(double), hipMemcpyDeviceToHost);
+
+    // Free device memory
+    hipFree(d_a);
+    hipFree(d_b);
+    hipFree(d_c);
+}
+
+int main() {
+    // Example parameters
+    int m = 2, n = 3, k = 2;
+    double alpha = 1.0, beta = 1.0;
+    double a[2][2] = {{1.0, 2.0}, {3.0, 4.0}};
+    double b[2][3] = {{5.0, 6.0, 7.0}, {8.0, 9.0, 10.0}};
+    double c[2][3] = {{1.0, 1.0, 1.0}, {1.0, 1.0, 1.0}};
+
+    gemm_parallel(m, n, k, alpha, (double*)a, 2, (double*)b, 3, beta, (double*)c, 3);
+
+    // Print the result
+    for (int i = 0; i < m; ++i) {
+        for (int j = 0; j < n; ++j) {
+            std::cout << c[i][j] << " ";
+        }
+        std::cout << std::endl;
+    }
+
+    return 0;
+}
+```
+
+Explanation:
+
+1. Parameters \(m\), \(n\), and \(k\) define the dimensions of the matrices involved in the GEMM operation.
+2. The `gemm_kernel` function is executed on the GPU. It indexes into the matrices and performs the matrix multiplication and addition.
+3. `gemm_parallel` allocates memory on the GPU for input matrices \(a\), \(b\), and the output matrix \(c\). `hipMemcpy` is used to transfer data back and forth between the host and the GPU.
+4. The compute grid is divided into blocks and threads to handle the parallel computation.
+5. After the kernel execution, the result is copied back from the device to the host and the GPU memory is freed.
+
+To compile and run this HIP program, make sure you have the HIP environment set up on your machine. If you are using AMD ROCm, you can use the `hipcc` compiler:
+```sh
+hipcc -o gemm gemm.cpp
+./gemm
+```
+
+Output 3:
+Below is a C++ version of the Generalized Matrix Multiplication (GEMM) operation, which utilizes HIP to parallelize the code for GPU execution. This code snippet demonstrates how to perform the same operation in a HIP-accelerated environment.
+
+```cpp
+#include <hip/hip_runtime.h>
+#include <iostream>
+
+#define IDX2C(i,j,ld) (((j)*(ld))+(i))
+
+__global__ void gemm_kernel(int m, int n, int k, double alpha, const double* a, int lda,
+                            const double* b, int ldb, double beta, double* c, int ldc) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    if (i < m && j < n) {
+        double temp = 0.0;
+        for (int l = 0; l < k; ++l) {
+            temp += a[IDX2C(i, l, lda)] * b[IDX2C(l, j, ldb)];
+        }
+        c[IDX2C(i, j, ldc)] = alpha * temp + beta * c[IDX2C(i, j, ldc)];
+    }
+}
+
+void gemm_parallel(int m, int n, int k, double alpha, const double* a, int lda,
+                   const double* b, int ldb, double beta, double* c, int ldc) {
+    // Allocate device memory
+    double *d_a, *d_b, *d_c;
+    hipMalloc((void**)&d_a, m * k * sizeof(double));
+    hipMalloc((void**)&d_b, k * n * sizeof(double));
+    hipMalloc((void**)&d_c, m * n * sizeof(double));
+    
+    // Copy data to device
+    hipMemcpy(d_a, a, m * k * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_b, b, k * n * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_c, c, m * n * sizeof(double), hipMemcpyHostToDevice);
+    
+    // Define grid and block dimensions
+    dim3 blockDim(16, 16);
+    dim3 gridDim((m + blockDim.x - 1) / blockDim.x, (n + blockDim.y - 1) / blockDim.y);
+    
+    // Launch the kernel
+    hipLaunchKernelGGL(gemm_kernel, gridDim, blockDim, 0, 0, m, n, k, alpha, d_a, lda, d_b, ldb, beta, d_c, ldc);
+    
+    // Copy the result back to host
+    hipMemcpy(c, d_c, m * n * sizeof(double), hipMemcpyDeviceToHost);
+    
+    // Free device memory
+    hipFree(d_a);
+    hipFree(d_b);
+    hipFree(d_c);
+}
+
+int main() {
+    // Example usage
+    const int m = 2, n = 2, k = 2;
+    double alpha = 1.0, beta = 0.0;
+    const int lda = k, ldb = n, ldc = n;
+    double a[m*k] = {1, 2, 3, 4};
+    double b[k*n] = {5, 6, 7, 8};
+    double c[m*n] = {1, 1, 1, 1};
+    
+    gemm_parallel(m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+    
+    // Output result
+    for (int i = 0; i < m; ++i) {
+        for (int j = 0; j < n; ++j) {
+            std::cout << c[IDX2C(i, j, ldc)] << " ";
+        }
+        std::cout << std::endl;
+    }
+    return 0;
+}
+```
+
+Explanation:
+1. **CUDA/Kernels:** The gemm_kernel is the GPU kernel responsible for performing the matrix multiplication operation. The use of `blockIdx`, `blockDim`, and `threadIdx` allows for parallel execution across the GPU cores.
+2. **Memory Allocation:** Device memory for the matrices is allocated using `hipMalloc`, and data is transferred between the host and device memory with `hipMemcpy`.
+3. **Launch Configuration:** The kernel `gemm_kernel` is launched with a specified grid and block dimensions that determine the distribution of work among the GPU threads.
+4. **Memory Cleanup:** Device memory is freed after computations using `hipFree`.
+
+Compile with:
+```
+hipcc -o gemm_parallel gemm_parallel.cpp
+```
+
+Ensure you have the HIP runtime and necessary GPU drivers installed to run the code. The example provided is a simple usage scenario. You can modify the matrix dimensions and values per your requirements.
+
+Output 4:
+Sure, here is a C++ version of your Fortran OpenACC code, converted to use HIP for parallel execution. This example demonstrates a GEMM operation using HIP:
+
+```cpp
+#include <hip/hip_runtime.h>
+#include <iostream>
+
+// Kernel function for GEMM operation
+__global__ void gemmParallel(int m, int n, int k, double alpha, const double* __restrict__ a, int lda, const double* __restrict__ b, int ldb, double beta, double* __restrict__ c, int ldc) {
+    int j = blockIdx.x * blockDim.x + threadIdx.x;
+    int i = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if (i < m && j < n) {
+        double temp = 0.0;
+        for (int l = 0; l < k; ++l) {
+            temp += a[i * lda + l] * b[l * ldb + j];
+        }
+        c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+    }
+}
+
+// GEMM parallel function
+void gemmParallelWrapper(int m, int n, int k, double alpha, const double* a, int lda, const double* b, int ldb, double beta, double* c, int ldc) {
+    // Define block and grid dimensions
+    dim3 blockSize(16, 16);
+    dim3 gridSize((n + blockSize.x - 1) / blockSize.x, (m + blockSize.y - 1) / blockSize.y);
+
+    // Launch the GEMM kernel
+    hipLaunchKernelGGL(gemmParallel, gridSize, blockSize, 0, 0, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+
+    // Check for any errors launching the kernel
+    hipError_t err = hipGetLastError();
+    if (err != hipSuccess)
+        std::cerr << "Failed to launch gemmParallel kernel (error code " << hipGetErrorString(err) << ")!" << std::endl;
+
+    // Synchronize the device to ensure completion
+    hipDeviceSynchronize();
+}
+
+int main() {
+    // Example usage
+    int m = 3, n = 3, k = 3;
+    double alpha = 1.0, beta = 0.0;
+
+    double a[9] = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0};
+    double b[9] = {9.0, 8.0, 7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0};
+    double c[9] = {0.0};
+
+    double *d_a, *d_b, *d_c;
+
+    // Allocate device memory
+    hipMalloc(&d_a, m * k * sizeof(double));
+    hipMalloc(&d_b, k * n * sizeof(double));
+    hipMalloc(&d_c, m * n * sizeof(double));
+
+    // Copy data to device
+    hipMemcpy(d_a, a, m * k * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_b, b, k * n * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_c, c, m * n * sizeof(double), hipMemcpyHostToDevice);
+
+    // Perform the GEMM operation
+    gemmParallelWrapper(m, n, k, alpha, d_a, k, d_b, n, beta, d_c, n);
+
+    // Copy result back to host
+    hipMemcpy(c, d_c, m * n * sizeof(double), hipMemcpyDeviceToHost);
+
+    // Print the results
+    for (int i = 0; i < m; ++i) {
+        for (int j = 0; j < n; ++j) {
+            std::cout << c[i * n + j] << "\t";
+        }
+        std::cout << std::endl;
+    }
+
+    // Free device memory
+    hipFree(d_a);
+    hipFree(d_b);
+    hipFree(d_c);
+
+    return 0;
+}
+```
+
+This code defines a HIP kernel called `gemmParallel` to perform the GEMM operation in parallel on a GPU. The `gemmParallelWrapper` function sets up the grid and block dimensions and launches the kernel. Finally, in the `main` function, we allocate memory on the device, copy the input matrices to the device, call the GEMM function, and then copy the result back to the host.
+
+Remember to compile this code with a HIP compiler, for example:
+```sh
+hipcc -o gemm gemm_hip.cpp
+```
+
+Also, ensure that you have a ROCm-compatible AMD GPU and the ROCm software stack installed on your system to run HIP programs.
+
+Output 5:
+Below is a C/C++ version of the given Fortran OpenACC code using HIP (Heterogeneous-compute Interface for Portability) to implement a Generalized Matrix Multiplication (GEMM):
+
+```cpp
+#include <hip/hip_runtime.h>
+#include <iostream>
+
+#define IDX2C(i, j, ld) (((j) * (ld)) + (i))
+
+__global__ void gemm_kernel(int m, int n, int k, double alpha, const double *a, int lda, const double *b, int ldb, 
+                            double beta, double *c, int ldc) {
+    int j = blockIdx.x * blockDim.x + threadIdx.x;
+    int i = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if (i < m && j < n) {
+        double temp = 0.0;
+        for (int l = 0; l < k; l++) {
+            temp += a[IDX2C(i, l, lda)] * b[IDX2C(l, j, ldb)];
+        }
+        c[IDX2C(i, j, ldc)] = alpha * temp + beta * c[IDX2C(i, j, ldc)];
+    }
+}
+
+void gemm_parallel(int m, int n, int k, double alpha, const double *a, int lda, const double *b, int ldb, 
+                   double beta, double *c, int ldc) {
+    double *d_a, *d_b, *d_c;
+
+    hipMalloc((void**)&d_a, m * k * sizeof(double));
+    hipMalloc((void**)&d_b, k * n * sizeof(double));
+    hipMalloc((void**)&d_c, m * n * sizeof(double));
+
+    hipMemcpy(d_a, a, m * k * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_b, b, k * n * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_c, c, m * n * sizeof(double), hipMemcpyHostToDevice);
+
+    dim3 threadsPerBlock(16, 16);
+    dim3 numBlocks((n + 15) / 16, (m + 15) / 16);
+
+    hipLaunchKernelGGL(gemm_kernel, numBlocks, threadsPerBlock, 0, 0, m, n, k, alpha, d_a, lda, d_b, ldb, beta, d_c, ldc);
+
+    hipMemcpy(c, d_c, m * n * sizeof(double), hipMemcpyDeviceToHost);
+
+    hipFree(d_a);
+    hipFree(d_b);
+    hipFree(d_c);
+}
+
+// Example usage
+int main() {
+    int m = 4, n = 4, k = 4;
+    double alpha = 1.0, beta = 0.0;
+    double a[4*4] = { /* initialize with values */ };
+    double b[4*4] = { /* initialize with values */ };
+    double c[4*4] = { /* initialize with values */ };
+
+    gemm_parallel(m, n, k, alpha, a, m, b, k, beta, c, m);
+
+    // Print the matrix C
+    for (int i = 0; i < m; ++i) {
+        for (int j = 0; j < n; ++j) {
+            std::cout << c[IDX2C(i, j, m)] << " ";
+        }
+        std::cout << std::endl;
+    }
+
+    return 0;
+}
+```
+
+This implementation performs the following steps:
+1. Allocate memory on the GPU for matrices \( A \), \( B \), and \( C \).
+2. Copy the matrices from the host to the device.
+3. Launch the kernel to compute \( C = \alpha \times (A \times B) + \beta \times C \).
+4. Copy the result matrix \( C \) back to the host.
+5. Clean up the allocated memory on the GPU.
+
+Please note that you need to install HIP and have a compatible GPU to run this code. Moreover, take care to replace the placeholder initialization of `a`, `b`, and `c` with actual values before running the example usage code.
+
+Output 6:
+Sure, here is a C/C++ version of the GEMM operation using HIP for parallel computation on AMD GPUs:
+
+```cpp
+#include <hip/hip_runtime.h>
+
+__global__ void gemm_kernel(int m, int n, int k, double alpha, const double* a, int lda, const double* b, int ldb, double beta, double* c, int ldc) {
+    int idx = threadIdx.x + blockIdx.x * blockDim.x;
+    int idy = threadIdx.y + blockIdx.y * blockDim.y;
+    
+    if (idx < n && idy < m) {
+        double temp = 0.0;
+        for (int l = 0; l < k; ++l) {
+            temp += a[idy + l * lda] * b[l + idx * ldb];
+        }
+        c[idy + idx * ldc] = alpha * temp + beta * c[idy + idx * ldc];
+    }
+}
+
+void gemm_parallel(int m, int n, int k, double alpha, const double* a, int lda, const double* b, int ldb, double beta, double* c, int ldc) {
+    double *d_a, *d_b, *d_c;
+    
+    hipMalloc((void**)&d_a, m * k * sizeof(double));
+    hipMalloc((void**)&d_b, k * n * sizeof(double));
+    hipMalloc((void**)&d_c, m * n * sizeof(double));
+    
+    hipMemcpy(d_a, a, m * k * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_b, b, k * n * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_c, c, m * n * sizeof(double), hipMemcpyHostToDevice);
+    
+    dim3 threadsPerBlock(16, 16);
+    dim3 blocksPerGrid((n + 15) / 16, (m + 15) / 16);
+    
+    hipLaunchKernelGGL(gemm_kernel, blocksPerGrid, threadsPerBlock, 0, 0, m, n, k, alpha, d_a, lda, d_b, ldb, beta, d_c, ldc);
+    
+    hipMemcpy(c, d_c, m * n * sizeof(double), hipMemcpyDeviceToHost);
+    
+    hipFree(d_a);
+    hipFree(d_b);
+    hipFree(d_c);
+}
+
+int main() {
+    // Example usage:
+    int m = 2, n = 3, k = 4;
+    double alpha = 1.0, beta = 1.0;
+    double a[8] = {1, 2, 3, 4, 5, 6, 7, 8};
+    double b[12] = {1, 4, 7, 2, 5, 8, 3, 6, 9, 4, 7, 0};
+    double c[6] = {0, 0, 0, 0, 0, 0};
+    
+    gemm_parallel(m, n, k, alpha, a, 2, b, 4, beta, c, 2);
+
+    // Print result 
+    for(int i = 0; i < m; i++) {
+        for(int j = 0; j < n; j++) {
+            printf("%f ", c[i + j * 2]);
+        }
+        printf("\n");
+    }
+
+    return 0;
+}
+```
+
+### Explanation:
+
+1. **Kernel Function (`gemm_kernel`)**:
+   - The kernel computes the product of matrices `a` and `b` and updates the matrix `c`.
+   - Each thread computes the value for one element of the result matrix `c`.
+
+2. **Host Function (`gemm_parallel`)**:
+   - Allocates memory on the device for matrices `a`, `b`, and `c`.
+   - Copies the data from host to device.
+   - Configures the launch parameters for the kernel.
+   - Invokes the kernel.
+   - Copies the result back from device to host.
+   - Frees the device memory.
+   
+3. **Main Function**:
+   - Demonstrates an example usage of `gemm_parallel` and prints the result matrix.
+
+### Note:
+- Ensure that HIP is correctly installed and configured on your system to compile and run this code.
+- This implementation uses column-major order as suggested by your Fortran code.
+- Adjust `m`, `n`, `k`, `a`, `lda`, `b`, `ldb`, and `c` according to your specific needs.
+
+Output 7:
+Certainly! Below is a C++ version of the provided Fortran code that leverages HIP (Heterogeneous Interface for Portability) to implement the Generalized Matrix Multiplication (GEMM) operation in a parallelized manner. Note that HIP is used for GPU acceleration in this implementation.
+
+```cpp
+#include <hip/hip_runtime.h>
+
+__global__ void gemm_kernel(int m, int n, int k, double alpha, 
+                            const double *a, int lda, 
+                            const double *b, int ldb, 
+                            double beta, double *c, int ldc) {
+    int j = blockIdx.x * blockDim.x + threadIdx.x;
+    int i = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if (i < m && j < n) {
+        double temp = 0.0;
+        for (int l = 0; l < k; ++l) {
+            temp += a[i * lda + l] * b[l * ldb + j];
+        }
+        c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+    }
+}
+
+void gemm_parallel(int m, int n, int k, double alpha, 
+                   const double *a, int lda, 
+                   const double *b, int ldb, 
+                   double beta, double *c, int ldc) {
+    // Define grid and block dimensions
+    dim3 blockDim(16, 16);
+    dim3 gridDim((n + blockDim.x - 1) / blockDim.x, 
+                 (m + blockDim.y - 1) / blockDim.y);
+
+    // Pointers for device
+    double *d_a, *d_b, *d_c;
+    size_t size_a = m * k * sizeof(double);
+    size_t size_b = k * n * sizeof(double);
+    size_t size_c = m * n * sizeof(double);
+
+    // Allocate device memory
+    hipMalloc(&d_a, size_a);
+    hipMalloc(&d_b, size_b);
+    hipMalloc(&d_c, size_c);
+
+    // Copy data to device
+    hipMemcpy(d_a, a, size_a, hipMemcpyHostToDevice);
+    hipMemcpy(d_b, b, size_b, hipMemcpyHostToDevice);
+    hipMemcpy(d_c, c, size_c, hipMemcpyHostToDevice);
+
+    // Launch kernel
+    hipLaunchKernelGGL(gemm_kernel, gridDim, blockDim, 0, 0, 
+                       m, n, k, alpha, d_a, lda, d_b, ldb, beta, d_c, ldc);
+
+    // Copy result back to host
+    hipMemcpy(c, d_c, size_c, hipMemcpyDeviceToHost);
+
+    // Free device memory
+    hipFree(d_a);
+    hipFree(d_b);
+    hipFree(d_c);
+}
+
+int main() {
+    // Example usage of the gemm_parallel function
+    const int m = 4, n = 4, k = 4;
+    const int lda = 4, ldb = 4, ldc = 4;
+    double alpha = 1.0, beta = 1.0;
+    double a[lda * k] = { /* matrix A data */ };
+    double b[ldb * n] = { /* matrix B data */ };
+    double c[ldc * n] = { /* matrix C data */ };
+
+    // Call the gemm_parallel function
+    gemm_parallel(m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+
+    // Print the result
+    for (int i = 0; i < m; ++i) {
+        for (int j = 0; j < n; ++j) {
+            printf("%f ", c[i * ldc + j]);
+        }
+        printf("\n");
+    }
+
+    return 0;
+}
+```
+
+In this code:
+
+- We define a HIP kernel `gemm_kernel` that performs the matrix multiplication.
+- The host function `gemm_parallel` sets up the HIP environment, including memory allocation on the GPU, data transfer to the GPU, kernel launch, and data transfer back to the host.
+- The kernel computes the GEMM operation similar to the Fortran code, where each thread computes one element of the result matrix.
+
+Ensure that you have the HIP environment set up correctly on your system to compile and run this code. Also, remember to replace the placeholder comments in the array initializations with actual data.
+
+Output 8:
+To convert the provided Fortran code to C/C++ with HIP (Heterogeneous-Compute Interface for Portability), we need to translate the GEMM routine and include HIP directives and syntax for parallel execution on GPUs. Below is a C++ version of the provided Fortran code using HIP:
+
+```cpp
+#include <hip/hip_runtime.h>
+#include <iostream>
+
+#define IDX2C(i, j, ld) (((j) * (ld)) + (i))
+
+// Kernel function for GEMM operation
+__global__ void gemm_kernel(int m, int n, int k, double alpha, const double* a, int lda, const double* b, int ldb, double beta, double* c, int ldc) {
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (i < m && j < n) {
+        double temp = 0.0;
+        for (int l = 0; l < k; ++l) {
+            temp += a[IDX2C(i, l, lda)] * b[IDX2C(l, j, ldb)];
+        }
+        c[IDX2C(i, j, ldc)] = alpha * temp + beta * c[IDX2C(i, j, ldc)];
+    }
+}
+
+void gemm_parallel(int m, int n, int k, double alpha, const double* a, int lda, const double* b, int ldb, double beta, double* c, int ldc) {
+    // Define grid and block dimensions
+    dim3 threadsPerBlock(16, 16);
+    dim3 numBlocks((m + threadsPerBlock.x - 1) / threadsPerBlock.x, (n + threadsPerBlock.y - 1) / threadsPerBlock.y);
+
+    // Launch kernel
+    hipLaunchKernelGGL(gemm_kernel, numBlocks, threadsPerBlock, 0, 0, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+}
+
+int main() {
+    // Example parameters (use appropriate values here)
+    int m = 1024;
+    int n = 1024;
+    int k = 1024;
+    int lda = 1024;
+    int ldb = 1024;
+    int ldc = 1024;
+    
+    double alpha = 1.0;
+    double beta = 0.0;
+    
+    // Allocate memory for matrices on the host
+    double* h_a = new double[lda * k];
+    double* h_b = new double[ldb * n];
+    double* h_c = new double[ldc * n];
+
+    // Initialize matrices a, b, and c...
+
+    // Allocate memory for matrices on the device
+    double* d_a;
+    double* d_b;
+    double* d_c;
+    
+    hipMalloc(&d_a, lda * k * sizeof(double));
+    hipMalloc(&d_b, ldb * n * sizeof(double));
+    hipMalloc(&d_c, ldc * n * sizeof(double));
+
+    // Copy data from host to device
+    hipMemcpy(d_a, h_a, lda * k * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_b, h_b, ldb * n * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_c, h_c, ldc * n * sizeof(double), hipMemcpyHostToDevice);
+
+    // Call the GEMM function
+    gemm_parallel(m, n, k, alpha, d_a, lda, d_b, ldb, beta, d_c, ldc);
+
+    // Copy result from device to host
+    hipMemcpy(h_c, d_c, ldc * n * sizeof(double), hipMemcpyDeviceToHost);
+
+    // Cleanup
+    hipFree(d_a);
+    hipFree(d_b);
+    hipFree(d_c);
+    
+    delete[] h_a;
+    delete[] h_b;
+    delete[] h_c;
+
+    return 0;
+}
+```
+
+### Explanation:
+- We define a kernel function `gemm_kernel` which performs the GEMM operation. This kernel is executed in parallel by many threads.
+- `IDX2C` macro is used to handle matrix indexing in a 1-dimensional array.
+- `gemm_parallel` function launches the kernel with the specified grid and block dimensions based on the matrix sizes.
+- Main function initializes the matrices, copies them to the device, calls the GEMM function, and copies the result back to the host.
+- Matrices `a`, `b`, and `c` are allocated and freed appropriately on both host and device.
+
+Output 9:
+Sure, below is a version of the Generalized Matrix Multiplication (GEMM) operation implemented in C/C++ using HIP (Heterogeneous-Compute Interface for Portability).
+
+```cpp
+#include <hip/hip_runtime.h>
+#include <iostream>
+
+__global__ void gemm_kernel(int m, int n, int k, double alpha, const double* __restrict__ a, int lda, 
+                            const double* __restrict__ b, int ldb, double beta, 
+                            double* __restrict__ c, int ldc) {
+    int j = blockIdx.x * blockDim.x + threadIdx.x;
+    int i = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if (i < m && j < n) {
+        double temp = 0.0;
+        for (int l = 0; l < k; ++l) {
+            temp += a[i * lda + l] * b[l * ldb + j];
+        }
+        c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+    }
+}
+
+void gemm_parallel(int m, int n, int k, double alpha, const double* a, int lda, 
+                   const double* b, int ldb, double beta, double* c, int ldc) {
+    double *d_a, *d_b, *d_c;
+    
+    // Allocate device memory
+    hipMalloc(&d_a, m * k * sizeof(double));
+    hipMalloc(&d_b, k * n * sizeof(double));
+    hipMalloc(&d_c, m * n * sizeof(double));
+
+    // Copy data to device
+    hipMemcpy(d_a, a, m * k * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_b, b, k * n * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_c, c, m * n * sizeof(double), hipMemcpyHostToDevice);
+
+    // Define block and grid dimensions
+    dim3 threadsPerBlock(16, 16);
+    dim3 numBlocks((n + threadsPerBlock.x - 1) / threadsPerBlock.x, 
+                   (m + threadsPerBlock.y - 1) / threadsPerBlock.y);
+
+    // Launch kernel
+    hipLaunchKernelGGL(gemm_kernel, numBlocks, threadsPerBlock, 0, 0, 
+                       m, n, k, alpha, d_a, lda, d_b, ldb, beta, d_c, ldc);
+
+    // Copy result back to host
+    hipMemcpy(c, d_c, m * n * sizeof(double), hipMemcpyDeviceToHost);
+
+    // Free device memory
+    hipFree(d_a);
+    hipFree(d_b);
+    hipFree(d_c);
+}
+
+int main() {
+    // Example allocation and initialization
+    const int m = 3, n = 2, k = 3;
+    const int lda = k, ldb = n, ldc = n;
+    const double alpha = 1.0, beta = 1.0;
+    
+    double a[m * k] = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0};
+    double b[k * n] = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0};
+    double c[m * n] = {1.0, 1.0, 1.0, 1.0, 1.0, 1.0};
+
+    gemm_parallel(m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+
+    // Output matrix C
+    std::cout << "Matrix C after GEMM: " << std::endl;
+    for (int i = 0; i < m; ++i) {
+        for (int j = 0; j < n; ++j) {
+            std::cout << c[i * ldc + j] << " ";
+        }
+        std::cout << std::endl;
+    }
+
+    return 0;
+}
+```
+
+Here's a breakdown of the code:
+1. **Kernel Function `gemm_kernel`**: The `__global__` function is executed on the device. It performs the GEMM calculation for a single element of the output matrix `C`.
+
+2. **Function `gemm_parallel`**: Manages memory allocation on the device, memory transfers between the host and device, kernel launch, and final memory transfer back to the host.
+
+3. **Main Function**: Initializes sample data and calls `gemm_parallel` to perform the matrix multiplication. Outputs the resulting matrix.
+
+This example assumes the matrices `A`, `B`, and `C` are stored in a linear array in row-major order and performs operations accordingly. Adjustments may be required based on actual data layout and dimensions.
+
+Output 10:
+Here is a C++ version of the provided Fortran OpenACC code that implements a Generalized Matrix Multiplication (GEMM) operation using HIP (Heterogeneous Interface for Portability) for parallel execution on GPUs. The code includes the necessary HIP headers and setup functions to ensure it runs correctly on AMD GPUs:
+
+```cpp
+#include <iostream>
+#include <hip/hip_runtime.h>
+
+__global__ void gemm_kernel(int m, int n, int k, double alpha, const double* __restrict__ a, int lda, const double* __restrict__ b, int ldb, double beta, double* __restrict__ c, int ldc) {
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (i < m && j < n) {
+        double temp = 0.0;
+        for (int l = 0; l < k; ++l) {
+            temp += a[i * lda + l] * b[l * ldb + j];
+        }
+        c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+    }
+}
+
+void gemm_parallel(int m, int n, int k, double alpha, const double* a, int lda, const double* b, int ldb, double beta, double* c, int ldc) {
+    double *d_a, *d_b, *d_c;
+
+    // Allocate device memory
+    hipMalloc((void**)&d_a, m * k * sizeof(double));
+    hipMalloc((void**)&d_b, k * n * sizeof(double));
+    hipMalloc((void**)&d_c, m * n * sizeof(double));
+
+    // Copy matrices to device
+    hipMemcpy(d_a, a, m * k * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_b, b, k * n * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_c, c, m * n * sizeof(double), hipMemcpyHostToDevice);
+
+    // Define block and grid dimensions
+    dim3 blockDim(16, 16);
+    dim3 gridDim((m + blockDim.x - 1) / blockDim.x, (n + blockDim.y - 1) / blockDim.y);
+
+    // Launch the kernel
+    hipLaunchKernelGGL(gemm_kernel, gridDim, blockDim, 0, 0, m, n, k, alpha, d_a, lda, d_b, ldb, beta, d_c, ldc);
+
+    // Copy result back to host
+    hipMemcpy(c, d_c, m * n * sizeof(double), hipMemcpyDeviceToHost);
+
+    // Free device memory
+    hipFree(d_a);
+    hipFree(d_b);
+    hipFree(d_c);
+}
+
+int main() {
+    const int m = 3, n = 3, k = 3;
+    const int lda = k, ldb = n, ldc = n;
+    double alpha = 1.0, beta = 1.0;
+    double a[m][k] = { {1.0, 2.0, 3.0}, {4.0, 5.0, 6.0}, {7.0, 8.0, 9.0} };
+    double b[k][n] = { {1.0, 2.0, 3.0}, {4.0, 5.0, 6.0}, {7.0, 8.0, 9.0} };
+    double c[m][n] = { {1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0} };
+
+    gemm_parallel(m, n, k, alpha, (double*)a, lda, (double*)b, ldb, beta, (double*)c, ldc);
+    
+    std::cout << "Result matrix C:\n";
+    for (int i = 0; i < m; ++i) {
+        for (int j = 0; j < n; ++j) {
+            std::cout << c[i][j] << " ";
+        }
+        std::cout << "\n";
+    }
+
+    return 0;
+}
+```
+
+In this code:
+- `gemm_kernel` is the HIP kernel function that performs the GEMM operation.
+- `gemm_parallel` is the host function that sets up the kernel execution.
+- Memory is allocated on the device for matrices `a`, `b`, and `c`, which are copied to the GPU, processed by the kernel, and then copied back to the host.
+- The kernel performs the matrix multiplication and addition, as specified by GEMM.
+- The `main` function demonstrates the use of `gemm_parallel` with sample matrices.
+

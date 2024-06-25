@@ -1,0 +1,465 @@
+Code Block 1:
+void jacobi_parallel(double* u, double* unew, int n, int niter) {
+    double* d_u;
+    double* d_unew;
+
+    // Allocate memory on the device
+    hipMalloc(&d_u, n * n * n * sizeof(double));
+    hipMalloc(&d_unew, n * n * n * sizeof(double));
+
+    // Copy data from host to device
+    hipMemcpy(d_u, u, n * n * n * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_unew, unew, n * n * n * sizeof(double), hipMemcpyHostToDevice);
+
+    dim3 threadsPerBlock(8, 8, 8);
+    dim3 numBlocks((n + threadsPerBlock.x - 1) / threadsPerBlock.x,
+                   (n + threadsPerBlock.y - 1) / threadsPerBlock.y,
+                   (n + threadsPerBlock.z - 1) / threadsPerBlock.z);
+
+    for (int iter = 0; iter < niter; ++iter) {
+        hipLaunchKernelGGL(jacobi_kernel, numBlocks, threadsPerBlock, 0, 0, d_u, d_unew, n);
+        hipDeviceSynchronize();
+
+        // Swap the pointers for each iteration
+        double* temp = d_u;
+        d_u = d_unew;
+        d_unew = temp;
+    }
+
+    // Copy the result back to the host
+    hipMemcpy(u, d_u, n * n * n * sizeof(double), hipMemcpyDeviceToHost);
+
+    // Free device memory
+    hipFree(d_u);
+    hipFree(d_unew);
+}
+
+__global__
+void jacobi_kernel(const double* u, double* unew, int n) {
+    int i = blockDim.x * blockIdx.x + threadIdx.x + 1;
+    int j = blockDim.y * blockIdx.y + threadIdx.y + 1;
+    int k = blockDim.z * blockIdx.z + threadIdx.z + 1;
+
+    if (i < n - 1 && j < n - 1 && k < n - 1) {
+        unew[IDX(i, j, k, n)] = 0.125 * (
+            u[IDX(i-1, j, k, n)] + u[IDX(i+1, j, k, n)] + 
+            u[IDX(i, j-1, k, n)] + u[IDX(i, j+1, k, n)] + 
+            u[IDX(i, j, k-1, n)] + u[IDX(i, j, k+1, n)] + 
+            u[IDX(i, j, k, n)]);
+    }
+}
+
+Code Block 2:
+void jacobi_parallel(double* u, double* unew, int n, int niter) {
+    double *d_u, *d_unew;
+
+    // Allocate device memory
+    hipMalloc(&d_u, n * n * n * sizeof(double));
+    hipMalloc(&d_unew, n * n * n * sizeof(double));
+
+    // Copy data to device
+    hipMemcpy(d_u, u, n * n * n * sizeof(double), hipMemcpyHostToDevice);
+
+    dim3 blockSize(8, 8, 8);
+    dim3 gridSize((n + blockSize.x - 1) / blockSize.x,
+                  (n + blockSize.y - 1) / blockSize.y,
+                  (n + blockSize.z - 1) / blockSize.z);
+
+    for (int iter = 0; iter < niter; iter++) {
+        hipLaunchKernelGGL(jacobi_kernel, gridSize, blockSize, 0, 0, d_u, d_unew, n);
+
+        // Swap pointers
+        double* temp = d_u;
+        d_u = d_unew;
+        d_unew = temp;
+    }
+
+    // Copy result back to host
+    hipMemcpy(u, d_u, n * n * n * sizeof(double), hipMemcpyDeviceToHost);
+
+    // Free device memory
+    hipFree(d_u);
+    hipFree(d_unew);
+}
+
+__global__ void jacobi_kernel(double *u, double *unew, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x + 1;
+    int j = blockIdx.y * blockDim.y + threadIdx.y + 1;
+    int k = blockIdx.z * blockDim.z + threadIdx.z + 1;
+
+    if (i < n - 1 && j < n - 1 && k < n - 1) {
+        unew[IDX(i,j,k,n)] = 0.125 * (u[IDX(i-1,j,k,n)] + u[IDX(i+1,j,k,n)] +
+                                      u[IDX(i,j-1,k,n)] + u[IDX(i,j+1,k,n)] +
+                                      u[IDX(i,j,k-1,n)] + u[IDX(i,j,k+1,n)] +
+                                      u[IDX(i,j,k,n)]);
+    }
+}
+
+Code Block 3:
+void jacobi_parallel(double* u, double* unew, int n, int niter) {
+    // Allocate device memory for u and unew
+    double *d_u, *d_unew;
+    size_t size = n * n * n * sizeof(double);
+    hipMalloc(&d_u, size);
+    hipMalloc(&d_unew, size);
+
+    // Copy the initial data from host to device
+    hipMemcpy(d_u, u, size, hipMemcpyHostToDevice);
+    hipMemcpy(d_unew, unew, size, hipMemcpyHostToDevice);
+
+    dim3 threadsPerBlock(8, 8, 8); // Adjust these values to match your problem size and GPU capabilities
+    dim3 numBlocks((n + threadsPerBlock.x - 1) / threadsPerBlock.x,
+                   (n + threadsPerBlock.y - 1) / threadsPerBlock.y,
+                   (n + threadsPerBlock.z - 1) / threadsPerBlock.z);
+
+    for (int iter = 0; iter < niter; ++iter) {
+        jacobi_iteration<<<numBlocks, threadsPerBlock>>>(d_u, d_unew, n);
+
+        // Swap u and unew for the next iteration
+        double* temp = d_u;
+        d_u = d_unew;
+        d_unew = temp;
+    }
+
+    // Copy the final result from device to host
+    hipMemcpy(u, d_u, size, hipMemcpyDeviceToHost);
+
+    // Free device memory
+    hipFree(d_u);
+    hipFree(d_unew);
+}
+
+__global__
+void jacobi_iteration(double* u, double* unew, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x + 1;
+    int j = blockIdx.y * blockDim.y + threadIdx.y + 1;
+    int k = blockIdx.z * blockDim.z + threadIdx.z + 1;
+
+    if (i < n - 1 && j < n - 1 && k < n - 1) {
+        int idx = k * n * n + j * n + i;
+        int idx_im1 = (k * n * n + j * n + (i - 1));
+        int idx_ip1 = (k * n * n + j * n + (i + 1));
+        int idx_jm1 = (k * n * n + (j - 1) * n + i);
+        int idx_jp1 = (k * n * n + (j + 1) * n + i);
+        int idx_km1 = ((k - 1) * n * n + j * n + i);
+        int idx_kp1 = ((k + 1) * n * n + j * n + i);
+
+        unew[idx] = 0.125 * (u[idx_im1] + u[idx_ip1] +
+                             u[idx_jm1] + u[idx_jp1] +
+                             u[idx_km1] + u[idx_kp1] +
+                             u[idx]);
+    }
+}
+
+Code Block 4:
+void jacobi_parallel(std::vector<double>& u, std::vector<double>& unew, int n, int niter) {
+    double *d_u, *d_unew;
+
+    size_t size = n * n * n * sizeof(double);
+    
+    hipMalloc(&d_u, size);
+    hipMalloc(&d_unew, size);
+
+    hipMemcpy(d_u, u.data(), size, hipMemcpyHostToDevice);
+    hipMemcpy(d_unew, unew.data(), size, hipMemcpyHostToDevice);
+
+    dim3 threadsPerBlock(8, 8, 8);
+    dim3 numBlocks((n + threadsPerBlock.x - 1) / threadsPerBlock.x,
+                   (n + threadsPerBlock.y - 1) / threadsPerBlock.y,
+                   (n + threadsPerBlock.z - 1) / threadsPerBlock.z);
+
+    for (int iter = 0; iter < niter; ++iter) {
+        hipLaunchKernelGGL(jacobi_kernel, numBlocks, threadsPerBlock, 0, 0, d_u, d_unew, n);
+        hipDeviceSynchronize();
+        hipMemcpy(d_u, d_unew, size, hipMemcpyDeviceToDevice);
+    }
+
+    hipMemcpy(u.data(), d_u, size, hipMemcpyDeviceToHost);
+
+    hipFree(d_u);
+    hipFree(d_unew);
+}
+
+__global__ void jacobi_kernel(const double* u, double* unew, int n) {
+    int k = blockDim.z * blockIdx.z + threadIdx.z + 1;
+    int j = blockDim.y * blockIdx.y + threadIdx.y + 1;
+    int i = blockDim.x * blockIdx.x + threadIdx.x + 1;
+
+    if (k < n-1 && j < n-1 && i < n-1) {
+        int idx = IDX3D(i, j, k, n);
+        int idx_xm = IDX3D(i - 1, j, k, n);
+        int idx_xp = IDX3D(i + 1, j, k, n);
+        int idx_ym = IDX3D(i, j - 1, k, n);
+        int idx_yp = IDX3D(i, j + 1, k, n);
+        int idx_zm = IDX3D(i, j, k - 1, n);
+        int idx_zp = IDX3D(i, j, k + 1, n);
+
+        unew[idx] = 0.125 * (u[idx_xm] + u[idx_xp] + u[idx_ym] + u[idx_yp] +
+                             u[idx_zm] + u[idx_zp] + u[idx]);
+    }
+}
+
+Code Block 5:
+void jacobi_parallel(double* u, double* unew, int n, int niter) {
+    double *d_u, *d_unew;
+
+    // Allocate device memory
+    hipMalloc((void**)&d_u, n * n * n * sizeof(double));
+    hipMalloc((void**)&d_unew, n * n * n * sizeof(double));
+
+    // Copy initial data from host to device
+    hipMemcpy(d_u, u, n * n * n * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_unew, unew, n * n * n * sizeof(double), hipMemcpyHostToDevice);
+
+    dim3 blockSize(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+    dim3 gridSize((n + BLOCK_SIZE - 1) / BLOCK_SIZE, (n + BLOCK_SIZE - 1) / BLOCK_SIZE, (n + BLOCK_SIZE - 1) / BLOCK_SIZE);
+
+    for (int iter = 0; iter < niter; ++iter) {
+        // Launch the kernel
+        hipLaunchKernelGGL(jacobi_kernel, gridSize, blockSize, 0, 0, d_u, d_unew, n);
+        
+        // Synchronize to ensure kernel completion
+        hipDeviceSynchronize();
+
+        // Swap pointers
+        double* temp = d_u;
+        d_u = d_unew;
+        d_unew = temp;
+    }
+
+    // Copy the result back to the host
+    hipMemcpy(u, d_u, n * n * n * sizeof(double), hipMemcpyDeviceToHost);
+    hipMemcpy(unew, d_unew, n * n * n * sizeof(double), hipMemcpyDeviceToHost);
+
+    // Free device memory
+    hipFree(d_u);
+    hipFree(d_unew);
+}
+
+__global__ void jacobi_kernel(double* u, double* unew, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x + 1;
+    int j = blockIdx.y * blockDim.y + threadIdx.y + 1;
+    int k = blockIdx.z * blockDim.z + threadIdx.z + 1;
+
+    if (i < n - 1 && j < n - 1 && k < n - 1) {
+        unew[i*n*n + j*n + k] = 0.125 * (u[(i-1)*n*n + j*n + k] + u[(i+1)*n*n + j*n + k] +
+                                          u[i*n*n + (j-1)*n + k] + u[i*n*n + (j+1)*n + k] + 
+                                          u[i*n*n + j*n + (k-1)] + u[i*n*n + j*n + (k+1)] +
+                                          u[i*n*n + j*n + k]);
+    }
+}
+
+Code Block 6:
+1
+
+    if (i < n-1 && j < n-1 && k < n-1) {
+        unew[IDX(i, j, k, n)] = 0.125 * (
+            u[IDX(i-1, j, k, n)] + u[IDX(i+1, j, k, n)] +
+            u[IDX(i, j-1, k, n)] + u[IDX(i, j+1, k, n)] +
+            u[IDX(i, j, k-1, n)] + u[IDX(i, j, k+1, n)] +
+            u[IDX(i, j, k, n)]);
+    }
+
+__global__ void jacobi_iteration(double* u, double* unew, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x + 1; // Start from 1
+    int j = blockIdx.y * blockDim.y + threadIdx.y + 1; // Start from 1
+    int k = blockIdx.z * blockDim.z + threadIdx.z + 1; // Start from 1
+
+    if (i < n-1 && j < n-1 && k < n-1) {
+        unew[IDX(i, j, k, n)] = 0.125 * (
+            u[IDX(i-1, j, k, n)] + u[IDX(i+1, j, k, n)] +
+            u[IDX(i, j-1, k, n)] + u[IDX(i, j+1, k, n)] +
+            u[IDX(i, j, k-1, n)] + u[IDX(i, j, k+1, n)] +
+            u[IDX(i, j, k, n)]);
+    }
+}
+
+Code Block 7:
+void jacobi_parallel(double* u, double* unew, int n, int niter) {
+    double *d_u, *d_unew;
+    size_t size = n * n * n * sizeof(double);
+
+    hipMalloc(&d_u, size);
+    hipMalloc(&d_unew, size);
+
+    hipMemcpy(d_u, u, size, hipMemcpyHostToDevice);
+    
+    dim3 blockSize(8, 8, 8);  // Choose an appropriate block size
+    dim3 gridSize((n + blockSize.x - 1) / blockSize.x,
+                  (n + blockSize.y - 1) / blockSize.y,
+                  (n + blockSize.z - 1) / blockSize.z);
+
+    for (int iter = 0; iter < niter; iter++) {
+        hipLaunchKernelGGL(jacobi_kernel, gridSize, blockSize, 0, 0, d_u, d_unew, n);
+
+        hipDeviceSynchronize();
+
+        double* tmp = d_u;
+        d_u = d_unew;
+        d_unew = tmp;
+    }
+
+    hipMemcpy(u, d_u, size, hipMemcpyDeviceToHost);
+
+    hipFree(d_u);
+    hipFree(d_unew);
+}
+
+__global__ void jacobi_kernel(const double* u, double* unew, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x + 1;  // i ranges from 1 to n-2
+    int j = blockIdx.y * blockDim.y + threadIdx.y + 1;  // j ranges from 1 to n-2
+    int k = blockIdx.z * blockDim.z + threadIdx.z + 1;  // k ranges from 1 to n-2
+
+    if (i >= n - 1 || j >= n - 1 || k >= n - 1) return;
+
+    unew[IDX(i, j, k, n)] = 0.125 * (u[IDX(i-1, j, k, n)] + u[IDX(i+1, j, k, n)] + 
+                                     u[IDX(i, j-1, k, n)] + u[IDX(i, j+1, k, n)] + 
+                                     u[IDX(i, j, k-1, n)] + u[IDX(i, j, k+1, n)] + 
+                                     u[IDX(i, j, k, n)]);
+}
+
+Code Block 8:
+void jacobi_parallel(double* u, double* unew, int n, int niter) {
+    size_t size = n * n * n * sizeof(double);
+    double* d_u, * d_unew;
+
+    hipMalloc(&d_u, size);
+    hipMalloc(&d_unew, size);
+    hipMemcpy(d_u, u, size, hipMemcpyHostToDevice);
+
+    dim3 threadsPerBlock(8, 8, 8);
+    dim3 numBlocks((n + threadsPerBlock.x - 2) / threadsPerBlock.x,
+                   (n + threadsPerBlock.y - 2) / threadsPerBlock.y,
+                   (n + threadsPerBlock.z - 2) / threadsPerBlock.z);
+
+    for (int iter = 0; iter < niter; ++iter) {
+        hipLaunchKernelGGL(jacobi_kernel, numBlocks, threadsPerBlock, 0, 0, d_u, d_unew, n);
+        hipDeviceSynchronize();
+        
+        double* tmp = d_u;
+        d_u = d_unew;
+        d_unew = tmp;
+    }
+
+    hipMemcpy(u, d_u, size, hipMemcpyDeviceToHost);
+    hipFree(d_u);
+    hipFree(d_unew);
+}
+
+__global__ void jacobi_kernel(double* u, double* unew, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x + 1;
+    int j = blockIdx.y * blockDim.y + threadIdx.y + 1;
+    int k = blockIdx.z * blockDim.z + threadIdx.z + 1;
+   
+    if (i < n - 1 && j < n - 1 && k < n - 1) {
+        int idx = IDX(i, j, k, n);
+        unew[idx] = 0.125 * (u[IDX(i-1, j, k, n)] + u[IDX(i+1, j, k, n)] +
+                             u[IDX(i, j-1, k, n)] + u[IDX(i, j+1, k, n)] +
+                             u[IDX(i, j, k-1, n)] + u[IDX(i, j, k+1, n)] +
+                             u[idx]);
+    }
+}
+
+Code Block 9:
+void jacobi_parallel(double *u, double *unew, int n, int niter) {
+    double *d_u, *d_unew;
+
+    size_t size = n * n * n * sizeof(double);
+
+    // Allocate device memory
+    hipMalloc(&d_u, size);
+    hipMalloc(&d_unew, size);
+
+    // Copy data to device
+    hipMemcpy(d_u, u, size, hipMemcpyHostToDevice);
+
+    dim3 threadsPerBlock(8, 8, 8);
+    dim3 numBlocks((n + threadsPerBlock.x - 1) / threadsPerBlock.x,
+                   (n + threadsPerBlock.y - 1) / threadsPerBlock.y,
+                   (n + threadsPerBlock.z - 1) / threadsPerBlock.z);
+
+    for (int iter = 0; iter < niter; ++iter) {
+        jacobi_kernel<<<numBlocks, threadsPerBlock>>>(d_u, d_unew, n);
+        hipDeviceSynchronize();
+
+        // Swap the pointers
+        double *temp = d_u;
+        d_u = d_unew;
+        d_unew = temp;
+    }
+
+    // Copy result back to host
+    hipMemcpy(u, d_u, size, hipMemcpyDeviceToHost);
+
+    // Free device memory
+    hipFree(d_u);
+    hipFree(d_unew);
+}
+
+__global__
+void jacobi_kernel(double *u, double *unew, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x + 1;
+    int j = blockIdx.y * blockDim.y + threadIdx.y + 1;
+    int k = blockIdx.z * blockDim.z + threadIdx.z + 1;
+
+    if (i < n-1 && j < n-1 && k < n-1) {
+        int idx = i + n * (j + n * k);
+        unew[idx] = 0.125 * (u[(i-1) + n * (j + n * k)] +
+                             u[(i+1) + n * (j + n * k)] +
+                             u[i + n * ((j-1) + n * k)] +
+                             u[i + n * ((j+1) + n * k)] +
+                             u[i + n * (j + n * (k-1))] +
+                             u[i + n * (j + n * (k+1))] +
+                             u[idx]);
+    }
+}
+
+Code Block 10:
+void jacobi_parallel(double* u, double* unew, int n, int niter) {
+    double *d_u, *d_unew;
+
+    // Allocate device memory
+    hipMalloc(&d_u, n * n * n * sizeof(double));
+    hipMalloc(&d_unew, n * n * n * sizeof(double));
+
+    // Copy initial data to the device
+    hipMemcpy(d_u, u, n * n * n * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_unew, unew, n * n * n * sizeof(double), hipMemcpyHostToDevice);
+
+    dim3 threadsPerBlock(8, 8, 8);
+    dim3 numBlocks((n + threadsPerBlock.x - 1) / threadsPerBlock.x,
+                   (n + threadsPerBlock.y - 1) / threadsPerBlock.y,
+                   (n + threadsPerBlock.z - 1) / threadsPerBlock.z);
+
+    for (int iter = 0; iter < niter; ++iter) {
+        hipLaunchKernelGGL(jacobi_kernel, numBlocks, threadsPerBlock, 0, 0, d_u, d_unew, n);
+
+        // Swap pointers for the next iteration
+        double* temp = d_u;
+        d_u = d_unew;
+        d_unew = temp;
+    }
+
+    // Copy result back to host
+    hipMemcpy(u, d_u, n * n * n * sizeof(double), hipMemcpyDeviceToHost);
+
+    // Free device memory
+    hipFree(d_u);
+    hipFree(d_unew);
+}
+
+__global__ void jacobi_kernel(double* u, double* unew, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x + 2;
+    int j = blockIdx.y * blockDim.y + threadIdx.y + 2;
+    int k = blockIdx.z * blockDim.z + threadIdx.z + 2;
+
+    if (i < n - 1 && j < n - 1 && k < n - 1) {
+        unew[IDX(i, j, k, n)] = 0.125 * (
+                u[IDX(i - 1, j, k, n)] + u[IDX(i + 1, j, k, n)] +
+                u[IDX(i, j - 1, k, n)] + u[IDX(i, j + 1, k, n)] +
+                u[IDX(i, j, k - 1, n)] + u[IDX(i, j, k + 1, n)] +
+                u[IDX(i, j, k, n)]
+            );
+    }
+}
+
