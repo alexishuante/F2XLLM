@@ -49,9 +49,8 @@ def parse_functions(file_path):
     
     # Updated Regex to use non-capturing groups
     functions = re.findall(
-        r'void\s+saxpy_parallel\s*\(\s*(?:const\s+)?int\s+n,\s*(?:const\s+)?float\s+a,\s*(?:const\s+)?float\s*\*x,\s*float\s*\*y\s*\)\s*\{(.*?)^\}',
-        content, flags=re.DOTALL | re.MULTILINE)
-    print(functions)
+        r'void\s+saxpy_parallel\s*\(\s*(?:const\s+)?int\s+n,\s*(?:const\s+)?float\s+a,\s*(?:const\s+)?float\s*\*x,\s*float\s*\*y\s*\)\s*\{.*?^\}',
+        content_filtered, flags=re.DOTALL | re.MULTILINE)
     return functions
 
 # Function to compile, execute, and verify test file
@@ -96,7 +95,7 @@ for function in functions:
     print(str(count))
     test_file_name = test_file_prefix + '{:03}'.format(test_file_counter) + '.cpp'
     with open(test_file_name, 'w') as test_file:
-        # print(function)
+        #print(function)
         test_file.write(libraries_needed+ '\n' + function + '\n' + main_code_template)
     compiled, result = compile_execute_verify(test_file_name)
     # print_test_file(test_file_name)
