@@ -65,37 +65,37 @@ subroutine basic_hf_proxy(ngauss, natom, txpnt, tcoef, tgeom, erep)
     xpnt = txpnt
     coef = tcoef
     do i = 1, natom*3
-    j = mod(i - 1, 3) + 1
-    k = ceiling(real(i) / 3.0)
-    geom(j, k) = tgeom(i)
+        j = mod(i - 1, 3) + 1
+        k = ceiling(real(i) / 3.0)
+        geom(j, k) = tgeom(i)
     end do
 
     ! Build density matrix from fake density 
     allocate( dens( natom, natom ) )  
     do  i  =  1,  natom  
-    do  j  =  1,  natom  
-    dens( i, j )  =  0.1d0   
-    end do
-    dens( i, i )  =  1.0d0   
+        do  j  =  1,  natom  
+            dens( i, j )  =  0.1d0   
+        end do
+        dens( i, i )  =  1.0d0   
     end do
 
     allocate( fock( natom, natom ) )  
     ! Normalize the primitive GTO weights.
     do i = 1, ngauss 
-    coef( i ) = coef( i )*( ( 2.0d0*xpnt( i ) )**0.75d0 )
+        coef( i ) = coef( i )*( ( 2.0d0*xpnt( i ) )**0.75d0 )
     end do
 
     !  Scale the geometry to Bohrs for energy calculations in AU.
     do  i  =  1,  natom 
-    geom( 1, i )  =  geom( 1, i )*tobohrs   
-    geom( 2, i )  =  geom( 2, i )*tobohrs   
-    geom( 3, i )  =  geom( 3, i )*tobohrs   
+        geom( 1, i )  =  geom( 1, i )*tobohrs   
+        geom( 2, i )  =  geom( 2, i )*tobohrs   
+        geom( 3, i )  =  geom( 3, i )*tobohrs   
     end do
 
     do  i  =  1,  natom  
-    do  j  =  1,  natom  
-    fock( i, j )  =  0.0d0  
-    end do
+        do  j  =  1,  natom  
+            fock( i, j )  =  0.0d0  
+        end do
     end do
     
 
@@ -105,11 +105,11 @@ subroutine basic_hf_proxy(ngauss, natom, txpnt, tcoef, tgeom, erep)
 
     ij = 0 
     do  i  =  1,  natom  
-    do  j  =  1,  i  
-    ij = ij + 1 
-    call ssss( i, j, i, j, ngauss, xpnt, coef, geom, eri )
-    schwarz( ij )  =  sqrt( abs( eri ) )  
-    end do
+        do  j  =  1,  i  
+            ij = ij + 1 
+            call ssss( i, j, i, j, ngauss, xpnt, coef, geom, eri )
+            schwarz( ij )  =  sqrt( abs( eri ) )  
+        end do
     end do
 
     ! Integrals are screened to avoid small terms.
@@ -117,96 +117,96 @@ subroutine basic_hf_proxy(ngauss, natom, txpnt, tcoef, tgeom, erep)
 
     !$OMP TARGET MAP(TO:nnnn,ngauss,geom,xpnt,coef,dens,schwarz) MAP(TOFROM:fock)
     !$OMP TEAMS DISTRIBUTE 
+        do  ijkl  =  1,  nnnn 
+            ! decompose triangular ijkl index into ij>=kl
+            ij = sqrt( dble( 2*ijkl ) )
+            n = ( ij*ij + ij )/2
+            do  while ( n .lt. ijkl )
+                ij = ij + 1
+                n = ( ij*ij + ij )/2
+            end do
+            kl  =  ijkl - ( ij*ij - ij )/2 
+            if ( schwarz( ij )*schwarz( kl ) > dtol ) then      
 
-    do  ijkl  =  1,  nnnn 
-    ! decompose triangular ijkl index into ij>=kl
-    ij = sqrt( dble( 2*ijkl ) )
-    n = ( ij*ij + ij )/2
-    do  while ( n .lt. ijkl )
-    ij = ij + 1
-    n = ( ij*ij + ij )/2
-    end do
-    kl  =  ijkl - ( ij*ij - ij )/2 
-    if ( schwarz( ij )*schwarz( kl ) > dtol ) then      
+                ! decompose triangular ij index into i>=j
+                i = sqrt( dble( 2*ij ) )
+                n = ( i*i + i )/2
+                do  while ( n .lt. ij )
+                    i = i + 1
+                    n = ( i*i + i )/2
+                end do
+                j  =  ij - ( i*i - i )/2 
 
-    ! decompose triangular ij index into i>=j
-    i = sqrt( dble( 2*ij ) )
-    n = ( i*i + i )/2
-    do  while ( n .lt. ij )
-    i = i + 1
-    n = ( i*i + i )/2
-    end do
-    j  =  ij - ( i*i - i )/2 
+                ! decompose triangular kl index into k>=l
+                k = sqrt( dble( 2*kl ) )
+                n = ( k*k + k )/2
+                do  while ( n .lt. kl )
+                    k = k + 1
+                    n = ( k*k + k )/2
+                end do
+                l  =  kl - ( k*k - k )/2 
 
-    ! decompose triangular kl index into k>=l
-    k = sqrt( dble( 2*kl ) )
-    n = ( k*k + k )/2
-    do  while ( n .lt. kl )
-    k = k + 1
-    n = ( k*k + k )/2
-    end do
-    l  =  kl - ( k*k - k )/2 
+                eri  =  0.0d0 
+                do  ib  =  1,  ngauss  
+                    do  jb  =  1,  ngauss  
+                        aij = 1.0d0/( xpnt( ib ) + xpnt( jb ) ) 
+                        dij = coef( ib )*coef( jb )*exp( -xpnt( ib )*xpnt( jb )*aij*  &  
+                            ( ( geom( 1, i ) - geom( 1, j ) )**2   &
+                            + ( geom( 2, i ) - geom( 2, j ) )**2   &
+                            + ( geom( 3, i ) - geom( 3, j ) )**2  )  )*( aij**1.5d0 )  
+                        if ( abs( dij ) > dtol ) then      
+                            xij = aij*( xpnt( ib )*geom( 1, i ) + xpnt( jb )*geom( 1, j ) )  
+                            yij = aij*( xpnt( ib )*geom( 2, i ) + xpnt( jb )*geom( 2, j ) )  
+                            zij = aij*( xpnt( ib )*geom( 3, i ) + xpnt( jb )*geom( 3, j ) )  
+                            do  kb  =  1,  ngauss  
+                                do  lb  =  1,  ngauss 
+                                    akl = 1.0d0/( xpnt( kb ) + xpnt( lb ) ) 
+                                    dkl = dij*coef( kb )*coef( lb )*exp( -xpnt( kb )*xpnt( lb )*akl*  &  
+                                        ( ( geom( 1, k ) - geom( 1, l ) )**2   &
+                                        + ( geom( 2, k ) - geom( 2, l ) )**2   &
+                                        + ( geom( 3, k ) - geom( 3, l ) )**2  )  )*( akl**1.5d0 )  
+                                    if ( abs( dkl ) > dtol ) then      
+                                        aijkl = ( xpnt( ib ) + xpnt( jb ) )*( xpnt( kb ) + xpnt( lb ) )  &  
+                                            / ( xpnt( ib ) + xpnt( jb )  +  xpnt( kb ) + xpnt( lb ) )  
+                                        tt = aijkl*( ( xij -akl*( xpnt( kb )*geom( 1, k ) + xpnt( lb )*geom( 1, l ) ) )**2  & 
+                                                    + ( yij -akl*( xpnt( kb )*geom( 2, k ) + xpnt( lb )*geom( 2, l ) ) )**2  & 
+                                                    + ( zij -akl*( xpnt( kb )*geom( 3, k ) + xpnt( lb )*geom( 3, l ) ) )**2  ) 
+                                        f0t  =  sqrpi2 
+                                    if ( tt > rcut )  f0t  =  ( tt**( -0.5d0 ) )*erf( sqrt(tt) ) 
+                                        eri  =  eri  +  dkl*f0t*sqrt(aijkl)  
+                                    end if 
+                            end do  ;  end do  
+                        end if  
+                end do  ;  end do 
 
-    eri  =  0.0d0 
-    do  ib  =  1,  ngauss  
-    do  jb  =  1,  ngauss  
-    aij = 1.0d0/( xpnt( ib ) + xpnt( jb ) ) 
-    dij = coef( ib )*coef( jb )*exp( -xpnt( ib )*xpnt( jb )*aij*  &  
-        ( ( geom( 1, i ) - geom( 1, j ) )**2   &
-        + ( geom( 2, i ) - geom( 2, j ) )**2   &
-        + ( geom( 3, i ) - geom( 3, j ) )**2  )  )*( aij**1.5d0 )  
-    if ( abs( dij ) > dtol ) then      
-    xij = aij*( xpnt( ib )*geom( 1, i ) + xpnt( jb )*geom( 1, j ) )  
-    yij = aij*( xpnt( ib )*geom( 2, i ) + xpnt( jb )*geom( 2, j ) )  
-    zij = aij*( xpnt( ib )*geom( 3, i ) + xpnt( jb )*geom( 3, j ) )  
-    do  kb  =  1,  ngauss  
-    do  lb  =  1,  ngauss 
-    akl = 1.0d0/( xpnt( kb ) + xpnt( lb ) ) 
-    dkl = dij*coef( kb )*coef( lb )*exp( -xpnt( kb )*xpnt( lb )*akl*  &  
-        ( ( geom( 1, k ) - geom( 1, l ) )**2   &
-        + ( geom( 2, k ) - geom( 2, l ) )**2   &
-        + ( geom( 3, k ) - geom( 3, l ) )**2  )  )*( akl**1.5d0 )  
-    if ( abs( dkl ) > dtol ) then      
-    aijkl = ( xpnt( ib ) + xpnt( jb ) )*( xpnt( kb ) + xpnt( lb ) )  &  
-        / ( xpnt( ib ) + xpnt( jb )  +  xpnt( kb ) + xpnt( lb ) )  
-    tt = aijkl*( ( xij -akl*( xpnt( kb )*geom( 1, k ) + xpnt( lb )*geom( 1, l ) ) )**2  & 
-                + ( yij -akl*( xpnt( kb )*geom( 2, k ) + xpnt( lb )*geom( 2, l ) ) )**2  & 
-                + ( zij -akl*( xpnt( kb )*geom( 3, k ) + xpnt( lb )*geom( 3, l ) ) )**2  ) 
-    f0t  =  sqrpi2 
-    if ( tt > rcut )  f0t  =  ( tt**( -0.5d0 ) )*erf( sqrt(tt) ) 
-    eri  =  eri  +  dkl*f0t*sqrt(aijkl)  
-    end if 
-    end do  ;  end do  
-    end if  
-    end do  ;  end do 
-
-    if ( i == j ) eri = eri*0.5d0 
-    if ( k == l ) eri = eri*0.5d0 
-    if ( i == k .and. j == l ) eri = eri*0.5d0
-    !$OMP ATOMIC
-    fock( i, j )  =  fock( i, j )  +dens( k, l )*eri*4.0d0  
-    !$OMP ATOMIC
-    fock( k, l )  =  fock( k, l )  +dens( i, j )*eri*4.0d0  
-    !$OMP ATOMIC
-    fock( i, k )  =  fock( i, k )  -dens( j, l )*eri  
-    !$OMP ATOMIC
-    fock( i, l )  =  fock( i, l )  -dens( j, k )*eri  
-    !$OMP ATOMIC
-    fock( j, k )  =  fock( j, k )  -dens( i, l )*eri  
-    !$OMP ATOMIC
-    fock( j, l )  =  fock( j, l )  -dens( i, k )*eri  
-
-    end if  
-    end do  
+                if ( i == j ) eri = eri*0.5d0 
+                if ( k == l ) eri = eri*0.5d0 
+                if ( i == k .and. j == l ) eri = eri*0.5d0
+                
+                !$OMP ATOMIC
+                    fock( i, j )  =  fock( i, j )  +dens( k, l )*eri*4.0d0  
+                !$OMP ATOMIC
+                    fock( k, l )  =  fock( k, l )  +dens( i, j )*eri*4.0d0  
+                !$OMP ATOMIC
+                    fock( i, k )  =  fock( i, k )  -dens( j, l )*eri  
+                !$OMP ATOMIC
+                    fock( i, l )  =  fock( i, l )  -dens( j, k )*eri  
+                !$OMP ATOMIC
+                    fock( j, k )  =  fock( j, k )  -dens( i, l )*eri  
+                !$OMP ATOMIC
+                    fock( j, l )  =  fock( j, l )  -dens( i, k )*eri  
+            
+            end if  
+        end do  
     !$OMP END TEAMS DISTRIBUTE
     !$OMP END TARGET 
     
     !  Trace Fock with the density and print the 2e- energy.
     erep  =  0.0d0
     do  i  =  1,  natom  
-    do  j  =  1,  natom 
-    erep  =  erep  +  fock( i, j )*dens( i, j ) 
-    end do
+        do  j  =  1,  natom 
+            erep  =  erep  +  fock( i, j )*dens( i, j ) 
+        end do
     end do 
 
     deallocate( dens )  
@@ -229,34 +229,34 @@ subroutine ssss( i, j, k, l, ngauss, xpnt, coef, geom, eri )
 
     eri  =  0.0d0 
     do  ib  =  1,  ngauss  
-    do  jb  =  1,  ngauss  
-    aij = 1.0d0/( xpnt( ib ) + xpnt( jb ) ) 
-    dij = coef( ib )*coef( jb )*exp( -xpnt( ib )*xpnt( jb )*aij*  &  
-        ( ( geom( 1, i ) - geom( 1, j ) )**2   &
-        + ( geom( 2, i ) - geom( 2, j ) )**2   &
-        + ( geom( 3, i ) - geom( 3, j ) )**2  )  )*( aij**1.5d0 )  
-    if ( abs( dij ) > dtol ) then      
-    xij = aij*( xpnt( ib )*geom( 1, i ) + xpnt( jb )*geom( 1, j ) )  
-    yij = aij*( xpnt( ib )*geom( 2, i ) + xpnt( jb )*geom( 2, j ) )  
-    zij = aij*( xpnt( ib )*geom( 3, i ) + xpnt( jb )*geom( 3, j ) )  
-    do  kb  =  1,  ngauss  
-    do  lb  =  1,  ngauss 
-    akl = 1.0d0/( xpnt( kb ) + xpnt( lb ) ) 
-    dkl = dij*coef( kb )*coef( lb )*exp( -xpnt( kb )*xpnt( lb )*akl*  &  
-        ( ( geom( 1, k ) - geom( 1, l ) )**2   &
-        + ( geom( 2, k ) - geom( 2, l ) )**2   &
-        + ( geom( 3, k ) - geom( 3, l ) )**2  )  )*( akl**1.5d0 )  
-    if ( abs( dkl ) > dtol ) then      
-    aijkl = ( xpnt( ib ) + xpnt( jb ) )*( xpnt( kb ) + xpnt( lb ) )  &  
-        / ( xpnt( ib ) + xpnt( jb )  +  xpnt( kb ) + xpnt( lb ) )  
-    tt = aijkl*( ( xij -akl*( xpnt( kb )*geom( 1, k ) + xpnt( lb )*geom( 1, l ) ) )**2  & 
-                + ( yij -akl*( xpnt( kb )*geom( 2, k ) + xpnt( lb )*geom( 2, l ) ) )**2  & 
-                + ( zij -akl*( xpnt( kb )*geom( 3, k ) + xpnt( lb )*geom( 3, l ) ) )**2  ) 
-    f0t  =  sqrpi2 
-    if ( tt > rcut )  f0t  =  ( tt**( -0.5d0 ) )*erf( sqrt(tt) ) 
-    eri  =  eri  +  dkl*f0t*sqrt(aijkl)  
-    end if 
-    end do  ;  end do  
-    end if  
+        do  jb  =  1,  ngauss  
+            aij = 1.0d0/( xpnt( ib ) + xpnt( jb ) ) 
+            dij = coef( ib )*coef( jb )*exp( -xpnt( ib )*xpnt( jb )*aij*  &  
+                ( ( geom( 1, i ) - geom( 1, j ) )**2   &
+                + ( geom( 2, i ) - geom( 2, j ) )**2   &
+                + ( geom( 3, i ) - geom( 3, j ) )**2  )  )*( aij**1.5d0 )  
+            if ( abs( dij ) > dtol ) then      
+                xij = aij*( xpnt( ib )*geom( 1, i ) + xpnt( jb )*geom( 1, j ) )  
+                yij = aij*( xpnt( ib )*geom( 2, i ) + xpnt( jb )*geom( 2, j ) )  
+                zij = aij*( xpnt( ib )*geom( 3, i ) + xpnt( jb )*geom( 3, j ) )  
+                do  kb  =  1,  ngauss  
+                    do  lb  =  1,  ngauss 
+                    akl = 1.0d0/( xpnt( kb ) + xpnt( lb ) ) 
+                    dkl = dij*coef( kb )*coef( lb )*exp( -xpnt( kb )*xpnt( lb )*akl*  &  
+                        ( ( geom( 1, k ) - geom( 1, l ) )**2   &
+                        + ( geom( 2, k ) - geom( 2, l ) )**2   &
+                        + ( geom( 3, k ) - geom( 3, l ) )**2  )  )*( akl**1.5d0 )  
+                    if ( abs( dkl ) > dtol ) then      
+                        aijkl = ( xpnt( ib ) + xpnt( jb ) )*( xpnt( kb ) + xpnt( lb ) )  &  
+                            / ( xpnt( ib ) + xpnt( jb )  +  xpnt( kb ) + xpnt( lb ) )  
+                        tt = aijkl*( ( xij -akl*( xpnt( kb )*geom( 1, k ) + xpnt( lb )*geom( 1, l ) ) )**2  & 
+                                    + ( yij -akl*( xpnt( kb )*geom( 2, k ) + xpnt( lb )*geom( 2, l ) ) )**2  & 
+                                    + ( zij -akl*( xpnt( kb )*geom( 3, k ) + xpnt( lb )*geom( 3, l ) ) )**2  ) 
+                        f0t  =  sqrpi2 
+                    if ( tt > rcut )  f0t  =  ( tt**( -0.5d0 ) )*erf( sqrt(tt) ) 
+                        eri  =  eri  +  dkl*f0t*sqrt(aijkl)  
+                    end if 
+                end do  ;  end do  
+            end if  
     end do  ;  end do 
  end subroutine ssss
