@@ -10,36 +10,50 @@ module params
 end module params
 
 PROGRAM main
-    use       params 
-    implicit  none 
-    integer   natom, ngauss
+    use       params
+    use       omp_lib
+    implicit  none
+    integer   natom,ngauss, t,n,i
     real(8)   erep
     real(8)   :: txpnt(3)
-    real(8)   :: tcoef(3) 
-    real(8)   :: tgeom(24) 
-    
+    real(8)   :: tcoef(3)
+    real(8)   :: tgeom(45000)
+
     ! initialize input variables
     ngauss = 3
-    natom = 8
+    natom = 15000
     erep = 0
+
+    print *, 'Max threads: ', OMP_GET_MAX_THREADS()
+    call OMP_SET_NUM_THREADS(8)
+    print *, 'Number of threads: ', OMP_GET_NUM_THREADS()
 
     ! Input data
     data txpnt / 6.3624214, 1.1589230, 0.3136498 /
     data tcoef / 0.154328967295, 0.535328142282, 0.444634542185 /
-    data tgeom / 0.0000, 0.0000, 0.0000, &
-                 0.0000, 0.0000, 1.4000, &
-                 0.0000, 1.4000, 0.0000, &
-                 0.0000, 1.4000, 1.4000, &
-                 1.4000, 0.0000, 0.0000, &   
-                 1.4000, 0.0000, 1.4000, & 
-                 1.4000, 1.4000, 0.0000, &       
-                 1.4000, 1.4000, 1.4000 /
+
+    !$OMP PARALLEL DO PRIVATE(n)
+        do i = 1, natom
+            n = mod(i, 5)
+            if ( n == 0 ) then
+                tgeom(i) = 0.000
+            else if ( n == 1 ) then
+                tgeom(i) = 1.400
+            else if ( n == 2) then
+                tgeom(i) = 5.600
+            else if ( n == 3 ) then
+                tgeom(i) = 16.8000
+            else
+                tgeom(i) = 21.000
+            end if
+        end do
+    !$OMP END PARALLEL DO
 
     ! Compute Hartree-Fock kernel
     call basic_hf_proxy(ngauss, natom, txpnt, tcoef, tgeom, erep)
 
     ! Print results
-    print *, '2e- energy= ', erep*0.5d0   
+    print *, '2e- energy= ', erep*0.5d0
 END PROGRAM main
 
 subroutine basic_hf_proxy(ngauss, natom, txpnt, tcoef, tgeom, erep)
@@ -64,11 +78,15 @@ subroutine basic_hf_proxy(ngauss, natom, txpnt, tcoef, tgeom, erep)
 
     xpnt = txpnt
     coef = tcoef
-    do i = 1, natom*3
-        j = mod(i - 1, 3) + 1
-        k = ceiling(real(i) / 3.0)
-        geom(j, k) = tgeom(i)
-    end do
+
+    !$OMP PARALLEL DO
+        do i = 1, natom*3
+            j = mod(i - 1, 3) + 1
+            k = ceiling(real(i) / 3.0)
+            geom(j, k) = tgeom(i)
+        end do
+    !$OMP END PARALLEL DO
+
 
     ! Build density matrix from fake density 
     allocate( dens( natom, natom ) )  
