@@ -4,7 +4,7 @@ from io import open
 import os
 
 # Assuming the source file contains the functions as provided
-source_file_path = '/home/jvalglz/gptFortranLara/Transformations/TestTransformations/functions.c'
+source_file_path = '/home/jvalglz/gptFortranLara/Transformations/TestTransformations/functions.cpp'
 libraries_needed = """
 #include <stdio.h>
 #include <stdlib.h>
@@ -49,7 +49,7 @@ def parse_functions(file_path):
     
     # Updated Regex to use non-capturing groups
     functions = re.findall(
-        r'void\s+saxpy_parallel\s*\(\s*(?:const\s+)?int\s+n,\s*(?:const\s+)?float\s+a,\s*(?:const\s+)?float\s*\*x,\s*float\s*\*y\s*\)\s*\{.*?^\}',
+        r'void\s+[a-zA-Z_][a-zA-Z0-9_]*\s*\(\s*(?:[^)]*)\)\s*\{.*?^\}',
         content_filtered, flags=re.DOTALL | re.MULTILINE)
     return functions
 
