@@ -2,7 +2,7 @@
 import re
 from openai import OpenAI
 
-client = OpenAI(api_key='REPLACE API KEY HERE')  # REPLACE API KEY
+client = OpenAI()  # REPLACE API KEY
 
 # Improved function to extract __global__ functions, considering nested braces
 def extract_global_functions(code):
