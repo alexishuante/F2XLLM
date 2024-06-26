@@ -1,0 +1,254 @@
+Code Block 1:
+void gemm_parallel(int m, int n, int k, float alpha, float *a, int lda, float *b, int ldb, float beta, float *c, int ldc) {
+  int blockSize = 256;
+  int numBlocks = (m * n + blockSize - 1) / blockSize;
+  
+  gemm_kernel<<<numBlocks, blockSize>>>(m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+  
+  cudaDeviceSynchronize();
+}
+
+__global__ void gemm_kernel(int m, int n, int k, float alpha, float *a, int lda, float *b, int ldb, float beta, float *c, int ldc) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = idx / m;
+  int i = idx % m;
+  
+  if (i < m && j < n) {
+    float temp = 0.0;
+    for (int l = 0; l < k; l++) {
+      temp += a[i * lda + l] * b[l * ldb + j];
+    }
+    c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+  }
+}
+
+Code Block 2:
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int num_blocks_x = (n + NUM_THREADS - 1) / NUM_THREADS;
+  int num_blocks_y = (m + NUM_THREADS - 1) / NUM_THREADS;
+
+  double *a_d, *b_d, *c_d;
+
+  cudaMalloc((void **)&a_d, lda * k * sizeof(double));
+  cudaMalloc((void **)&b_d, ldb * n * sizeof(double));
+  cudaMalloc((void **)&c_d, ldc * n * sizeof(double));
+
+  cudaMemcpy(a_d, a, lda * k * sizeof(double), cudaMemcpyHostToDevice);
+  cudaMemcpy(b_d, b, ldb * n * sizeof(double), cudaMemcpyHostToDevice);
+  cudaMemcpy(c_d, c, ldc * n * sizeof(double), cudaMemcpyHostToDevice);
+
+  dim3 block(NUM_THREADS, NUM_THREADS);
+  dim3 grid(num_blocks_x, num_blocks_y);
+
+  gemm_parallel_kernel<<<grid, block>>>(m, n, k, alpha, a_d, lda, b_d, ldb, beta, c_d, ldc);
+
+  cudaMemcpy(c, c_d, ldc * n * sizeof(double), cudaMemcpyDeviceToHost);
+
+  cudaFree(a_d);
+  cudaFree(b_d);
+  cudaFree(c_d);
+}
+
+__global__ void gemm_parallel_kernel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int tx = threadIdx.x;
+  int ty = threadIdx.y;
+  int bx = blockIdx.x;
+  int by = blockIdx.y;
+  int i = ty + by * blockDim.y;
+  int j = tx + bx * blockDim.x;
+
+  __shared__ double a_shared[NUM_THREADS];
+  __shared__ double b_shared[NUM_THREADS];
+
+  double temp = 0.0;
+
+  if (i < m && j < n) {
+    for (int l = 0; l < k; l++) {
+      a_shared[tx] = a[i * lda + l];
+      b_shared[tx] = b[l * ldb + j];
+      __syncthreads();
+      temp += a_shared[tx] * b_shared[tx];
+      __syncthreads();
+    }
+    c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+  }
+}
+
+Code Block 3:
+void gemm_parallel(int m, int n, int k, float alpha, float *a, int lda, float *b, int ldb, float beta, float *c, int ldc) {
+  int blockSize = 256;
+  int numBlocks = (m * n + blockSize - 1) / blockSize;
+
+  gemm_parallel_kernel<<<numBlocks, blockSize>>>(m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+}
+
+__global__ void gemm_parallel_kernel(int m, int n, int k, float alpha, float *a, int lda, float *b, int ldb, float beta, float *c, int ldc) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = idx / m;
+  int i = idx % m;
+
+  if (i < m && j < n) {
+    float temp = 0.0;
+    for (int l = 0; l < k; l++) {
+      temp += a[i * lda + l] * b[l * ldb + j];
+    }
+    c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+  }
+}
+
+Code Block 4:
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int blockSize = 16;
+  int numBlocks = (m + blockSize - 1) / blockSize;
+  
+  gemm_parallel_kernel<<<numBlocks, blockSize>>>(m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+  
+  cudaDeviceSynchronize();
+}
+
+__global__ void gemm_parallel_kernel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int row = blockIdx.x * blockDim.x + threadIdx.x;
+  int col = blockIdx.y * blockDim.y + threadIdx.y;
+  
+  if (row < m && col < n) {
+    double temp = 0.0;
+    for (int l = 0; l < k; l++) {
+      temp += a[row * lda + l] * b[l * ldb + col];
+    }
+    c[row * ldc + col] = alpha * temp + beta * c[row * ldc + col];
+  }
+}
+
+Code Block 5:
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int blockSize = 256;
+  int numBlocks = (m * n + blockSize - 1) / blockSize;
+  
+  gemm_parallel_kernel<<<numBlocks, blockSize>>>(m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+  
+  cudaDeviceSynchronize();
+}
+
+__global__ void gemm_parallel_kernel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+  
+  if (i < m && j < n) {
+    double temp = 0.0;
+    for (int l = 0; l < k; l++) {
+      temp += a[i * lda + l] * b[l * ldb + j];
+    }
+    c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+  }
+}
+
+Code Block 6:
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int blockSize = 256;
+  int numBlocks = (m * n + blockSize - 1) / blockSize;
+
+  gemm_parallel_kernel<<<numBlocks, blockSize>>>(m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+
+  cudaDeviceSynchronize();
+}
+
+__global__ void gemm_parallel_kernel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+
+  if (i < m && j < n) {
+    double temp = 0.0;
+    for (int l = 0; l < k; l++) {
+      temp += a[i * lda + l] * b[l * ldb + j];
+    }
+    c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+  }
+}
+
+Code Block 7:
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int blockSize = 256;
+  int numBlocks = (m * n + blockSize - 1) / blockSize;
+  
+  gemm_parallel_kernel<<<numBlocks, blockSize>>>(m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+  
+  cudaDeviceSynchronize();
+}
+
+__global__ void gemm_parallel_kernel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+  
+  if (i < m && j < n) {
+    double temp = 0.0;
+    for (int l = 0; l < k; l++) {
+      temp += a[i * lda + l] * b[l * ldb + j];
+    }
+    c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+  }
+}
+
+Code Block 8:
+void gemm_parallel(int m, int n, int k, float alpha, float *a, int lda, float *b, int ldb, float beta, float *c, int ldc) {
+  int blockSize = 256;
+  int numBlocks = (m * n + blockSize - 1) / blockSize;
+
+  gemm_kernel<<<numBlocks, blockSize>>>(m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+
+  cudaDeviceSynchronize();
+}
+
+__global__ void gemm_kernel(int m, int n, int k, float alpha, float *a, int lda, float *b, int ldb, float beta, float *c, int ldc) {
+  int row = blockIdx.x * blockDim.x + threadIdx.x;
+  int col = blockIdx.y * blockDim.y + threadIdx.y;
+
+  if (row < m && col < n) {
+    float temp = 0.0;
+    for (int l = 0; l < k; l++) {
+      temp += a[row * lda + l] * b[l * ldb + col];
+    }
+    c[row * ldc + col] = alpha * temp + beta * c[row * ldc + col];
+  }
+}
+
+Code Block 9:
+__global__ void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  __shared__ double temp;
+  inttx = blockIdx.x * TILE_WIDTH + threadIdx.x;
+  int ty = blockIdx.y * TILE_WIDTH + threadIdx.y;
+  int i, j, l;
+  
+  temp = 0.0;
+  
+  if (tx < m && ty < n) {
+    for (l = 0; l < k; l++) {
+      temp += a[tx * lda + l] * b[l * ldb + ty];
+    }
+    c[tx * ldc + ty] = alpha * temp + beta * c[tx * ldc + ty];
+  }
+}
+
+Code Block 10:
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int blockSize = 256;
+  int numBlocks = (m * n + blockSize - 1) / blockSize;
+  
+  gemm_kernel<<<numBlocks, blockSize>>>(m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+  
+  cudaDeviceSynchronize();
+}
+
+__global__ void gemm_kernel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = idx / m;
+  int i = idx % m;
+  
+  if (i < m && j < n) {
+    double temp = 0.0;
+    for (int l = 0; l < k; l++) {
+      temp += a[i * lda + l] * b[l * ldb + j];
+    }
+    c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+  }
+}
+

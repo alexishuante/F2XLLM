@@ -1,0 +1,453 @@
+Code Block 1:
+matrix
+    if (i < n) {
+        float sum = 0.0;
+        for (int j = row[i]; j < row[i + 1]; ++j) {
+            sum += val[j] * x[col[j]];
+        }
+        y[i] = sum;
+    }
+
+__global__ void spmv_kernel(int n, const float* val, const int* row, const int* col, const float* x, float* y) {
+    // Define thread index
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+    // Each thread works on a separate row of the sparse matrix
+    if (i < n) {
+        float sum = 0.0;
+        for (int j = row[i]; j < row[i + 1]; ++j) {
+            sum += val[j] * x[col[j]];
+        }
+        y[i] = sum;
+    }
+}
+
+Code Block 2:
+void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    // Allocate device memory
+    int *d_row, *d_col;
+    float *d_val, *d_x, *d_y;
+    cudaMalloc((void**)&d_row, (n + 1) * sizeof(int));
+    cudaMalloc((void**)&d_col, nnz * sizeof(int));
+    cudaMalloc((void**)&d_val, nnz * sizeof(float));
+    cudaMalloc((void**)&d_x, n * sizeof(float));
+    cudaMalloc((void**)&d_y, n * sizeof(float));
+
+    // Copy input data from host to device
+    cudaMemcpy(d_row, row, (n + 1) * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_col, col, nnz * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_val, val, nnz * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_x, x, n * sizeof(float), cudaMemcpyHostToDevice);
+
+    // Define block and grid sizes
+    int blockSize = 256;  // Number of threads in each block
+    int numBlocks = (n + blockSize - 1) / blockSize;  // Number of blocks
+
+    // Launch the kernel
+    spmv_parallel_kernel<<<numBlocks, blockSize>>>(n, d_row, d_col, d_val, d_x, d_y);
+
+    // Copy the result back to host
+    cudaMemcpy(y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
+
+    // Free device memory
+    cudaFree(d_row);
+    cudaFree(d_col);
+    cudaFree(d_val);
+    cudaFree(d_x);
+    cudaFree(d_y);
+}
+
+__global__ void spmv_parallel_kernel(int n, int *row, int *col, float *val, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        float sum = 0.0f;
+        for (int j = row[i]; j < row[i + 1]; ++j) {
+            sum += val[j] * x[col[j]];
+        }
+        y[i] = sum;
+    }
+}
+
+Code Block 3:
+void spmv_parallel(int n, int nnz, const std::vector<float> &val, const std::vector<int> &row, const std::vector<int> &col, const std::vector<float> &x, std::vector<float> &y) {
+    float *d_val, *d_x, *d_y;
+    int *d_row, *d_col;
+
+    // Allocate memory on the GPU
+    cudaMalloc(&d_val, nnz * sizeof(float));
+    cudaMalloc(&d_x, n * sizeof(float));
+    cudaMalloc(&d_y, n * sizeof(float));
+    cudaMalloc(&d_row, (n + 1) * sizeof(int));
+    cudaMalloc(&d_col, nnz * sizeof(int));
+
+    // Copy data from host to device
+    cudaMemcpy(d_val, val.data(), nnz * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_x, x.data(), n * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_row, row.data(), (n + 1) * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_col, col.data(), nnz * sizeof(int), cudaMemcpyHostToDevice);
+
+    // Define block size and grid size
+    int blockSize = 256;
+    int gridSize = (n + blockSize - 1) / blockSize;
+
+    // Launch the kernel
+    spmv_parallel_kernel<<<gridSize, blockSize>>>(n, nnz, d_val, d_row, d_col, d_x, d_y);
+
+    // Wait for GPU to finish before accessing the result
+    cudaDeviceSynchronize();
+
+    // Copy the result from device to host
+    cudaMemcpy(y.data(), d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
+
+    // Free device memory
+    cudaFree(d_val);
+    cudaFree(d_x);
+    cudaFree(d_y);
+    cudaFree(d_row);
+    cudaFree(d_col);
+}
+
+__global__ void spmv_parallel_kernel(int n, int nnz, const float* __restrict__ val, const int* __restrict__ row, const int* __restrict__ col, const float* __restrict__ x, float* y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        float sum = 0.0;
+        for (int j = row[i]; j < row[i + 1]; j++) {
+            sum += val[j] * x[col[j]];
+        }
+        y[i] = sum;
+    }
+}
+
+Code Block 4:
+extern "C" void spmv_parallel(int n, int nnz, const float *val, const int *row, const int *col, const float *x, float *y) {
+    // Device pointers
+    float *d_val, *d_x, *d_y;
+    int *d_row, *d_col;
+
+    // Allocate device memory
+    cudaMalloc((void**)&d_val, nnz * sizeof(float));
+    cudaMalloc((void**)&d_row, (n + 1) * sizeof(int));
+    cudaMalloc((void**)&d_col, nnz * sizeof(int));
+    cudaMalloc((void**)&d_x, n * sizeof(float));
+    cudaMalloc((void**)&d_y, n * sizeof(float));
+
+    // Copy data from host to device
+    cudaMemcpy(d_val, val, nnz * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_row, row, (n + 1) * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_col, col, nnz * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_x, x, n * sizeof(float), cudaMemcpyHostToDevice);
+
+    // Launch kernel
+    int blockSize = 256;
+    int numBlocks = (n + blockSize - 1) / blockSize;
+    spmv_kernel<<<numBlocks, blockSize>>>(n, nnz, d_val, d_row, d_col, d_x, d_y);
+
+    // Copy result from device to host
+    cudaMemcpy(y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
+
+    // Free device memory
+    cudaFree(d_val);
+    cudaFree(d_row);
+    cudaFree(d_col);
+    cudaFree(d_x);
+    cudaFree(d_y);
+}
+
+__global__ void spmv_kernel(int n, int nnz, const float *val, const int *row, const int *col, const float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        float sum = 0.0f;
+        for (int j = row[i]; j < row[i + 1]; ++j) {
+            sum += val[j] * x[col[j]];
+        }
+        y[i] = sum;
+    }
+}
+
+Code Block 5:
+void spmv_parallel(int n, int nnz, const float* val, const int* row, const int* col, const float* x, float* y) {
+    // Device pointers
+    float* d_val;
+    int* d_row;
+    int* d_col;
+    float* d_x;
+    float* d_y;
+
+    // Allocate device memory
+    cudaMalloc((void**)&d_val, nnz * sizeof(float));
+    cudaMalloc((void**)&d_row, (n + 1) * sizeof(int));
+    cudaMalloc((void**)&d_col, nnz * sizeof(int));
+    cudaMalloc((void**)&d_x, n * sizeof(float));
+    cudaMalloc((void**)&d_y, n * sizeof(float));
+
+    // Copy data to device
+    cudaMemcpy(d_val, val, nnz * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_row, row, (n + 1) * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_col, col, nnz * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_x, x, n * sizeof(float), cudaMemcpyHostToDevice);
+
+    // Launch kernel
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    spmv_kernel<<<blocksPerGrid, threadsPerBlock>>>(n, nnz, d_val, d_row, d_col, d_x, d_y);
+
+    // Copy result back to host
+    cudaMemcpy(y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
+
+    // Free device memory
+    cudaFree(d_val);
+    cudaFree(d_row);
+    cudaFree(d_col);
+    cudaFree(d_x);
+    cudaFree(d_y);
+}
+
+__global__ void spmv_kernel(int n, int nnz, const float* val, const int* row, const int* col, const float* x, float* y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        float sum = 0.0f;
+        for (int j = row[i]; j < row[i + 1]; ++j) {
+            sum += val[j] * x[col[j]];
+        }
+        y[i] = sum;
+    }
+}
+
+Code Block 6:
+void spmv_parallel(int n, int nnz, const float *val, const int *row, const int *col, const float *x, float *y) {
+    float *d_val, *d_x, *d_y;
+    int *d_row, *d_col;
+
+    // Allocating memory on the device
+    cudaMalloc((void**)&d_val, nnz * sizeof(float));
+    cudaMalloc((void**)&d_row, (n + 1) * sizeof(int));
+    cudaMalloc((void**)&d_col, nnz * sizeof(int));
+    cudaMalloc((void**)&d_x, n * sizeof(float));
+    cudaMalloc((void**)&d_y, n * sizeof(float));
+
+    // Copying data from host to device
+    cudaMemcpy(d_val, val, nnz * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_row, row, (n + 1) * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_col, col, nnz * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_x, x, n * sizeof(float), cudaMemcpyHostToDevice);
+
+    // Launching CUDA kernel
+    int blockSize = 256; // threads per block
+    int numBlocks = (n + blockSize - 1) / blockSize; // number of blocks
+    spmv_kernel<<<numBlocks, blockSize>>>(n, nnz, d_val, d_row, d_col, d_x, d_y);
+
+    // Copying result back to the host
+    cudaMemcpy(y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
+
+    // Freeing device memory
+    cudaFree(d_val);
+    cudaFree(d_row);
+    cudaFree(d_col);
+    cudaFree(d_x);
+    cudaFree(d_y);
+}
+
+__global__ void spmv_kernel(int n, int nnz, const float *val, const int *row, const int *col, const float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        float temp = 0.0;
+        for (int j = row[i]; j < row[i + 1]; j++) {
+            temp += val[j] * x[col[j]];
+        }
+        y[i] = temp;
+    }
+}
+
+Code Block 7:
+extern "C" void spmv_parallel(int n, int nnz, const float *val, const int *row, const int *col, const float *x, float *y) {
+    float *d_val, *d_x, *d_y;
+    int *d_row, *d_col;
+
+    // Allocate device memory
+    cudaMalloc((void**)&d_val, nnz * sizeof(float));
+    cudaMalloc((void**)&d_row, (n + 1) * sizeof(int));
+    cudaMalloc((void**)&d_col, nnz * sizeof(int));
+    cudaMalloc((void**)&d_x, n * sizeof(float));
+    cudaMalloc((void**)&d_y, n * sizeof(float));
+
+    // Copy data from host to device
+    cudaMemcpy(d_val, val, nnz * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_row, row, (n + 1) * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_col, col, nnz * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_x, x, n * sizeof(float), cudaMemcpyHostToDevice);
+
+    // Define block and grid sizes
+    int blockSize = 256;
+    int gridSize = (n + blockSize - 1) / blockSize;
+
+    // Call the kernel
+    spmv_kernel<<<gridSize, blockSize>>>(n, nnz, d_val, d_row, d_col, d_x, d_y);
+
+    // Copy result from device to host
+    cudaMemcpy(y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
+
+    // Free device memory
+    cudaFree(d_val);
+    cudaFree(d_row);
+    cudaFree(d_col);
+    cudaFree(d_x);
+    cudaFree(d_y);
+}
+
+__global__ void spmv_kernel(int n, int nnz, const float *val, const int *row, const int *col, const float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (i < n) {
+        float sum = 0.0f;
+
+        for (int j = row[i]; j < row[i + 1]; j++) {
+            sum += val[j] * x[col[j]];
+        }
+
+        y[i] = sum;
+    }
+}
+
+Code Block 8:
+void spmv_parallel(int n, int nnz, const float* val, const int* row, const int* col, const float* x, float* y) {
+    float *d_val, *d_x, *d_y;
+    int *d_row, *d_col;
+
+    // Allocate device memory
+    cudaMalloc((void**)&d_val, nnz * sizeof(float));
+    cudaMalloc((void**)&d_row, (n + 1) * sizeof(int));
+    cudaMalloc((void**)&d_col, nnz * sizeof(int));
+    cudaMalloc((void**)&d_x, n * sizeof(float));
+    cudaMalloc((void**)&d_y, n * sizeof(float));
+
+    // Copy data to the device
+    cudaMemcpy(d_val, val, nnz * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_row, row, (n + 1) * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_col, col, nnz * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_x, x, n * sizeof(float), cudaMemcpyHostToDevice);
+
+    // Define block size and grid size
+    int blockSize = 256;
+    int gridSize = (n + blockSize - 1) / blockSize;
+
+    // Launch the kernel
+    spmv_kernel<<<gridSize, blockSize>>>(n, nnz, d_val, d_row, d_col, d_x, d_y);
+
+    // Copy the result back to the host
+    cudaMemcpy(y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
+
+    // Free device memory
+    cudaFree(d_val);
+    cudaFree(d_row);
+    cudaFree(d_col);
+    cudaFree(d_x);
+    cudaFree(d_y);
+}
+
+__global__ void spmv_kernel(int n, int nnz, const float* val, const int* row, const int* col, const float* x, float* y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (i < n) {
+        float sum = 0.0;
+
+        for (int j = row[i]; j < row[i + 1]; j++) {
+            sum += val[j] * x[col[j]];
+        }
+        y[i] = sum;
+    }
+}
+
+Code Block 9:
+void spmv_parallel(int n, int nnz, const float *val, const int *row, const int *col, const float *x, float *y) {
+    // Allocate device memory
+    float *d_val, *d_x, *d_y;
+    int *d_row, *d_col;
+
+    cudaMalloc((void**)&d_val, nnz * sizeof(float));
+    cudaMalloc((void**)&d_row, (n + 1) * sizeof(int));
+    cudaMalloc((void**)&d_col, nnz * sizeof(int));
+    cudaMalloc((void**)&d_x, n * sizeof(float));
+    cudaMalloc((void**)&d_y, n * sizeof(float));
+
+    // Copy data to device
+    cudaMemcpy(d_val, val, nnz * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_row, row, (n + 1) * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_col, col, nnz * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_x, x, n * sizeof(float), cudaMemcpyHostToDevice);
+
+    // Kernel launch parameters
+    int blockSize = 256;
+    int numBlocks = (n + blockSize - 1) / blockSize;
+
+    // Launch kernel
+    spmv_kernel<<<numBlocks, blockSize>>>(n, d_val, d_row, d_col, d_x, d_y);
+
+    // Copy result back to host
+    cudaMemcpy(y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
+
+    // Free device memory
+    cudaFree(d_val);
+    cudaFree(d_row);
+    cudaFree(d_col);
+    cudaFree(d_x);
+    cudaFree(d_y);
+}
+
+__global__ void spmv_kernel(int n, const float *val, const int *row, const int *col, const float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        float sum = 0.0f;
+        for (int j = row[i]; j < row[i + 1]; j++) {
+            sum += val[j] * x[col[j]];
+        }
+        y[i] = sum;
+    }
+}
+
+Code Block 10:
+void spmv_parallel(int n, int nnz, const float* val, const int* row, const int* col, const float* x, float* y) {
+    float *d_val, *d_x, *d_y;
+    int *d_row, *d_col;
+
+    // Allocate memory on the device
+    cudaMalloc(&d_val, nnz * sizeof(float));
+    cudaMalloc(&d_row, (n + 1) * sizeof(int));
+    cudaMalloc(&d_col, nnz * sizeof(int));
+    cudaMalloc(&d_x, n * sizeof(float));
+    cudaMalloc(&d_y, n * sizeof(float));
+
+    // Copy data from host to device
+    cudaMemcpy(d_val, val, nnz * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_row, row, (n + 1) * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_col, col, nnz * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_x, x, n * sizeof(float), cudaMemcpyHostToDevice);
+
+    // Define block and grid sizes
+    int blockSize = 256;
+    int gridSize = (n + blockSize - 1) / blockSize;
+
+    // Call the kernel
+    spmv_kernel<<<gridSize, blockSize>>>(n, d_row, d_col, d_val, d_x, d_y);
+
+    // Copy the result back to host
+    cudaMemcpy(y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
+
+    // Free device memory
+    cudaFree(d_val);
+    cudaFree(d_row);
+    cudaFree(d_col);
+    cudaFree(d_x);
+    cudaFree(d_y);
+}
+
+__global__ void spmv_kernel(int n, const int* row, const int* col, const float* val, const float* x, float* y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        float sum = 0.0f;
+        for (int j = row[i]; j < row[i + 1]; ++j) {
+            sum += val[j] * x[col[j]];
+        }
+        y[i] = sum;
+    }
+}
+
