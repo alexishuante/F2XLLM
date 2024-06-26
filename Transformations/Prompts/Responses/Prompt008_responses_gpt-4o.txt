@@ -1,0 +1,746 @@
+Output 1:
+Sure! Here's a C/C++ version of your Jacobi operation implemented with OpenMP for parallelism:
+
+```cpp
+#include <omp.h>
+#include <iostream>
+
+/**
+ * Function that performs the Jacobi operation in parallel using OpenMP.
+ *
+ * @param u  3D array containing initial values.
+ * @param unew  3D array to store new values.
+ * @param n  Dimension size of the 3D arrays.
+ * @param niter  Number of iterations to perform.
+ */
+void jacobi_parallel(double ***u, double ***unew, int n, int niter) {
+    for (int iter = 0; iter < niter; ++iter) {
+        #pragma omp parallel for collapse(3) private(i, j, k)
+        for (int k = 1; k < n - 1; ++k) {
+            for (int j = 1; j < n - 1; ++j) {
+                for (int i = 1; i < n - 1; ++i) {
+                    unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] +
+                                             u[i][j-1][k] + u[i][j+1][k] +
+                                             u[i][j][k-1] + u[i][j][k+1] +
+                                             u[i][j][k]);
+                }
+            }
+        }
+
+        // Copy unew to u
+        #pragma omp parallel for collapse(3)
+        for (int k = 0; k < n; ++k) {
+            for (int j = 0; j < n; ++j) {
+                for (int i = 0; i < n; ++i) {
+                    u[i][j][k] = unew[i][j][k];
+                }
+            }
+        }
+    }
+}
+
+int main() {
+    // Example usage (make sure to allocate memory for u and unew)
+    int n = 100;
+    int niter = 100;
+    // Allocate u and unew
+    double ***u = new double**[n];
+    double ***unew = new double**[n];
+    for(int i = 0; i < n; i++) {
+        u[i] = new double*[n];
+        unew[i] = new double*[n];
+        for(int j = 0; j < n; j++) {
+            u[i][j] = new double[n];
+            unew[i][j] = new double[n];
+        }
+    }
+
+    // Initialize u and unew with some values (example initialization)
+    for(int k = 0; k < n; k++) {
+        for(int j = 0; j < n; j++) {
+            for(int i = 0; i < n; i++) {
+                u[i][j][k] = static_cast<double>(rand()) / RAND_MAX;
+                unew[i][j][k] = 0.0;
+            }
+        }
+    }
+
+    jacobi_parallel(u, unew, n, niter);
+
+    // Do something with u and unew
+    // ...
+
+    // Deallocate u and unew
+    for(int i = 0; i < n; i++) {
+        for(int j = 0; j < n; j++) {
+            delete[] u[i][j];
+            delete[] unew[i][j];
+        }
+        delete[] u[i];
+        delete[] unew[i];
+    }
+    delete[] u;
+    delete[] unew;
+
+    return 0;
+}
+```
+
+### Explanation:
+1. **Dynamic Memory Allocation**: Allocated `u` and `unew` dynamically in the `main` function.
+2. **OpenMP Directives**: Used `#pragma omp parallel for collapse(3)` to parallelize the nested loops.
+3. **Array Copy**: Added the copy operation within a parallel region for efficiency.
+4. **Private Variables**: Declared `i`, `j`, and `k` as private inside the `#pragma` directive.
+
+Remember to compile the C++ code using a compiler that supports OpenMP (such as `gcc` or `clang`) with the `-fopenmp` flag:
+
+```sh
+g++ -fopenmp -o jacobi omp_jacobi.cpp
+./jacobi
+```
+
+Output 2:
+Certainly! Below is a version of the provided Fortran OpenACC code implemented in C/C++ using OpenMP for parallelization.
+
+```c
+#include <omp.h>
+#include <stdio.h>
+
+void jacobi_parallel(double* u, double* unew, int n, int niter) {
+    int i, j, k, iter;
+    
+    // Define array boundaries
+    #define IND(i, j, k) ((i) + (n) * ((j) + (n) * (k)))
+
+    for (iter = 0; iter < niter; iter++) {
+        #pragma omp parallel for collapse(3) private(i, j, k)
+        for (k = 1; k < n-1; k++) {
+            for (j = 1; j < n-1; j++) {
+                for (i = 1; i < n-1; i++) {
+                    unew[IND(i, j, k)] = 0.125 * (u[IND(i-1, j, k)] + u[IND(i+1, j, k)] 
+                        + u[IND(i, j-1, k)] + u[IND(i, j+1, k)] 
+                        + u[IND(i, j, k-1)] + u[IND(i, j, k+1)] 
+                        + u[IND(i, j, k)]);
+                }
+            }
+        }
+
+        #pragma omp parallel for collapse(3) private(i, j, k)
+        for (k = 0; k < n; k++) {
+            for (j = 0; j < n; j++) {
+                for (i = 0; i < n; i++) {
+                    u[IND(i, j, k)] = unew[IND(i, j, k)];
+                }
+            }
+        }
+    }
+}
+
+int main() {
+    int n = 10;                 // Define the size of the grid 
+    int niter = 5;              // Define the number of iterations
+    double *u = (double*)malloc(n * n * n * sizeof(double));
+    double *unew = (double*)malloc(n * n * n * sizeof(double));
+
+    // Initialize u and unew arrays
+    for (int i = 0; i < n*n*n; i++) {
+        u[i] = 0.0;
+        unew[i] = 0.0;
+    }
+
+    // Perform the Jacobi operation
+    jacobi_parallel(u, unew, n, niter);
+
+    // Free allocated memory
+    free(u);
+    free(unew);
+
+    return 0;
+}
+```
+
+### Explanations:
+1. **Array Index Macro:**
+   - The `#define IND(i, j, k)` macro helps to convert the 3D subscripts `(i, j, k)` into a single linear index for the 1D array.
+  
+2. **Parallelization:**
+   - The `#pragma omp parallel for collapse(3) private(i, j, k)` directive is used to split the three nested loops across multiple threads. `collapse(3)` integrates three levels of nested loops into one single parallel loop.
+   - The `private(i, j, k)` clause ensures that these loop variables are private to each thread.
+  
+3. **Loop Bounds:**
+   - In C/C++, array indices start from 0, which is different from Fortran where array indexing starts from 1. This code assumes that the update needs to happen within 1 to `n-2` index range, as Fortran typically handles the boundary conditions explicitly.
+
+4. **Memory Allocation:**
+   - Dynamic memory allocation is done using `malloc` for the `u` and `unew` arrays.
+   
+5. **Initialization:**
+   - The arrays `u` and `unew` are initialized to `0.0`.
+
+6. **Memory De-allocation:**
+   - The `free()` function is used to release the dynamically allocated memory.
+
+This implementation is intended to be equivalent to the provided Fortran code using OpenACC, but adapted for C/C++ using OpenMP for parallelization. Please make sure to include the OpenMP library by adding the `-fopenmp` compiler flag when compiling this program with GCC, like `gcc -fopenmp -o jacobi jacobi.c`.
+
+Output 3:
+Here is a version of the Jacobi operation implemented in C/C++ using OpenMP to parallelize the computation, which corresponds to the provided Fortran OpenACC code:
+
+```cpp
+#include <omp.h>
+
+// Jacobi iteration function
+void jacobi_parallel(double ***u, double ***unew, int n, int niter) {
+    for (int iter = 0; iter < niter; iter++) {
+        #pragma omp parallel for collapse(3) private(i, j, k)
+        for (int k = 1; k < n-1; k++) {
+            for (int j = 1; j < n-1; j++) {
+                for (int i = 1; i < n-1; i++) {
+                    unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] + 
+                                             u[i][j-1][k] + u[i][j+1][k] + 
+                                             u[i][j][k-1] + u[i][j][k+1] + 
+                                             u[i][j][k]);
+                }
+            }
+        }
+
+        #pragma omp parallel for collapse(3)
+        for (int k = 0; k < n; k++) {
+            for (int j = 0; j < n; j++) {
+                for (int i = 0; i < n; i++) {
+                    u[i][j][k] = unew[i][j][k];
+                }
+            }
+        }
+    }
+}
+
+// Function to allocate 3D array
+double*** allocate3DArray(int n) {
+    double ***array = new double**[n];
+    for (int i = 0; i < n; i++) {
+        array[i] = new double*[n];
+        for (int j = 0; j < n; j++) {
+            array[i][j] = new double[n];
+        }
+    }
+    return array;
+}
+
+// Function to deallocate 3D array
+void deallocate3DArray(double ***array, int n) {
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            delete[] array[i][j];
+        }
+        delete[] array[i];
+    }
+    delete[] array;
+}
+
+int main() {
+    int n = 100;     // Size of the grid
+    int niter = 100; // Number of iterations
+
+    // Allocate memory for arrays u and unew
+    double ***u = allocate3DArray(n);
+    double ***unew = allocate3DArray(n);
+
+    // Initialize arrays (e.g., with zeroes, or some initial values)
+
+    // Call the jacobi_parallel function
+    jacobi_parallel(u, unew, n, niter);
+
+    // Deallocate memory
+    deallocate3DArray(u, n);
+    deallocate3DArray(unew, n);
+
+    return 0;
+}
+```
+
+### Notes
+1. **Memory Allocation and Deallocation**: You'll need to allocate and deallocate the memory for the 3D arrays `u` and `unew` as shown. This example includes helper functions to allocate and deallocate the 3D arrays.
+2. **Parallelization**:
+   - The `#pragma omp parallel for collapse(3) private(i, j, k)` directive is used to parallelize the triple nested loop for updating `unew`.
+   - A similar `#pragma omp parallel for collapse(3)` directive is used for copying `unew` back to `u` after each iteration.
+3. **Boundary Conditions**: The C/C++ array indexing starts at 0, so note the loop bounds are adjusted accordingly (loops starting from 1 instead of 2 to align with Fortran's 1-based array indexing).
+
+### Additional Considerations
+- **Initialization**: Ensure that the arrays `u` and `unew` are properly initialized before the Jacobi iterations.
+- **Performance**: Depending on the problem size, consider the impact of false sharing and other parallelization effects when using OpenMP.
+- **Error Checking**: For production code, include proper error handling for memory allocation failures and other issues.
+
+Output 4:
+Certainly! Here is a version of the given Fortran code using C/C++ with OpenMP to implement a Jacobi operation:
+
+### Fortran OpenACC Code:
+```fortran
+subroutine jacobi_parallel(u, unew, n, niter)
+    implicit none
+    integer, intent(in) :: n, niter
+    real(kind=8), dimension(n, n, n), intent(inout) :: u, unew
+    integer :: i, j, k, iter
+    do iter = 1, niter
+      !$ACC PARALLEL LOOP COLLAPSE(3) PRIVATE(i, j, k)
+      do k = 2, n - 1
+        do j = 2, n - 1
+          do i = 2, n - 1
+            unew(i, j, k) = 0.125 * (u(i-1, j, k) + u(i+1, j, k) + u(i, j-1, k) &
+              + u(i, j+1, k) + u(i, j, k-1) + u(i, j, k+1) + u(i, j, k))
+          end do
+        end do
+      end do
+      !$ACC END PARALLEL LOOP
+      u(:, :, :) = unew(:, :, :)
+    end do
+  end subroutine jacobi_parallel
+```
+
+### C/C++ OpenMP Code:
+```cpp
+#include <omp.h>
+
+void jacobi_parallel(double*** u, double*** unew, int n, int niter) {
+    for (int iter = 0; iter < niter; iter++) {
+        #pragma omp parallel for collapse(3) private(i, j, k)
+        for (int k = 1; k < n - 1; k++) {
+            for (int j = 1; j < n - 1; j++) {
+                for (int i = 1; i < n - 1; i++) {
+                    unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] + 
+                                             u[i][j-1][k] + u[i][j+1][k] + 
+                                             u[i][j][k-1] + u[i][j][k+1] + 
+                                             u[i][j][k]);
+                }
+            }
+        }
+        // Copy unew to u using nested loops to ensure deep copy
+        #pragma omp parallel for collapse(3) private(i, j, k)
+        for (int k = 0; k < n; k++) {
+            for (int j = 0; j < n; j++) {
+                for (int i = 0; i < n; i++) {
+                    u[i][j][k] = unew[i][j][k];
+                }
+            }
+        }
+    }
+}
+```
+
+### Explanation:
+1. **OpenMP Parallelization**:
+   - `#pragma omp parallel for collapse(3) private(i, j, k)` is used to parallelize the nested loops over `i`, `j`, and `k` indices.
+   - The `collapse(3)` directive collapses the three loops into a single large loop, giving more iterations to be distributed among the threads.
+
+2. **Initialization and Update**:
+   - In the Jacobi update loop, boundary elements (from `2` to `n-1` in Fortran, or `1` to `n-2` in C++ due to 0-based indexing) are updated.
+   - After updating `unew`, elements from `unew` are copied back to `u`.
+
+3. **Deep Copy**:
+   - The nested loops for copying `unew` to `u` ensure that we perform a deep copy operation across the entire 3D array.
+
+### Note:
+You'll need to ensure that the memory for `u` and `unew` is allocated correctly using dynamic memory allocation (e.g., using `malloc` or `new` in C/C++), and properly handle the array indexing and boundary conditions as necessary.
+
+Output 5:
+Certainly! The C/C++ code with OpenMP to perform the Jacobi operation can be achieved as follows:
+
+```cpp
+#include <omp.h>
+
+void jacobi_parallel(double ***u, double ***unew, int n, int niter) {
+    int i, j, k, iter;
+
+    // Assuming the double matrices u and unew are dynamically allocated
+    // and n represents the edge size of the 3D matrix
+
+    for (iter = 1; iter <= niter; iter++) {
+        // Use OpenMP parallel for with collapse(3) to parallelize the nested loops
+        #pragma omp parallel for collapse(3) private(i, j, k) shared(unew, u) 
+        for (k = 1; k < n - 1; k++) {   // Fortran is 1-indexed, C/C++ is 0-indexed.
+            for (j = 1; j < n - 1; j++) {
+                for (i = 1; i < n - 1; i++) {
+                    unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] 
+                                            + u[i][j-1][k] + u[i][j+1][k] 
+                                            + u[i][j][k-1] + u[i][j][k+1] 
+                                            + u[i][j][k]);
+                }
+            }
+        }
+        
+        // Copy unew to u
+        #pragma omp parallel for collapse(3) private(i, j, k) shared(unew, u)
+        for (k = 0; k < n; k++) {
+            for (j = 0; j < n; j++) {
+                for (i = 0; i < n; i++) {
+                    u[i][j][k] = unew[i][j][k];
+                }
+            }
+        }
+    }
+}
+
+```
+
+### Some Important Notes:
+1. **Array Indexing**: Fortran arrays are 1-indexed, whereas C/C++ arrays are 0-indexed. The code above assumes `n` includes the boundary cells.
+2. **Array Allocation**: Ensure proper allocation of 3D arrays `u` and `unew`. This example assumes `u` and `unew` are `double ***` (pointers to pointers to pointers of doubles) which are dynamically allocated.
+3. **Shared and Private Clauses**: The `shared` and `private` clauses in OpenMP are used to specify how variables are treated in parallel regions.
+4. **Parallel Performance**: Ensure an efficient implementation by ensuring arrays are properly aligned in memory, and consider other performance aspects specific to your system.
+
+Output 6:
+To convert the provided Fortran OpenACC code to C/C++ using OpenMP, you need to ensure parallelization is properly managed with OpenMP constructs. The main goal is to perform the Jacobi iteration in parallel. Here's how you can accomplish that in C++:
+
+```cpp
+#include <omp.h>
+#include <algorithm>  // for std::copy
+
+void jacobi_parallel(double ***u, double ***unew, int n, int niter) {
+    int i, j, k, iter;
+
+    for (iter = 0; iter < niter; ++iter) {
+        #pragma omp parallel for collapse(3) private(i, j, k)
+        for (k = 1; k < n - 1; ++k) {
+            for (j = 1; j < n - 1; ++j) {
+                for (i = 1; i < n - 1; ++i) {
+                    unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] + 
+                                             u[i][j-1][k] + u[i][j+1][k] + 
+                                             u[i][j][k-1] + u[i][j][k+1] + 
+                                             u[i][j][k]);
+                }
+            }
+        }
+
+        // Copy unew to u
+        #pragma omp parallel for collapse(3) private(i, j, k)
+        for (k = 0; k < n; ++k) {
+            for (j = 0; j < n; ++j) {
+                for (i = 0; i < n; ++i) {
+                    u[i][j][k] = unew[i][j][k];
+                }
+            }
+        }
+    }
+}
+```
+
+### Key Points
+1. **Array Initialization**: Ensure that `u` and `unew` are three-dimensional dynamically allocated arrays, which should be properly initialized before calling the `jacobi_parallel` function.
+2. **OpenMP Directives**: 
+   - `#pragma omp parallel for collapse(3) private(i, j, k)`: This directive parallelizes the nested loops and collapses them into a single loop to be partitioned among threads.
+   - Private variables `i, j, k` ensure each thread has its copy of the loop indices.
+3. **Array Update**: The outer loop iterates over the number of iterations `niter`.
+
+### Important Notes
+- **Boundary Conditions**: This example assumes periodic or fixed boundary conditions where the edges (`u[0], u[n-1]`, etc.) are not updated. Make sure this matches your specific requirements.
+- **Memory Allocation**: Ensure that memory for `u` and `unew` is allocated and deallocated properly, typically with `new` and `delete` (or better yet, using RAII-friendly containers like `std::vector`).
+
+Here's an example of how you might allocate the 3D arrays:
+
+```cpp
+double*** allocate_3d_array(int n) {
+    double*** array = new double**[n];
+    for (int i = 0; i < n; ++i) {
+        array[i] = new double*[n];
+        for (int j = 0; j < n; ++j) {
+            array[i][j] = new double[n];
+        }
+    }
+    return array;
+}
+```
+
+And don't forget to deallocate them appropriately to avoid memory leaks.
+
+Output 7:
+Here is a C/C++ version of the given Fortran OpenACC code implementing the Jacobi operation using OpenMP for parallelism:
+
+```c
+#include <omp.h>
+
+void jacobi_parallel(double*** u, double*** unew, int n, int niter) {
+    int iter, i, j, k;
+
+    #pragma omp parallel private(iter, i, j, k) shared(u, unew)
+    {
+        for (iter = 0; iter < niter; iter++) {
+            #pragma omp for collapse(3)
+            for (k = 1; k < n - 1; k++) {
+                for (j = 1; j < n - 1; j++) {
+                    for (i = 1; i < n - 1; i++) {
+                        unew[i][j][k] = 0.125 * (u[i - 1][j][k] + u[i + 1][j][k] +
+                                                 u[i][j - 1][k] + u[i][j + 1][k] +
+                                                 u[i][j][k - 1] + u[i][j][k + 1] +
+                                                 u[i][j][k]);
+                    }
+                }
+            }
+            #pragma omp barrier
+
+            #pragma omp for collapse(3)
+            for (k = 0; k < n; k++) {
+                for (j = 0; j < n; j++) {
+                    for (i = 0; i < n; i++) {
+                        u[i][j][k] = unew[i][j][k];
+                    }
+                }
+            }
+            #pragma omp barrier
+        }
+    }
+}
+```
+
+### Key Points:
+- **Parallelism with OpenMP:** The `#pragma omp parallel` directive specifies that the following block of code should be executed in parallel by multiple threads. The `#pragma omp for` directive is used to distribute the iterations of the loop among the threads.
+- **Variable Scoping:**
+  - The `private` clause ensures that each thread has its own instance of the loop variables `iter`, `i`, `j`, and `k`.
+  - The `shared` clause ensures that the arrays `u` and `unew` are shared among all threads.
+- **Collapse Clause:** The `collapse(3)` directive is used to collapse the three nested loops into a single loop to optimize parallel execution.
+- **Barrier:** The `#pragma omp barrier` directive is used to synchronize all threads, ensuring that all threads have completed the specified section of the code before any thread proceeds. This is important after updating `unew` and before copying it back to `u`.
+
+### Memory Allocation:
+The arrays `u` and `unew` should be allocated dynamically before calling this function, typically using `malloc` or similar functions. Here is an example of how you might allocate and deallocate such 3D arrays in C:
+
+```c
+double*** allocate_3d_array(int n) {
+    int i, j;
+    double*** array = (double***) malloc(n * sizeof(double**));
+    for (i = 0; i < n; i++) {
+        array[i] = (double**) malloc(n * sizeof(double*));
+        for (j = 0; j < n; j++) {
+            array[i][j] = (double*) malloc(n * sizeof(double));
+        }
+    }
+    return array;
+}
+
+void deallocate_3d_array(double*** array, int n) {
+    int i, j;
+    for (i = 0; i < n; i++) {
+        for (j = 0; j < n; j++) {
+            free(array[i][j]);
+        }
+        free(array[i]);
+    }
+    free(array);
+}
+
+int main() {
+    int n = 10;
+    int niter = 100;
+    double*** u = allocate_3d_array(n);
+    double*** unew = allocate_3d_array(n);
+
+    // Initialize arrays u and unew as needed
+
+    jacobi_parallel(u, unew, n, niter);
+
+    deallocate_3d_array(u, n);
+    deallocate_3d_array(unew, n);
+
+    return 0;
+}
+```
+
+This example helps to set up and clean up the 3D arrays necessary for the Jacobi iteration function. Adjust the initialization and the size (`n`) as needed based on your application's requirements.
+
+Output 8:
+Certainly! To translate this Fortran OpenACC code to C/C++ using OpenMP, you would first need to understand the basic structure of both the code itself and the specifics of the Jacobi operation. Here's an equivalent version in C/C++ with OpenMP:
+
+```cpp
+#include <omp.h>
+
+void jacobi_parallel(double*** u, double*** unew, int n, int niter) {
+    #pragma omp parallel
+    {
+        int i, j, k, iter;
+        for (iter = 1; iter <= niter; ++iter) {
+            #pragma omp for collapse(3) private(i, j, k) schedule(static)
+            for (k = 1; k < n-1; ++k) {
+                for (j = 1; j < n-1; ++j) {
+                    for (i = 1; i < n-1; ++i) {
+                        unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] + 
+                                                 u[i][j-1][k] + u[i][j+1][k] + 
+                                                 u[i][j][k-1] + u[i][j][k+1] + 
+                                                 u[i][j][k]);
+                    }
+                }
+            }
+            #pragma omp single
+            {
+                // Copy unew to u
+                for (i = 1; i < n-1; ++i) {
+                    for (j = 1; j < n-1; ++j) {
+                        for (k = 1; k < n-1; ++k) {
+                            u[i][j][k] = unew[i][j][k];
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+### Explanation:
+1. **Data Structures:**
+   - The arrays `u` and `unew` are assumed to be 3D arrays of double-precision floating-point numbers (double***).
+
+2. **OpenMP Directives:**
+   - `#pragma omp parallel`: This declares a parallel region, meaning it starts the parallel execution of the following block.
+   - `#pragma omp for collapse(3) private(i, j, k) schedule(static)`: This directive breaks the nested loops into chunks that are distributed among the different threads. The `collapse(3)` clause collapses the three loops into one single loop. The `private(i, j, k)` clause ensures that each thread gets its own private copy of the loop variables. 
+
+3. **Loop Boundaries:**
+   - Note that in C++, array indices start from 0. But since you are performing operations from `2` to `n-1` in Fortran, which corresponds to `1` to `n-2` in zero-based indexing of C++, the loops properly handle these bounds.
+
+4. **Copying Data:**
+   - `#pragma omp single`: Ensures that the copy operation (copying `unew` back to `u`) is done by only one thread to avoid race conditions.
+
+If `u` and `unew` are dynamically allocated or if they span deeper or more complex structures, make sure you handle their allocation/deallocation accordingly.
+
+Output 9:
+Certainly! To convert this Fortran OpenACC code to C/C++ using OpenMP, you will be managing multi-dimensional arrays in C/C++ and adding appropriate OpenMP pragmas for parallelization. Below is a C/C++ implementation of your Fortran Jacobi operation:
+
+```c
+#include <omp.h>
+#include <stdio.h>
+
+void jacobi_parallel(double*** u, double*** unew, int n, int niter) {
+    int i, j, k, iter;
+    
+    // Loop over the number of iterations
+    for (iter = 0; iter < niter; iter++) {
+        // Parallelize using OpenMP with a collapse of 3 loops and private variables i, j, k
+        #pragma omp parallel for collapse(3) private(i, j, k)
+        for (k = 1; k < n - 1; k++) {
+            for (j = 1; j < n - 1; j++) {
+                for (i = 1; i < n - 1; i++) {
+                    unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] + 
+                                             u[i][j-1][k] + u[i][j+1][k] + 
+                                             u[i][j][k-1] + u[i][j][k+1] + 
+                                             u[i][j][k]);
+                }
+            }
+        }
+
+        // Update u array with new values from unew
+        #pragma omp parallel for collapse(3) private(i, j, k)
+        for (k = 0; k < n; k++) {
+            for (j = 0; j < n; j++) {
+                for (i = 0; i < n; i++) {
+                    u[i][j][k] = unew[i][j][k];
+                }
+            }
+        }
+    }
+}
+
+// Helper function to allocate a 3D array dynamically
+double*** create_3d_array(int n) {
+    double*** array = (double***)malloc(n * sizeof(double**));
+    for (int i = 0; i < n; i++) {
+        array[i] = (double**)malloc(n * sizeof(double*));
+        for (int j = 0; j < n; j++) {
+            array[i][j] = (double*)malloc(n * sizeof(double));
+        }
+    }
+    return array;
+}
+
+// Helper function to free a dynamically allocated 3D array
+void free_3d_array(double*** array, int n) {
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            free(array[i][j]);
+        }
+        free(array[i]);
+    }
+    free(array);
+}
+
+int main() {
+    int n = 10; // Example size
+    int niter = 100; // Example number of iterations
+    
+    // Create and initialize the 3D arrays
+    double*** u = create_3d_array(n);
+    double*** unew = create_3d_array(n);
+
+    // Initialize the arrays with some values (this is just an example)
+    for (int k = 0; k < n; k++) {
+        for (int j = 0; j < n; j++) {
+            for (int i = 0; i < n; i++) {
+                u[i][j][k] = (double)(i + j + k);
+                unew[i][j][k] = 0.0;
+            }
+        }
+    }
+
+    // Call the Jacobi parallel function
+    jacobi_parallel(u, unew, n, niter);
+
+    // Free the allocated arrays
+    free_3d_array(u, n);
+    free_3d_array(unew, n);
+    
+    return 0;
+}
+```
+
+This C/C++ code does the following:
+1. Defines the `jacobi_parallel` function to perform the Jacobi iteration in parallel using OpenMP.
+2. Uses three nested for-loops to iterate over the 3D array dimensions, with OpenMP pragmas to parallelize the work.
+3. Includes helper functions to create and free dynamically allocated 3D arrays since C/C++ does not have built-in support for multi-dimensional arrays as Fortran does.
+
+Make sure to compile the code with OpenMP support. For example, if using GCC, you can compile the code with:
+```bash
+gcc -fopenmp -o jacobi jacobi.c
+```
+
+Remember that dynamic multidimensional arrays management, like allocation and deallocation, can be error-prone in C/C++. Always ensure proper management to avoid memory leaks.
+
+Output 10:
+Certainly! Below is an equivalent version of the Jacobi operation implemented in C/C++ using OpenMP for parallelization:
+
+```c
+#include <omp.h>
+
+void jacobi_parallel(double ***u, double ***unew, int n, int niter) {
+    // Iterate for the given number of iterations
+    for (int iter = 0; iter < niter; ++iter) {
+        // Parallel region with OpenMP
+        #pragma omp parallel for collapse(3) private(i, j, k)
+        for (int k = 1; k < n - 1; ++k) {
+            for (int j = 1; j < n - 1; ++j) {
+                for (int i = 1; i < n - 1; ++i) {
+                    // Compute the new value at (i, j, k)
+                    unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] + u[i][j-1][k]
+                                          + u[i][j+1][k] + u[i][j][k-1] + u[i][j][k+1] + u[i][j][k]);
+                }
+            }
+        }
+
+        // Copy the updated values back to the original array
+        #pragma omp parallel for collapse(3)
+        for (int k = 0; k < n; ++k) {
+            for (int j = 0; j < n; ++j) {
+                for (int i = 0; i < n; ++i) {
+                    u[i][j][k] = unew[i][j][k];
+                }
+            }
+        }
+    }
+}
+```
+
+Here's a brief explanation of the code:
+
+1. **Initialization of Variables:** The function takes in two 3D arrays `u` and `unew`, integer dimensions `n` and `niter`.
+2. **OpenMP Parallel Loops:**
+    - The `#pragma omp parallel for collapse(3) private(i, j, k)` directive is used to parallelize the nested loops across threads. The `collapse(3)` clause collapses the three nested loops into a single loop for parallel execution.
+    - Inside these nested loops, we compute the Jacobi update by averaging the neighboring values.
+3. **Copy Updated Values:** After computing the new values, another parallel region is used to copy values from `unew` back to `u`.
+
+Make sure to enable OpenMP support in your compiler (e.g., using `-fopenmp` for gcc or clang). Additionally, you'll need to properly allocate and initialize the 3D arrays `u` and `unew` before calling this function.
+
+Also, be aware of potential edge cases and ensure your data structures are correctly allocated and freed to avoid memory leaks or access violations.
+
