@@ -25,7 +25,7 @@ PROGRAM main
     erep = 0
 
     print *, 'Max threads: ', OMP_GET_MAX_THREADS()
-    call OMP_SET_NUM_THREADS(8)
+    call OMP_SET_NUM_THREADS(24)
     print *, 'Number of threads: ', OMP_GET_NUM_THREADS()
 
     ! Input data
@@ -58,6 +58,7 @@ END PROGRAM main
 
 subroutine basic_hf_proxy(ngauss, natom, txpnt, tcoef, tgeom, erep)
     use        params 
+    use       omp_lib
     implicit   none 
     integer    ngauss, natom
     integer    i,j,ij, ib,jb,kb,lb, nn,kl,k,l, nnnn,ijkl,n   
@@ -81,6 +82,7 @@ subroutine basic_hf_proxy(ngauss, natom, txpnt, tcoef, tgeom, erep)
 
     !$OMP PARALLEL DO
         do i = 1, natom*3
+            print *, 'Number of threads in parallel: ', OMP_GET_NUM_THREADS()
             j = mod(i - 1, 3) + 1
             k = ceiling(real(i) / 3.0)
             geom(j, k) = tgeom(i)
