@@ -1,0 +1,495 @@
+Output 1:
+```c
+#include <stdio.h>
+#include <stdlib.h>
+
+void saxpy(int n, float a, float *x, float *y) {
+    int i;
+    for(i = 0; i < n; i++) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+__global__
+void saxpy_cuda(int n, float a, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if(i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+```
+
+Output 2:
+Here is the equivalent function implemented in C and CUDA for the given Fortran subroutine using OpenACC for the AXPY operation:
+
+```c
+#include <stdio.h>
+
+__global__ void saxpy(int n, float a, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+void saxpy_openacc(int n, float a, float *x, float *y) {
+    float *d_x, *d_y;
+
+    cudaMalloc(&d_x, n * sizeof(float));
+    cudaMalloc(&d_y, n * sizeof(float));
+
+    cudaMemcpy(d_x, x, n * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_y, y, n * sizeof(float), cudaMemcpyHostToDevice);
+
+    int blockSize = 256;
+    int gridSize = (n + blockSize - 1) / blockSize;
+
+    saxpy<<<gridSize, blockSize>>>(n, a, d_x, d_y);
+
+    cudaMemcpy(y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
+
+    cudaFree(d_x);
+    cudaFree(d_y);
+}
+
+int main() {
+    int n = 5;
+    float a = 2.0;
+    float x[] = {1.0, 2.0, 3.0, 4.0, 5.0};
+    float y[] = {0.5, 1.5, 2.5, 3.5, 4.5};
+
+    saxpy_openacc(n, a, x, y);
+
+    for (int i = 0; i < n; i++) {
+        printf("%f ", y[i]);
+    }
+    printf("\n");
+
+    return 0;
+}
+```
+
+In this code, the `saxpy_openacc` function replicates the functionality of the Fortran subroutine `saxpy` using CUDA and OpenACC. It allocates memory on the GPU, copies data from host to device, launches the saxpy kernel, and then copies the result back to the host. Finally, the main function demonstrates the function's usage by performing an AXPY operation on two arrays.
+
+Output 3:
+Here is a C function that performs the AXPY operation implemented in CUDA:
+
+```c
+#include <stdio.h>
+
+__global__ void saxpy(int n, float a, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+void saxpy_c(int n, float a, float *x, float *y) {
+    float *d_x, *d_y;
+
+    cudaMalloc(&d_x, n * sizeof(float));
+    cudaMalloc(&d_y, n * sizeof(float));
+
+    cudaMemcpy(d_x, x, n * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_y, y, n * sizeof(float), cudaMemcpyHostToDevice);
+
+    int blockSize = 256;
+    int numBlocks = (n + blockSize - 1) / blockSize;
+
+    saxpy<<<numBlocks, blockSize>>>(n, a, d_x, d_y);
+
+    cudaMemcpy(y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
+
+    cudaFree(d_x);
+    cudaFree(d_y);
+}
+
+int main() {
+    int n = 5;
+    float a = 2.0;
+    float x[] = {1.0, 2.0, 3.0, 4.0, 5.0};
+    float y[] = {1.0, 1.0, 1.0, 1.0, 1.0};
+
+    saxpy_c(n, a, x, y);
+
+    for (int i = 0; i < n; i++) {
+        printf("%f ", y[i]);
+    }
+
+    return 0;
+}
+```
+
+In this code, we define a CUDA kernel `saxpy` that performs the AXPY operation on the GPU. The `saxpy_c` function manages memory allocation and transfer between the host and the device, and then launches the kernel. Finally, in the `main` function, we provide sample input data and call the `saxpy_c` function to perform the AXPY operation.
+
+Output 4:
+Here is the equivalent function implemented in C and CUDA:
+
+```c
+#include <stdio.h>
+
+__global__ void saxpy(int n, float a, float *x, float *y){
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    if (i < n){
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+void saxpy_cuda(int n, float a, float *x, float *y){
+    float *d_x, *d_y;
+    cudaMalloc(&d_x, n * sizeof(float));
+    cudaMalloc(&d_y, n * sizeof(float));
+    
+    cudaMemcpy(d_x, x, n * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_y, y, n * sizeof(float), cudaMemcpyHostToDevice);
+    
+    int blockSize = 256;
+    int numBlocks = (n + blockSize - 1) / blockSize;
+    
+    saxpy<<<numBlocks, blockSize>>>(n, a, d_x, d_y);
+    
+    cudaMemcpy(y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
+    
+    cudaFree(d_x);
+    cudaFree(d_y);
+}
+
+int main(){
+    int n = 10;
+    float a = 2.0;
+    float x[n] = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0};
+    float y[n] = {10.0, 9.0, 8.0, 7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0};
+    
+    saxpy_cuda(n, a, x, y);
+    
+    for (int i = 0; i < n; i++){
+        printf("%f ", y[i]);
+    }
+    printf("\n");
+    
+    return 0;
+}
+```
+
+In this code, the `saxpy_cuda` function is equivalent to the `saxpy` subroutine in Fortran with OpenACC. The `saxpy` function in CUDA computes the AXPY operation using CUDA kernels. The `main` function provides an example usage of the `saxpy_cuda` function.
+
+Output 5:
+Sure! Here's the equivalent function implemented in C and CUDA:
+
+```c
+#include <stdio.h>
+
+__global__ void saxpy(int n, float a, float *x, float *y){
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if(i < n){
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+void saxpy_cuda(int n, float a, float *x, float *y){
+    float *d_x, *d_y;
+    
+    cudaMalloc(&d_x, n * sizeof(float));
+    cudaMalloc(&d_y, n * sizeof(float));
+
+    cudaMemcpy(d_x, x, n * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_y, y, n * sizeof(float), cudaMemcpyHostToDevice);
+
+    int block_size = 256;
+    int grid_size = (n + block_size - 1) / block_size;
+
+    saxpy<<<grid_size, block_size>>>(n, a, d_x, d_y);
+
+    cudaMemcpy(y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
+
+    cudaFree(d_x);
+    cudaFree(d_y);
+}
+
+int main(){
+    int n = 5;
+    float a = 2.0;
+    float x[] = {1.0, 2.0, 3.0, 4.0, 5.0};
+    float y[] = {2.0, 3.0, 4.0, 5.0, 6.0};
+
+    printf("Before AXPY operation:\n");
+    for(int i = 0; i < n; i++){
+        printf("%f ", y[i]);
+    }
+    printf("\n");
+
+    saxpy_cuda(n, a, x, y);
+
+    printf("After AXPY operation:\n");
+    for(int i = 0; i < n; i++){
+        printf("%f ", y[i]);
+    }
+    printf("\n");
+
+    return 0;
+}
+```
+
+Make sure you have the CUDA toolkit installed to compile and run this code.
+
+Output 6:
+Here is the equivalent function implemented in C and CUDA:
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+
+__global__ void saxpy(int n, float a, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+void saxpy_host(int n, float a, float *x, float *y) {
+    float *d_x, *d_y;
+    cudaMalloc((void**)&d_x, n * sizeof(float));
+    cudaMalloc((void**)&d_y, n * sizeof(float));
+    cudaMemcpy(d_x, x, n * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_y, y, n * sizeof(float), cudaMemcpyHostToDevice);
+
+    int block_size = 256;
+    int num_blocks = (n + block_size - 1) / block_size;
+    saxpy<<<num_blocks, block_size>>>(n, a, d_x, d_y);
+
+    cudaMemcpy(y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
+    cudaFree(d_x);
+    cudaFree(d_y);
+}
+
+int main() {
+    int n = 5;
+    float a = 2.0;
+    float x[] = {1.0, 2.0, 3.0, 4.0, 5.0};
+    float y[] = {1.0, 2.0, 3.0, 4.0, 5.0};
+
+    saxpy_host(n, a, x, y);
+
+    printf("Result: ");
+    for (int i = 0; i < n; i++) {
+        printf("%f ", y[i]);
+    }
+    printf("\n");
+
+    return 0;
+}
+```
+
+In this implementation, the `saxpy_host` function is the equivalent of the Fortran subroutine `saxpy`. It first allocates memory for the arrays `x` and `y` on the device, copies the data from the host to the device, launches the CUDA kernel `saxpy`, and finally copies the result back from the device to the host.
+
+The CUDA kernel `saxpy` performs the AXPY operation element-wise on the arrays `x` and `y` based on the index `i`. The number of blocks and threads per block is calculated to cover all elements of the arrays.
+
+Output 7:
+Here is a C function that implements the saxpy subroutine using CUDA:
+
+```c
+#include <stdio.h>
+
+__global__ void saxpy(int n, float a, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+void saxpy_wrapper(int n, float a, float *x, float *y) {
+    float *d_x, *d_y;
+    cudaMalloc(&d_x, n * sizeof(float));
+    cudaMalloc(&d_y, n * sizeof(float));
+
+    cudaMemcpy(d_x, x, n * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_y, y, n * sizeof(float), cudaMemcpyHostToDevice);
+
+    int blockSize = 256;
+    int numBlocks = (n + blockSize - 1) / blockSize;
+
+    saxpy<<<numBlocks, blockSize>>>(n, a, d_x, d_y);
+
+    cudaMemcpy(y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
+    
+    cudaFree(d_x);
+    cudaFree(d_y);
+}
+
+int main() {
+    int n = 5;
+    float a = 2.0;
+    float x[] = {1.0, 2.0, 3.0, 4.0, 5.0};
+    float y[] = {10.0, 9.0, 8.0, 7.0, 6.0};
+
+    saxpy_wrapper(n, a, x, y);
+
+    printf("Result: ");
+    for (int i = 0; i < n; i++) {
+        printf("%f ", y[i]);
+    }
+    printf("\n");
+
+    return 0;
+}
+```
+
+In this implementation, the `saxpy` function is executed on the GPU using CUDA. The `saxpy_wrapper` function handles memory allocation, data transfers, kernel launch, and memory deallocation. The main function demonstrates the usage of the saxpy operation with sample input arrays `x` and `y`.
+
+Output 8:
+Here is the equivalent function implemented in C and CUDA for the given Fortran subroutine with OpenACC for AXPY operation:
+
+```c
+#include <stdio.h>
+
+__global__ void saxpy(int n, float a, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+void saxpy_cuda(int n, float a, float *h_x, float *h_y) {
+    float *d_x, *d_y;
+    cudaMalloc(&d_x, n * sizeof(float));
+    cudaMalloc(&d_y, n * sizeof(float));
+
+    cudaMemcpy(d_x, h_x, n * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_y, h_y, n * sizeof(float), cudaMemcpyHostToDevice);
+
+    int blockSize = 256;
+    int gridSize = (n + blockSize - 1) / blockSize;
+    saxpy<<<gridSize, blockSize>>>(n, a, d_x, d_y);
+
+    cudaMemcpy(h_y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
+
+    cudaFree(d_x);
+    cudaFree(d_y);
+}
+
+int main() {
+    int n = 5;
+    float a = 2.0;
+    float h_x[n] = {1.0, 2.0, 3.0, 4.0, 5.0};
+    float h_y[n] = {2.0, 3.0, 4.0, 5.0, 6.0};
+    
+    saxpy_cuda(n, a, h_x, h_y);
+
+    printf("Result: ");
+    for (int i = 0; i < n; i++) {
+        printf("%.1f ", h_y[i]);
+    }
+    printf("\n");
+
+    return 0;
+}
+```
+
+In this implementation, the `saxpy_cuda` function sets up the necessary memory allocations, copies data to the GPU, launches the CUDA kernel `saxpy`, copies the result back to the host, and frees the allocated memory. Finally, the main function demonstrates the usage of the `saxpy_cuda` function with sample input data.
+
+Output 9:
+Here is a C function implemented with CUDA that performs the AXPY operation:
+
+```c
+#include <stdio.h>
+
+__global__ void saxpy(int n, float a, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+void saxpy_wrapper(int n, float a, float *h_x, float *h_y) {
+    float *d_x, *d_y;
+
+    cudaMalloc((void **)&d_x, n * sizeof(float));
+    cudaMalloc((void **)&d_y, n * sizeof(float));
+    
+    cudaMemcpy(d_x, h_x, n * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_y, h_y, n * sizeof(float), cudaMemcpyHostToDevice);
+
+    int blockSize = 256;
+    int numBlocks = (n + blockSize - 1) / blockSize;
+
+    saxpy<<<numBlocks, blockSize>>>(n, a, d_x, d_y);
+
+    cudaMemcpy(h_y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
+
+    cudaFree(d_x);
+    cudaFree(d_y);
+}
+
+int main() {
+    int n = 5;
+    float a = 2.0f;
+    float h_x[] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
+    float h_y[] = {5.0f, 4.0f, 3.0f, 2.0f, 1.0f};
+
+    saxpy_wrapper(n, a, h_x, h_y);
+
+    for (int i = 0; i < n; i++) {
+        printf("%f ", h_y[i]);
+    }
+    printf("\n");
+
+    return 0;
+}
+```
+
+In the code above, the `saxpy_wrapper` function acts as a wrapper for the CUDA kernel function `saxpy`. It handles memory allocation and copy operations between host and device. The `saxpy` kernel function performs the actual AXPY operation on the GPU device.
+
+Note: Make sure you have a CUDA-enabled GPU and the CUDA toolkit installed to compile and run this code.
+
+Output 10:
+Here is a function implemented in C and CUDA that performs the AXPY operation (y = a*x + y):
+
+```c
+#include <stdio.h>
+
+__global__ void saxpy(int n, float a, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+void saxpy_c(int n, float a, float *x, float *y) {
+    float *d_x, *d_y;
+
+    cudaMalloc(&d_x, n * sizeof(float));
+    cudaMalloc(&d_y, n * sizeof(float));
+
+    cudaMemcpy(d_x, x, n * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_y, y, n * sizeof(float), cudaMemcpyHostToDevice);
+
+    int block_size = 256;
+    int grid_size = (n + block_size - 1) / block_size;
+
+    saxpy<<<grid_size, block_size>>>(n, a, d_x, d_y);
+
+    cudaMemcpy(y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
+
+    cudaFree(d_x);
+    cudaFree(d_y);
+}
+
+int main() {
+    int n = 5;
+    float a = 2.0;
+    float x[] = {1.0, 2.0, 3.0, 4.0, 5.0};
+    float y[] = {10.0, 20.0, 30.0, 40.0, 50.0};
+
+    saxpy_c(n, a, x, y);
+
+    for (int i = 0; i < n; i++) {
+        printf("%.2f ", y[i]);
+    }
+
+    return 0;
+}
+```
+
+In this code snippet, the `saxpy_c` function performs the AXPY operation using CUDA, taking in the array size `n`, scalar `a`, input array `x`, and output array `y`. It performs the computation in a CUDA kernel function `saxpy` and handles memory management using CUDA APIs. The main function demonstrates the usage of the `saxpy_c` function with sample input arrays.
+

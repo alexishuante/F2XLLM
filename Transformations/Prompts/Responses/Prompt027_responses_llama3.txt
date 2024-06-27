@@ -1,0 +1,492 @@
+Output 1:
+Here is the equivalent C and HIP code for the given Fortran and OpenMP subroutine:
+// C Code
+#include <omp.h>
+
+void spmv_parallel(int n, int nnz, double *val, int *row, int *col, double *x, double *y) {
+  int i, j;
+  #pragma omp parallel for default(none) shared(n, nnz, val, row, col, x, y) private(i, j)
+  for (i = 0; i < n; i++) {
+    y[i] = 0.0;
+    for (j = row[i]; j < row[i+1]; j++) {
+      y[i] += val[j] * x[col[j]];
+    }
+  }
+}
+// HIP Code
+#include <hip/hip_runtime.h>
+
+__global__ void spmv_parallel_kernel(int n, int nnz, double *val, int *row, int *col, double *x, double *y) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n) {
+    y[i] = 0.0;
+    for (int j = row[i]; j < row[i+1]; j++) {
+      y[i] += val[j] * x[col[j]];
+    }
+  }
+}
+
+void spmv_parallel(int n, int nnz, double *val, int *row, int *col, double *x, double *y) {
+  int blockSize = 256;
+  int numBlocks = (n + blockSize - 1) / blockSize;
+  spmv_parallel_kernel<<<numBlocks, blockSize>>>(n, nnz, val, row, col, x, y);
+  hipDeviceSynchronize();
+}
+Note that in the HIP code, we have used a CUDA-like programming model, where we launch a kernel function on the GPU. The kernel function performs the same computation as the C and Fortran codes. We have used a block size of 256, but this can be adjusted based on the specific hardware and problem size. Also, the hipDeviceSynchronize() function is used to ensure that all GPU computations are complete before returning from the function.
+
+
+Output 2:
+Here are the implementations of the SpMV operation in C, HIP, Fortran, and OpenMP:
+C:
+void spmv_parallel(int n, int nnz, double *val, int *row, int *col, double *x, double *y) {
+  int i, j;
+  #pragma omp parallel for default(none) shared(n, nnz, val, row, col, x, y) private(i, j)
+  for (i = 0; i < n; i++) {
+    y[i] = 0.0;
+    for (j = row[i]; j < row[i+1]; j++) {
+      y[i] += val[j] * x[col[j]];
+    }
+  }
+}
+HIP:
+__global__ void spmv_parallel(int n, int nnz, double *val, int *row, int *col, double *x, double *y) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n) {
+    double sum = 0.0;
+    for (int j = row[i]; j < row[i+1]; j++) {
+      sum += val[j] * x[col[j]];
+    }
+    y[i] = sum;
+  }
+}
+Fortran with OpenMP:
+subroutine spmv_parallel(n, nnz, val, row, col, x, y)
+    integer, intent(in) :: n, nnz
+    real, intent(in) :: val(nnz), x(n)
+    integer, intent(in) :: row(n+1), col(nnz)
+    real, intent(out) :: y(n)
+    integer i, j
+    !$OMP PARALLEL DO DEFAULT(NONE) SHARED(n, nnz, val, row, col, x, y) PRIVATE(i, j)
+    do i = 1, n
+      y(i) = 0.0
+      do j = row(i), row(i+1)-1
+        y(i) = y(i) + val(j) * x(col(j))
+      enddo
+    enddo
+    !$OMP END PARALLEL DO
+end subroutine spmv_parallel
+Note that in the HIP implementation, I've assumed a CUDA-like programming model, where the kernel is launched on a grid of blocks, each containing multiple threads. The blockIdx.x and threadIdx.x variables are used to compute the global thread index i. The __global__ keyword indicates that the kernel is executed on the device (GPU).
+In the Fortran implementation, I've kept the same code as you provided, with the OpenMP directives to parallelize the outer loop.
+
+
+Output 3:
+Here are the implementations of the SpMV operation in C and HIP, and the Fortran and OpenMP code you provided:
+C:
+#include <stdio.h>
+
+void spmv(int n, int nnz, double *val, int *row, int *col, double *x, double *y) {
+  int i, j;
+  for (i = 0; i < n; i++) {
+    y[i] = 0.0;
+    for (j = row[i]; j < row[i+1]; j++) {
+      y[i] += val[j] * x[col[j]];
+    }
+  }
+}
+HIP:
+#include <hip/hip_runtime.h>
+
+__global__ void spmv_kernel(int n, int nnz, double *val, int *row, int *col, double *x, double *y) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n) {
+    y[i] = 0.0;
+    for (int j = row[i]; j < row[i+1]; j++) {
+      y[i] += val[j] * x[col[j]];
+    }
+  }
+}
+
+void spmv(int n, int nnz, double *val, int *row, int *col, double *x, double *y) {
+  int blockSize = 256;
+  int numBlocks = (n + blockSize - 1) / blockSize;
+  spmv_kernel<<<numBlocks, blockSize>>>(n, nnz, val, row, col, x, y);
+}
+Fortran and OpenMP (same as your code):
+subroutine spmv_parallel(n, nnz, val, row, col, x, y)
+  integer, intent(in) :: n, nnz
+  real, intent(in) :: val(nnz), x(n)
+  integer, intent(in) :: row(n+1), col(nnz)
+  real, intent(out) :: y(n)
+  integer i, j
+  !$OMP PARALLEL DO DEFAULT(NONE) SHARED(n, nnz, val, row, col, x, y) PRIVATE(i, j)
+  do i = 1, n
+    y(i) = 0.0
+    do j = row(i), row(i+1)-1
+      y(i) = y(i) + val(j) * x(col(j))
+    enddo
+  enddo
+  !$OMP END PARALLEL DO
+end subroutine spmv_parallel
+Note that the HIP code is a GPU implementation, and the spmv_kernel function is executed in parallel on the GPU. The number of blocks and threads per block are determined by the numBlocks and blockSize variables, respectively.
+
+
+Output 4:
+Here are the implementations of the SpMV operation in C, HIP, Fortran, and OpenMP:
+C:
+#include <stdio.h>
+
+void spmv(int n, int nnz, double *val, int *row, int *col, double *x, double *y) {
+  int i, j;
+  for (i = 0; i < n; i++) {
+    y[i] = 0.0;
+    for (j = row[i]; j < row[i+1]; j++) {
+      y[i] += val[j] * x[col[j]];
+    }
+  }
+}
+HIP:
+#include <hip/hip_runtime.h>
+
+__global__ void spmv_kernel(int n, int nnz, double *val, int *row, int *col, double *x, double *y) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n) {
+    y[i] = 0.0;
+    for (int j = row[i]; j < row[i+1]; j++) {
+      y[i] += val[j] * x[col[j]];
+    }
+  }
+}
+
+void spmv(int n, int nnz, double *val, int *row, int *col, double *x, double *y) {
+  int blockSize = 256;
+  int numBlocks = (n + blockSize - 1) / blockSize;
+  spmv_kernel<<<numBlocks, blockSize>>>(n, nnz, val, row, col, x, y);
+}
+Fortran with OpenMP:
+subroutine spmv_parallel(n, nnz, val, row, col, x, y)
+  integer, intent(in) :: n, nnz
+  real, intent(in) :: val(nnz), x(n)
+  integer, intent(in) :: row(n+1), col(nnz)
+  real, intent(out) :: y(n)
+  integer i, j
+  !$OMP PARALLEL DO DEFAULT(NONE) SHARED(n, nnz, val, row, col, x, y) PRIVATE(i, j)
+  do i = 1, n
+    y(i) = 0.0
+    do j = row(i), row(i+1)-1
+      y(i) = y(i) + val(j) * x(col(j))
+    enddo
+  enddo
+  !$OMP END PARALLEL DO
+end subroutine spmv_parallel
+Note that the HIP implementation uses a GPU kernel to perform the SpMV operation, while the Fortran with OpenMP implementation uses parallel loops to perform the operation on multiple CPU cores.
+Also, I've assumed that the val, row, col, x, and y arrays are already allocated and initialized in the calling code. You may need to add additional code to allocate and initialize these arrays depending on your specific use case.
+
+
+Output 5:
+Here are the implementations of the SpMV operation in C and HIP, and the Fortran and OpenMP code you provided:
+C:
+#include <stdio.h>
+
+void spmv_parallel(int n, int nnz, double *val, int *row, int *col, double *x, double *y) {
+  int i, j;
+  #pragma omp parallel for default(none) shared(n, nnz, val, row, col, x, y) private(i, j)
+  for (i = 0; i < n; i++) {
+    y[i] = 0.0;
+    for (j = row[i]; j < row[i+1]; j++) {
+      y[i] += val[j] * x[col[j]];
+    }
+  }
+}
+HIP:
+#include <hip/hip_runtime.h>
+
+__global__ void spmv_kernel(int n, int nnz, double *val, int *row, int *col, double *x, double *y) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n) {
+    double sum = 0.0;
+    for (int j = row[i]; j < row[i+1]; j++) {
+      sum += val[j] * x[col[j]];
+    }
+    y[i] = sum;
+  }
+}
+
+void spmv_parallel(int n, int nnz, double *val, int *row, int *col, double *x, double *y) {
+  int blockSize = 256;
+  int numBlocks = (n + blockSize - 1) / blockSize;
+  spmv_kernel<<<numBlocks, blockSize>>>(n, nnz, val, row, col, x, y);
+  hipDeviceSynchronize();
+}
+Fortran and OpenMP (your original code):
+subroutine spmv_parallel(n, nnz, val, row, col, x, y)
+  integer, intent(in) :: n, nnz
+  real, intent(in) :: val(nnz), x(n)
+  integer, intent(in) :: row(n+1), col(nnz)
+  real, intent(out) :: y(n)
+  integer i, j
+  !$OMP PARALLEL DO DEFAULT(NONE) SHARED(n, nnz, val, row, col, x, y) PRIVATE(i, j)
+  do i = 1, n
+    y(i) = 0.0
+    do j = row(i), row(i+1)-1
+      y(i) = y(i) + val(j) * x(col(j))
+    enddo
+  enddo
+  !$OMP END PARALLEL DO
+end subroutine spmv_parallel
+Note that the HIP implementation uses a GPU kernel to perform the SpMV operation in parallel, while the C and Fortran implementations use OpenMP for parallelization on the CPU.
+
+
+Output 6:
+Here are the implementations of the SpMV operation in C, HIP, Fortran, and OpenMP:
+C:
+#include <stdio.h>
+
+void spmv_parallel(int n, int nnz, double *val, int *row, int *col, double *x, double *y) {
+  int i, j;
+  #pragma omp parallel for default(none) shared(n, nnz, val, row, col, x, y) private(i, j)
+  for (i = 0; i < n; i++) {
+    y[i] = 0.0;
+    for (j = row[i]; j < row[i+1]; j++) {
+      y[i] += val[j] * x[col[j]];
+    }
+  }
+}
+HIP:
+#include <hip/hip_runtime.h>
+
+__global__ void spmv_kernel(int n, int nnz, double *val, int *row, int *col, double *x, double *y) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n) {
+    double sum = 0.0;
+    for (int j = row[i]; j < row[i+1]; j++) {
+      sum += val[j] * x[col[j]];
+    }
+    y[i] = sum;
+  }
+}
+
+void spmv_parallel(int n, int nnz, double *val, int *row, int *col, double *x, double *y) {
+  int blockSize = 256;
+  int numBlocks = (n + blockSize - 1) / blockSize;
+  spmv_kernel<<<numBlocks, blockSize>>>(n, nnz, val, row, col, x, y);
+  hipDeviceSynchronize();
+}
+Fortran with OpenMP:
+SUBROUTINE spmv_parallel(n, nnz, val, row, col, x, y)
+  INTEGER, INTENT(IN) :: n, nnz
+  REAL, INTENT(IN) :: val(nnz), x(n)
+  INTEGER, INTENT(IN) :: row(n+1), col(nnz)
+  REAL, INTENT(OUT) :: y(n)
+  INTEGER :: i, j
+  !$OMP PARALLEL DO DEFAULT(NONE) SHARED(n, nnz, val, row, col, x, y) PRIVATE(i, j)
+  DO i = 1, n
+    y(i) = 0.0
+    DO j = row(i), row(i+1)-1
+      y(i) = y(i) + val(j) * x(col(j))
+    ENDDO
+  ENDDO
+  !$OMP END PARALLEL DO
+END SUBROUTINE spmv_parallel
+Note that the HIP implementation uses a GPU kernel to perform the SpMV operation in parallel, while the C and Fortran implementations use OpenMP to parallelize the operation on the CPU.
+
+
+Output 7:
+Here are the implementations of the SpMV operation in C and HIP, and the Fortran and OpenMP code you provided:
+C:
+#include <stdio.h>
+
+void spmv(int n, int nnz, double *val, int *row, int *col, double *x, double *y) {
+  int i, j;
+  for (i = 0; i < n; i++) {
+    y[i] = 0.0;
+    for (j = row[i]; j < row[i+1]; j++) {
+      y[i] += val[j] * x[col[j]];
+    }
+  }
+}
+HIP:
+#include <hip/hip_runtime.h>
+
+__global__ void spmv_kernel(int n, int nnz, double *val, int *row, int *col, double *x, double *y) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n) {
+    y[i] = 0.0;
+    for (int j = row[i]; j < row[i+1]; j++) {
+      y[i] += val[j] * x[col[j]];
+    }
+  }
+}
+
+void spmv(int n, int nnz, double *val, int *row, int *col, double *x, double *y) {
+  int blockSize = 256;
+  int numBlocks = (n + blockSize - 1) / blockSize;
+  spmv_kernel<<<numBlocks, blockSize>>>(n, nnz, val, row, col, x, y);
+}
+Fortran and OpenMP (your code):
+subroutine spmv_parallel(n, nnz, val, row, col, x, y)
+  integer, intent(in) :: n, nnz
+  real, intent(in) :: val(nnz), x(n)
+  integer, intent(in) :: row(n+1), col(nnz)
+  real, intent(out) :: y(n)
+  integer i, j
+  !$OMP PARALLEL DO DEFAULT(NONE) SHARED(n, nnz, val, row, col, x, y) PRIVATE(i, j)
+  do i = 1, n
+    y(i) = 0.0
+    do j = row(i), row(i+1)-1
+      y(i) = y(i) + val(j) * x(col(j))
+    enddo
+  enddo
+  !$OMP END PARALLEL DO
+end subroutine spmv_parallel
+Note that the HIP code is a CUDA kernel, and you will need to compile it with the HIP compiler (hipcc) and run it on a GPU. The C and Fortran codes can be compiled with the respective compilers (gcc and gfortran) and run on a CPU.
+
+
+Output 8:
+Here are the implementations of the SpMV operation in C and HIP, followed by the Fortran and OpenMP implementation:
+C:
+#include <stdio.h>
+#include <stdlib.h>
+
+void spmv_parallel(int n, int nnz, double *val, int *row, int *col, double *x, double *y) {
+  int i, j;
+  for (i = 0; i < n; i++) {
+    y[i] = 0.0;
+    for (j = row[i]; j < row[i+1]; j++) {
+      y[i] += val[j] * x[col[j]];
+    }
+  }
+}
+HIP:
+#include <hip/hip_runtime.h>
+#include <hip/hip.h>
+
+__global__ void spmv_parallel(int n, int nnz, double *val, int *row, int *col, double *x, double *y) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n) {
+    double sum = 0.0;
+    for (int j = row[i]; j < row[i+1]; j++) {
+      sum += val[j] * x[col[j]];
+    }
+    y[i] = sum;
+  }
+}
+
+void spmv_parallel_host(int n, int nnz, double *val, int *row, int *col, double *x, double *y) {
+  int blockSize = 256;
+  int numBlocks = (n + blockSize - 1) / blockSize;
+  spmv_parallel<<<numBlocks, blockSize>>>(n, nnz, val, row, col, x, y);
+  hipDeviceSynchronize();
+}
+Fortran and OpenMP (same as provided):
+subroutine spmv_parallel(n, nnz, val, row, col, x, y)
+  integer, intent(in) :: n, nnz
+  real, intent(in) :: val(nnz), x(n)
+  integer, intent(in) :: row(n+1), col(nnz)
+  real, intent(out) :: y(n)
+  integer i, j
+  !$OMP PARALLEL DO DEFAULT(NONE) SHARED(n, nnz, val, row, col, x, y) PRIVATE(i, j)
+  do i = 1, n
+    y(i) = 0.0
+    do j = row(i), row(i+1)-1
+      y(i) = y(i) + val(j) * x(col(j))
+    enddo
+  enddo
+  !$OMP END PARALLEL DO
+end subroutine spmv_parallel
+Note: The HIP implementation assumes a HIP-enabled device (e.g., an NVIDIA GPU) and uses HIP runtime and kernel calls to execute the SpMV operation in parallel on the device. The Fortran and OpenMP implementation uses OpenMP directives to parallelize the SpMV operation on multiple CPU cores.
+
+
+Output 9:
+Here are the implementations of the SpMV operation in C, HIP, Fortran, and OpenMP:
+C:
+void spmv_parallel(int n, int nnz, double *val, int *row, int *col, double *x, double *y) {
+  int i, j;
+  #pragma omp parallel for default(none) shared(n, nnz, val, row, col, x, y) private(i, j)
+  for (i = 0; i < n; i++) {
+    y[i] = 0.0;
+    for (j = row[i]; j < row[i+1]; j++) {
+      y[i] += val[j] * x[col[j]];
+    }
+  }
+}
+HIP:
+void spmv_parallel(int n, int nnz, double *val, int *row, int *col, double *x, double *y) {
+  int i, j;
+  #pragma hip parallel for default(none) shared(n, nnz, val, row, col, x, y) private(i, j)
+  for (i = 0; i < n; i++) {
+    y[i] = 0.0;
+    for (j = row[i]; j < row[i+1]; j++) {
+      y[i] += val[j] * x[col[j]];
+    }
+  }
+}
+Fortran with OpenMP:
+subroutine spmv_parallel(n, nnz, val, row, col, x, y)
+  integer, intent(in) :: n, nnz
+  real, intent(in) :: val(nnz), x(n)
+  integer, intent(in) :: row(n+1), col(nnz)
+  real, intent(out) :: y(n)
+  integer :: i, j
+  !$OMP PARALLEL DO DEFAULT(NONE) SHARED(n, nnz, val, row, col, x, y) PRIVATE(i, j)
+  do i = 1, n
+    y(i) = 0.0
+    do j = row(i), row(i+1)-1
+      y(i) = y(i) + val(j) * x(col(j))
+    enddo
+  enddo
+  !$OMP END PARALLEL DO
+end subroutine spmv_parallel
+Note that in the HIP implementation, I've used the #pragma hip parallel for directive, which is similar to the OpenMP directive, but is specific to the HIP compiler. Also, in the Fortran implementation, I've kept the same code as you provided, with the OpenMP directives.
+
+
+Output 10:
+Here are the implementations of the SpMV operation in C and HIP, and in Fortran and OpenMP as requested:
+C Implementation:
+#include <stdio.h>
+
+void spmv(int n, int nnz, double *val, int *row, int *col, double *x, double *y) {
+  int i, j;
+  for (i = 0; i < n; i++) {
+    y[i] = 0.0;
+    for (j = row[i]; j < row[i+1]; j++) {
+      y[i] += val[j] * x[col[j]];
+    }
+  }
+}
+HIP Implementation:
+#include <hip/hip_runtime.h>
+
+__global__ void spmv_kernel(int n, int nnz, double *val, int *row, int *col, double *x, double *y) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n) {
+    y[i] = 0.0;
+    for (int j = row[i]; j < row[i+1]; j++) {
+      y[i] += val[j] * x[col[j]];
+    }
+  }
+}
+
+void spmv(int n, int nnz, double *val, int *row, int *col, double *x, double *y) {
+  int blockSize = 256;
+  int numBlocks = (n + blockSize - 1) / blockSize;
+  spmv_kernel<<<numBlocks, blockSize>>>(n, nnz, val, row, col, x, y);
+}
+Fortran and OpenMP Implementation:
+SUBROUTINE spmv_parallel(n, nnz, val, row, col, x, y)
+  INTEGER, INTENT(IN) :: n, nnz
+  REAL, INTENT(IN) :: val(nnz), x(n)
+  INTEGER, INTENT(IN) :: row(n+1), col(nnz)
+  REAL, INTENT(OUT) :: y(n)
+  INTEGER :: i, j
+  !$OMP PARALLEL DO DEFAULT(NONE) SHARED(n, nnz, val, row, col, x, y) PRIVATE(i, j)
+  DO i = 1, n
+    y(i) = 0.0
+    DO j = row(i), row(i+1)-1
+      y(i) = y(i) + val(j) * x(col(j))
+    END DO
+  END DO
+  !$OMP END PARALLEL DO
+END SUBROUTINE spmv_parallel
+Note that the HIP implementation uses a GPU kernel to perform the SpMV operation in parallel, while the Fortran and OpenMP implementation uses OpenMP directives to parallelize the loop. The C implementation is a serial implementation.
+
+

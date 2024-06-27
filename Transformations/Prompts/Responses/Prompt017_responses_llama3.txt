@@ -1,0 +1,420 @@
+Output 1:
+Here is the equivalent function implemented in C and OpenACC:
+void jacobi_parallel(double ***u, double ***unew, int n, int niter) {
+  int i, j, k, iter;
+  #pragma acc parallel loop collapse(3) private(i, j, k)
+  for (iter = 1; iter <= niter; iter++) {
+    for (k = 2; k < n - 1; k++) {
+      for (j = 2; j < n - 1; j++) {
+        for (i = 2; i < n - 1; i++) {
+          unew[k][j][i] = 0.125 * (u[k][j][i-1] + u[k][j][i+1] + u[k][j-1][i] +
+                                     u[k][j+1][i] + u[k-1][j][i] + u[k+1][j][i] + u[k][j][i]);
+        }
+      }
+    }
+  }
+  #pragma acc parallel loop collapse(3) private(i, j, k)
+  for (k = 0; k < n; k++) {
+    for (j = 0; j < n; j++) {
+      for (i = 0; i < n; i++) {
+        u[k][j][i] = unew[k][j][i];
+      }
+    }
+  }
+}
+Note that in C, we need to use pointers for the 3D array, and we also need to explicitly specify the loop bounds for the parallel region. Also, the private clause is used to specify that the loop indices i, j, and k are private to each thread.
+To compile this code, you would need to use a compiler that supports OpenACC, such as GCC or PGI, and link against the OpenACC runtime library. For example:
+gcc -fopenacc -o jacobi_parallel jacobi_parallel.c -lac_openacc
+This will generate an executable file jacobi_parallel that can be run on a GPU or other accelerator device.
+
+
+Output 2:
+Here is the equivalent C code using OpenACC:
+#include <stdio.h>
+#include <stdlib.h>
+#include <openacc.h>
+
+void jacobi_parallel(double ***u, double ***unew, int n, int niter) {
+  int i, j, k, iter;
+  for (iter = 1; iter <= niter; iter++) {
+    #pragma acc parallel loop collapse(3) private(i, j, k)
+    for (k = 2; k < n - 1; k++) {
+      for (j = 2; j < n - 1; j++) {
+        for (i = 2; i < n - 1; i++) {
+          unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] + u[i][j-1][k] +
+                                    u[i][j+1][k] + u[i][j][k-1] + u[i][j][k+1] + u[i][j][k]);
+        }
+      }
+    }
+    #pragma acc end parallel loop
+    for (k = 0; k < n; k++) {
+      for (j = 0; j < n; j++) {
+        for (i = 0; i < n; i++) {
+          u[i][j][k] = unew[i][j][k];
+        }
+      }
+    }
+  }
+}
+Note that in C, we need to use pointers to pointers to pointers (***) to represent 3D arrays, and we need to manually copy the data from unew back to u after each iteration.
+Also, I assume that the kind=8 in the Fortran code means that the real type is equivalent to a double in C. If that's not the case, you may need to adjust the type accordingly.
+You can call this function like this:
+int main() {
+  int n = 10;
+  int niter = 5;
+  double ***u, ***unew;
+
+  // Allocate memory for u and unew
+  u = (double ***)malloc(n * sizeof(double **));
+  unew = (double ***)malloc(n * sizeof(double **));
+  for (int i = 0; i < n; i++) {
+    u[i] = (double **)malloc(n * sizeof(double *));
+    unew[i] = (double **)malloc(n * sizeof(double *));
+    for (int j = 0; j < n; j++) {
+      u[i][j] = (double *)malloc(n * sizeof(double));
+      unew[i][j] = (double *)malloc(n * sizeof(double));
+    }
+  }
+
+  // Initialize u and unew
+  // ...
+
+  jacobi_parallel(u, unew, n, niter);
+
+  // Deallocate memory
+  for (int i = 0; i < n; i++) {
+    for (int j = 0; j < n; j++) {
+      free(u[i][j]);
+      free(unew[i][j]);
+    }
+    free(u[i]);
+    free(unew[i]);
+  }
+  free(u);
+  free(unew);
+
+  return 0;
+}
+This code allocates memory for the 3D arrays u and unew, initializes them, calls the jacobi_parallel function, and then deallocates the memory. You'll need to fill in the initialization code for u and unew.
+
+
+Output 3:
+Here is the equivalent function in C and OpenACC:
+#include <openacc.h>
+
+void jacobi_parallel(double ***u, double ***unew, int n, int niter) {
+  int i, j, k, iter;
+  #pragma acc data copy(u[:n][:n][:n], unew[:n][:n][:n])
+  for (iter = 1; iter <= niter; iter++) {
+    #pragma acc parallel loop collapse(3) private(i, j, k)
+    for (k = 2; k < n - 1; k++) {
+      for (j = 2; j < n - 1; j++) {
+        for (i = 2; i < n - 1; i++) {
+          unew[k][j][i] = 0.125 * (u[k][j][i-1] + u[k][j][i+1] + u[k][j-1][i] +
+                                     u[k][j+1][i] + u[k-1][j][i] + u[k+1][j][i] + u[k][j][i]);
+        }
+      }
+    }
+    #pragma acc exit data delete(u)
+    #pragma acc data copy(u[:n][:n][:n])
+    for (k = 0; k < n; k++) {
+      for (j = 0; j < n; j++) {
+        for (i = 0; i < n; i++) {
+          u[k][j][i] = unew[k][j][i];
+        }
+      }
+    }
+  }
+}
+Note that in C, we need to use pointers for the 3D array, and we use double *** to represent the array. Also, we use #pragma acc data directives to manage the data transfer between host and device. The collapse(3) clause in the #pragma acc parallel loop directive tells the compiler to collapse the three nested loops into a single loop, which can improve parallelization efficiency.
+Also, note that in the Fortran version, the array indices are reversed compared to the C version, this is because Fortran uses column-major ordering, while C uses row-major ordering.
+
+
+Output 4:
+Here is the equivalent C code using OpenACC:
+#pragma acc routine seq
+void jacobi_parallel(double *u, double *unew, int n, int niter) {
+  int i, j, k, iter;
+  for (iter = 1; iter <= niter; iter++) {
+    #pragma acc parallel loop collapse(3) present(u[:n*n*n], unew[:n*n*n])
+    for (k = 2; k < n - 1; k++) {
+      for (j = 2; j < n - 1; j++) {
+        for (i = 2; i < n - 1; i++) {
+          unew[(i * n * n) + (j * n) + k] = 0.125 * (
+            u[((i - 1) * n * n) + (j * n) + k] +
+            u[((i + 1) * n * n) + (j * n) + k] +
+            u[(i * n * n) + ((j - 1) * n) + k] +
+            u[(i * n * n) + ((j + 1) * n) + k] +
+            u[(i * n * n) + (j * n) + (k - 1)] +
+            u[(i * n * n) + (j * n) + (k + 1)] +
+            u[(i * n * n) + (j * n) + k]);
+        }
+      }
+    }
+    #pragma acc update self(u[:n*n*n])
+    for (i = 0; i < n * n * n; i++) {
+      u[i] = unew[i];
+    }
+  }
+}
+Note that I used #pragma acc routine seq to indicate that the function contains sequential code, and #pragma acc parallel loop to specify the parallel loop. I also used present to specify that the u and unew arrays are already present on the device. Additionally, I replaced the Fortran array indexing with C-style indexing, and replaced the kind=8 with the double type.
+
+
+Output 5:
+Here is the equivalent C code using OpenACC:
+#pragma acc routine seq
+void jacobi_parallel(float *u, float *unew, int n, int niter) {
+  int iter, i, j, k;
+  for (iter = 1; iter <= niter; iter++) {
+    #pragma acc parallel loop collapse(3) private(i, j, k)
+    for (k = 2; k < n - 1; k++) {
+      for (j = 2; j < n - 1; j++) {
+        for (i = 2; i < n - 1; i++) {
+          int idx = i + j * n + k * n * n;
+          unew[idx] = 0.125f * (u[idx - 1] + u[idx + 1] + u[idx - n] + 
+                                 u[idx + n] + u[idx - n * n] + u[idx + n * n] + u[idx]);
+        }
+      }
+    }
+    #pragma acc loop seq
+    for (int idx = 0; idx < n * n * n; idx++) {
+      u[idx] = unew[idx];
+    }
+  }
+}
+Note that in C, we need to manually calculate the index idx based on the 3D array indices i, j, and k. Also, the #pragma acc routine seq directive is used to indicate that the routine should be compiled in sequential mode, and the #pragma acc loop seq directive is used to ensure that the copy operation u = unew is executed sequentially.
+Also, the float type is used in the C code, you can change it to double if you need double precision.
+You can call this function in the same way as the Fortran subroutine, passing the arrays u and unew and the integers n and niter as arguments.
+
+
+Output 6:
+Here is the equivalent function in C with OpenACC:
+#include <stdlib.h>
+#include <openacc.h>
+
+void jacobi_parallel(double ***u, double ***unew, int n, int niter) {
+  int i, j, k, iter;
+  #pragma acc data create(u, unew) copyin(n, niter)
+  {
+    for (iter = 1; iter <= niter; iter++) {
+      #pragma acc parallel loop collapse(3) private(i, j, k)
+      for (k = 2; k < n - 1; k++) {
+        for (j = 2; j < n - 1; j++) {
+          for (i = 2; i < n - 1; i++) {
+            unew[k][j][i] = 0.125 * (u[k][j][i-1] + u[k][j][i+1] + u[k][j-1][i] +
+              u[k][j+1][i] + u[k-1][j][i] + u[k+1][j][i] + u[k][j][i]);
+          }
+        }
+      }
+      #pragma acc copy(u, unew, async)
+      #pragma acc wait
+    }
+  }
+}
+Note that in C, we need to use pointers to pointers to pointers (***u) to represent the 3D array, and we need to allocate memory for the arrays u and unew before calling the function. Also, we use #pragma acc data to specify the data that needs to be transferred to the device, and #pragma acc copy to copy the data from unew back to u.
+Also, the loop indices i, j, k are private by default in OpenACC, so we don't need to specify the PRIVATE clause explicitly.
+
+
+Output 7:
+Here is the equivalent function in C with OpenACC:
+#include <stdlib.h>
+#include <openacc.h>
+
+void jacobi_parallel(double ***u, double ***unew, int n, int niter) {
+  int i, j, k, iter;
+
+  for (iter = 1; iter <= niter; iter++) {
+    #pragma acc parallel loop collapse(3) private(i, j, k)
+    for (k = 2; k < n - 1; k++) {
+      for (j = 2; j < n - 1; j++) {
+        for (i = 2; i < n - 1; i++) {
+          unew[k][j][i] = 0.125 * (u[k][j][i-1] + u[k][j][i+1] + u[k][j-1][i] +
+            u[k][j+1][i] + u[k-1][j][i] + u[k+1][j][i] + u[k][j][i]);
+        }
+      }
+    }
+    #pragma acc end parallel loop
+    #pragma acc update host(u[:n][:n][:n])
+    #pragma acc copyout(unew[:n][:n][:n], u[:n][:n][:n])
+  }
+}
+Note that in C, 3D arrays are represented as pointers to pointers to pointers, and the array indices are reversed compared to Fortran. Also, the update and copyout directives are used to update the host array u and copy the data from unew to u, respectively.
+To use this function, you need to allocate the arrays u and unew using a 3D array allocation function, such as:
+double ***allocate_3d_array(int n) {
+  double ***arr;
+  arr = (double ***)malloc(n * sizeof(double **));
+  for (int i = 0; i < n; i++) {
+    arr[i] = (double **)malloc(n * sizeof(double *));
+    for (int j = 0; j < n; j++) {
+      arr[i][j] = (double *)malloc(n * sizeof(double));
+    }
+  }
+  return arr;
+}
+You can then call the jacobi_parallel function as:
+int main() {
+  int n = 100;
+  int niter = 10;
+  double ***u = allocate_3d_array(n);
+  double ***unew = allocate_3d_array(n);
+
+  jacobi_parallel(u, unew, n, niter);
+
+  free_3d_array(u, n);
+  free_3d_array(unew, n);
+
+  return 0;
+}
+where free_3d_array is a function that frees the allocated memory:
+void free_3d_array(double ***arr, int n) {
+  for (int i = 0; i < n; i++) {
+    for (int j = 0; j < n; j++) {
+      free(arr[i][j]);
+    }
+    free(arr[i]);
+  }
+  free(arr);
+}
+Note that this is just one way to implement the Jacobi operation in C with OpenACC, and there are many other ways to optimize the code for performance.
+
+
+Output 8:
+Here is the equivalent function in C with OpenACC:
+#pragma acc routine seq
+void jacobi_parallel(float *u, float *unew, int n, int niter) {
+  int i, j, k, iter;
+  for (iter = 1; iter <= niter; iter++) {
+    #pragma acc parallel loop collapse(3) private(i, j, k)
+    for (k = 2; k < n - 1; k++) {
+      for (j = 2; j < n - 1; j++) {
+        for (i = 2; i < n - 1; i++) {
+          int idx = i + j * n + k * n * n;
+          unew[idx] = 0.125f * (u[idx - 1] + u[idx + 1] + u[idx - n] + u[idx + n] +
+                                 u[idx - n * n] + u[idx + n * n] + u[idx]);
+        }
+      }
+    }
+    #pragma acc end parallel loop
+    #pragma acc loop collapse(3)
+    for (k = 0; k < n * n * n; k++) {
+      u[k] = unew[k];
+    }
+  }
+}
+Note that in C, we need to manually calculate the index idx based on the 3D array indices i, j, and k. Also, we use float as the data type, if you need double precision, you can change it to double.
+Also, I've added the #pragma acc routine seq directive to ensure that the routine is executed sequentially on the host.
+You can call this function by passing the pointers to the u and unew arrays, as well as the n and niter values.
+Let me know if you have any questions or need further assistance!
+
+
+Output 9:
+Here is the equivalent function in C and OpenACC:
+#include <stdlib.h>
+#include <openacc.h>
+
+void jacobi_parallel(double ***u, double ***unew, int n, int niter) {
+  int i, j, k, iter;
+
+  #pragma acc data create(u, unew) copyin(n, niter)
+  {
+    for (iter = 1; iter <= niter; iter++) {
+      #pragma acc parallel loop collapse(3) private(i, j, k)
+      for (k = 2; k < n - 1; k++) {
+        for (j = 2; j < n - 1; j++) {
+          for (i = 2; i < n - 1; i++) {
+            unew[k][j][i] = 0.125 * (u[k][j][i-1] + u[k][j][i+1] + u[k][j-1][i] +
+              u[k][j+1][i] + u[k-1][j][i] + u[k+1][j][i] + u[k][j][i]);
+          }
+        }
+      }
+      #pragma acc parallel loop collapse(3) private(i, j, k)
+      for (k = 0; k < n; k++) {
+        for (j = 0; j < n; j++) {
+          for (i = 0; i < n; i++) {
+            u[k][j][i] = unew[k][j][i];
+          }
+        }
+      }
+    }
+  }
+}
+Note that in C, we need to use pointers to pointers to pointers (***) to represent the 3D array, and we need to allocate memory for the arrays u and unew before calling the function. Also, the collapse(3) clause in the #pragma acc parallel loop directive tells the compiler to collapse the three nested loops into a single loop, which can be parallelized.
+Also, the private(i, j, k) clause in the #pragma acc parallel loop directive tells the compiler to make private copies of the loop indices i, j, and k for each thread.
+You can call this function from your main program like this:
+int main() {
+  int n = 100;
+  int niter = 10;
+  double ***u, ***unew;
+
+  // Allocate memory for u and unew
+  u = (double ***)malloc(n * sizeof(double **));
+  unew = (double ***)malloc(n * sizeof(double **));
+  for (int i = 0; i < n; i++) {
+    u[i] = (double **)malloc(n * sizeof(double *));
+    unew[i] = (double **)malloc(n * sizeof(double *));
+    for (int j = 0; j < n; j++) {
+      u[i][j] = (double *)malloc(n * sizeof(double));
+      unew[i][j] = (double *)malloc(n * sizeof(double));
+    }
+  }
+
+  // Initialize u and unew
+  for (int i = 0; i < n; i++) {
+    for (int j = 0; j < n; j++) {
+      for (int k = 0; k < n; k++) {
+        u[i][j][k] = (double)rand() / RAND_MAX;
+        unew[i][j][k] = 0.0;
+      }
+    }
+  }
+
+  jacobi_parallel(u, unew, n, niter);
+
+  // Deallocate memory for u and unew
+  for (int i = 0; i < n; i++) {
+    for (int j = 0; j < n; j++) {
+      free(u[i][j]);
+      free(unew[i][j]);
+    }
+    free(u[i]);
+    free(unew[i]);
+  }
+  free(u);
+  free(unew);
+
+  return 0;
+}
+This code allocates memory for the arrays u and unew, initializes them with random values, calls the jacobi_parallel function, and then deallocates the memory.
+
+
+Output 10:
+Here is the equivalent C code using OpenACC:
+#pragma acc routine seq
+void jacobi_parallel(float *u, float *unew, int n, int niter) {
+  int iter, i, j, k;
+  for (iter = 1; iter <= niter; iter++) {
+    #pragma acc parallel loop collapse(3) private(i, j, k)
+    for (k = 2; k < n - 1; k++) {
+      for (j = 2; j < n - 1; j++) {
+        for (i = 2; i < n - 1; i++) {
+          unew[i + j*n + k*n*n] = 0.125f * (u[(i-1) + j*n + k*n*n] + u[(i+1) + j*n + k*n*n] +
+            u[i + (j-1)*n + k*n*n] + u[i + (j+1)*n + k*n*n] +
+            u[i + j*n + (k-1)*n*n] + u[i + j*n + (k+1)*n*n] + u[i + j*n + k*n*n]);
+        }
+      }
+    }
+    #pragma acc end parallel loop
+    #pragma acc parallel loop collapse(3) private(i, j, k)
+    for (k = 0; k < n; k++) {
+      for (j = 0; j < n; j++) {
+        for (i = 0; i < n; i++) {
+          u[i + j*n + k*n*n] = unew[i + j*n + k*n*n];
+        }
+      }
+    }
+  }
+}
+Note that I've assumed float precision, if you need double precision, you can replace float with double and 0.125f with 0.125. Also, I've used #pragma acc routine seq to ensure the routine is executed sequentially on the host, if you want to execute it on the device, you can remove this directive.
+Please note that OpenACC is a directive-based parallel programming model, and the code will be executed on the host or device depending on the compiler and runtime environment.
+
+

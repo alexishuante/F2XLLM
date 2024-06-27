@@ -1,0 +1,569 @@
+Output 1:
+Here is the equivalent function implemented in C and CUDA:
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+
+__global__ void jacobi_kernel(double *u, double *unew, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    int k = blockIdx.z * blockDim.z + threadIdx.z;
+
+    if (i >= 1 && i < n - 1 && j >= 1 && j < n - 1 && k >= 1 && k < n - 1) {
+        int idx = k * n * n + j * n + i;
+        unew[idx] = 0.125 * (u[idx - n] + u[idx + n] + u[idx - 1] +
+                             u[idx + 1] + u[idx - n * n] + u[idx + n * n] +
+                             u[idx]);
+    }
+}
+
+void jacobi_parallel(double *u, double *unew, int n, int niter) {
+    double *d_u, *d_unew;
+    int size = n * n * n * sizeof(double);
+
+    cudaMalloc(&d_u, size);
+    cudaMalloc(&d_unew, size);
+
+    cudaMemcpy(d_u, u, size, cudaMemcpyHostToDevice);
+
+    dim3 block(8, 8, 8);
+    dim3 grid((n + block.x - 1) / block.x, (n + block.y - 1) / block.y, (n + block.z - 1) / block.z);
+
+    for (int iter = 0; iter < niter; iter++) {
+        jacobi_kernel<<<grid, block>>>(d_u, d_unew, n);
+        cudaMemcpy(d_u, d_unew, size, cudaMemcpyDeviceToDevice);
+    }
+
+    cudaMemcpy(unew, d_unew, size, cudaMemcpyDeviceToHost);
+
+    cudaFree(d_u);
+    cudaFree(d_unew);
+}
+
+int main() {
+    int n = 10;
+    int niter = 100;
+    double *u, *unew;
+
+    u = (double*)malloc(n * n * n * sizeof(double));
+    unew = (double*)malloc(n * n * n * sizeof(double));
+
+    // Initialize u array
+
+    jacobi_parallel(u, unew, n, niter);
+
+    // Print resulting unew array
+
+    free(u);
+    free(unew);
+
+    return 0;
+}
+```
+
+This C and CUDA implementation of the Jacobi operation uses a kernel function `jacobi_kernel` to compute the updates in parallel on the GPU. The `jacobi_parallel` function manages memory allocation, data transfer, and launches the kernel for the specified number of iterations. The `main` function initializes the arrays, calls the `jacobi_parallel` function, and prints the resulting array `unew`.
+
+Note: This code assumes that you have CUDA properly set up on your system and linked to your compiler.
+
+Output 2:
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+
+void jacobi_parallel(double *u, double *unew, int n, int niter) {
+    int i, j, k, iter;
+    
+    for(iter = 0; iter < niter; iter++) {
+        for(k = 1; k < n-1; k++) {
+            for(j = 1; j < n-1; j++) {
+                for(i = 1; i < n-1; i++) {
+                    unew[i + j*n + k*n*n] = 0.125 * (u[(i-1) + j*n + k*n*n] + u[(i+1) + j*n + k*n*n] + u[i + (j-1)*n + k*n*n] +
+                                                        u[i + (j+1)*n + k*n*n] + u[i + j*n + (k-1)*n*n] + u[i + j*n + (k+1)*n*n] + u[i + j*n + k*n*n]);
+                }
+            }
+        }
+        // Copy unew to u
+        for (int idx = 0; idx < n*n*n; idx++) {
+            u[idx] = unew[idx];
+        }
+    }
+}
+
+__global__ void jacobi_parallel_cuda(double *u, double *unew, int n, int niter) {
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    int j = threadIdx.y + blockIdx.y * blockDim.y;
+    int k = threadIdx.z + blockIdx.z * blockDim.z;
+    
+    if (i < n && j < n && k < n) {
+        for(int iter = 0; iter < niter; iter++) {
+            if (i > 0 && i < n-1 && j > 0 && j < n-1 && k > 0 && k < n-1) {
+                unew[i + j*n + k*n*n] = 0.125 * (u[(i-1) + j*n + k*n*n] + u[(i+1) + j*n + k*n*n] + u[i + (j-1)*n + k*n*n] +
+                                                  u[i + (j+1)*n + k*n*n] + u[i + j*n + (k-1)*n*n] + u[i + j*n + (k+1)*n*n] + u[i + j*n + k*n*n]);
+            }
+        }
+    }
+}
+```
+
+Output 3:
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+
+#define N 100
+#define NITER 100
+
+__global__ void jacobi_kernel(double *u, double *unew, int n){
+    int i = blockIdx.x * blockDim.x + threadIdx.x + 1;
+    int j = blockIdx.y * blockDim.y + threadIdx.y + 1;
+    int k = blockIdx.z * blockDim.z + threadIdx.z + 1;
+    
+    if(i < n-1 && j < n-1 && k < n-1){
+        int idx = k*n*n + j*n + i;
+        unew[idx] = 0.125 * (u[idx - n*n] + u[idx + n*n] + u[idx - n] + u[idx + n] + u[idx - 1] + u[idx + 1] + u[idx]);
+    }
+}
+
+void jacobi_parallel(double *u, double *unew, int n, int niter){
+    double *d_u, *d_unew;
+    int size = sizeof(double) * n * n * n;
+    
+    cudaMalloc(&d_u, size);
+    cudaMalloc(&d_unew, size);
+    
+    cudaMemcpy(d_u, u, size, cudaMemcpyHostToDevice);
+    
+    dim3 block_size(8, 8, 8);
+    dim3 grid_size((n-2+block_size.x-1)/block_size.x, (n-2+block_size.y-1)/block_size.y, (n-2+block_size.z-1)/block_size.z);
+    
+    for(int iter = 0; iter < niter; iter++){
+        jacobi_kernel<<<grid_size, block_size>>>(d_u, d_unew, n);
+        
+        double *temp = d_u;
+        d_u = d_unew;
+        d_unew = temp;
+    }
+    
+    cudaMemcpy(u, d_u, size, cudaMemcpyDeviceToHost);
+    
+    cudaFree(d_u);
+    cudaFree(d_unew);
+}
+```
+
+Output 4:
+```c
+#include <stdlib.h>
+#include <stdio.h>
+
+// Function implemented in C
+void jacobi_parallel(double *u, double *unew, int n, int niter) {
+    int i, j, k, iter;
+    for (iter = 0; iter < niter; iter++) {
+        for (k = 1; k < n - 1; k++) {
+            for (j = 1; j < n - 1; j++) {
+                for (i = 1; i < n - 1; i++) {
+                    unew[i + j*n + k*n*n] = 0.125 * (u[i-1 + j*n + k*n*n] + 
+                                                      u[i+1 + j*n + k*n*n] +
+                                                      u[i + (j-1)*n + k*n*n] + 
+                                                      u[i + (j+1)*n + k*n*n] + 
+                                                      u[i + j*n + (k-1)*n*n] + 
+                                                      u[i + j*n + (k+1)*n*n] + 
+                                                      u[i + j*n + k*n*n]);
+                }
+            }
+        }
+        for (k = 1; k < n - 1; k++) {
+            for (j = 1; j < n - 1; j++) {
+                for (i = 1; i < n - 1; i++) {
+                    u[i + j*n + k*n*n] = unew[i + j*n + k*n*n];
+                }
+            }
+        }
+    }
+}
+```
+
+```cuda
+#include <stdio.h>
+
+// Function implemented in CUDA
+__global__ void jacobi_parallel(double *u, double *unew, int n, int niter) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    int k = blockIdx.z * blockDim.z + threadIdx.z;
+
+    if (i >= 1 && i < n - 1 && j >= 1 && j < n - 1 && k >= 1 && k < n - 1) {
+        unew[i + j*n + k*n*n] = 0.125 * (u[i-1 + j*n + k*n*n] + 
+                                          u[i+1 + j*n + k*n*n] +
+                                          u[i + (j-1)*n + k*n*n] + 
+                                          u[i + (j+1)*n + k*n*n] + 
+                                          u[i + j*n + (k-1)*n*n] + 
+                                          u[i + j*n + (k+1)*n*n] + 
+                                          u[i + j*n + k*n*n]);
+        u[i + j*n + k*n*n] = unew[i + j*n + k*n*n];
+    }
+}
+
+int main() {
+    // CUDA setup code
+    int n = 100;
+    int niter = 100;
+    double *d_u, *d_unew;
+    cudaMalloc(&d_u, sizeof(double) * n * n * n);
+    cudaMalloc(&d_unew, sizeof(double) * n * n * n);
+
+    // Kernel call
+    dim3 blockSize(16, 16, 4);
+    dim3 gridSize((n + blockSize.x - 1) / blockSize.x, 
+                  (n + blockSize.y - 1) / blockSize.y, 
+                  (n + blockSize.z - 1) / blockSize.z);
+    jacobi_parallel<<<gridSize, blockSize>>>(d_u, d_unew, n, niter);
+
+    // Cleanup
+    cudaFree(d_u);
+    cudaFree(d_unew);
+
+    return 0;
+}
+```
+
+Output 5:
+Here is the implementation of the Jacobi operation in C and CUDA:
+
+```c
+#include <stdio.h>
+
+__global__ void jacobi_parallel_kernel(double *u, double *unew, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    int k = blockIdx.z * blockDim.z + threadIdx.z;
+    
+    if (i > 0 && i < n-1 && j > 0 && j < n-1 && k > 0 && k < n-1) {
+        int idx = i + j*n + k*n*n;
+        unew[idx] = 0.125 * (u[idx-n] + u[idx+n] + u[idx-n*n] + u[idx+n*n] + u[idx-1] + u[idx+1] + u[idx]);
+    }
+}
+
+void jacobi_parallel(double *u, double *unew, int n, int niter) {
+    double *d_u, *d_unew;
+    size_t size = n * n * n * sizeof(double);
+    
+    cudaMalloc((void **)&d_u, size);
+    cudaMalloc((void **)&d_unew, size);
+    
+    cudaMemcpy(d_u, u, size, cudaMemcpyHostToDevice);
+    
+    dim3 blockSize(8, 8, 8);
+    dim3 gridSize((n + blockSize.x - 1) / blockSize.x, (n + blockSize.y - 1) / blockSize.y, (n + blockSize.z - 1) / blockSize.z);
+    
+    for (int iter = 0; iter < niter; iter++) {
+        jacobi_parallel_kernel<<<gridSize, blockSize>>>(d_u, d_unew, n);
+        cudaDeviceSynchronize();
+        
+        cudaMemcpy(u, d_u, size, cudaMemcpyDeviceToHost);
+    }
+    
+    cudaFree(d_u);
+    cudaFree(d_unew);
+}
+
+int main() {
+    int n = 10;
+    int niter = 100;
+    
+    double *u, *unew;
+    u = (double *)malloc(n * n * n * sizeof(double));
+    unew = (double *)malloc(n * n * n * sizeof(double));
+    
+    // Initialize u array
+    
+    jacobi_parallel(u, unew, n, niter);
+    
+    // Print final u array
+    
+    free(u);
+    free(unew);
+    
+    return 0;
+}
+```
+
+This code defines a CUDA kernel `jacobi_parallel_kernel` that performs the Jacobi operation on a 3D grid. The main function `jacobi_parallel` iterates over the number of iterations and calls the kernel to update the `u` array. The `main` function initializes the arrays, calls `jacobi_parallel`, and prints the final results.
+
+Note that this is a simple example and might need modifications based on your specific requirements and data sizes.
+
+Output 6:
+Here is the C and CUDA implementation of the given subroutine:
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+
+__global__ void jacobi_parallel_cuda(double *u, double *unew, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    int k = blockIdx.z * blockDim.z + threadIdx.z;
+
+    if (i >= 1 && i < n-1 && j >= 1 && j < n-1 && k >= 1 && k < n-1) {
+        int idx = (k * n * n) + (j * n) + i;
+        unew[idx] = 0.125 * (u[idx - n] + u[idx + n] + u[idx - 1] + u[idx + 1] + u[idx - n*n] + u[idx + n*n] + u[idx]);
+    }
+}
+
+void jacobi_parallel_c(double *u, double *unew, int n, int niter) {
+    double *d_u, *d_unew;
+    int size = n * n * n * sizeof(double);
+
+    cudaMalloc(&d_u, size);
+    cudaMalloc(&d_unew, size);
+
+    cudaMemcpy(d_u, u, size, cudaMemcpyHostToDevice);
+
+    dim3 blocksPerGrid(n/8, n/8, n/8);
+    dim3 threadsPerBlock(8, 8, 8);
+
+    for (int iter = 0; iter < niter; iter++) {
+        jacobi_parallel_cuda<<<blocksPerGrid, threadsPerBlock>>>(d_u, d_unew, n);
+        cudaMemcpy(unew, d_unew, size, cudaMemcpyDeviceToHost);
+        cudaMemcpy(u, d_u, size, cudaMemcpyDeviceToHost);
+    }
+
+    cudaFree(d_u);
+    cudaFree(d_unew);
+}
+```
+
+This code defines a CUDA kernel `jacobi_parallel_cuda` that performs the Jacobi operation on a 3D array, and a function `jacobi_parallel_c` that initializes the CUDA memory, launches the kernel in a loop for `niter` iterations, and copies the results back to the host.
+
+Output 7:
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+
+#define N 100
+#define NITER 100
+
+__global__ void jacobi_kernel(double *u, double *unew) {
+    int i, j, k;
+    int index = threadIdx.x + blockIdx.x * blockDim.x;
+    
+    if(index < N * N * N) {
+        k = index / (N * N);
+        j = (index % (N * N)) / N;
+        i = index % N;
+        
+        if (i > 0 && i < N - 1 && j > 0 && j < N - 1 && k > 0 && k < N - 1) {
+            unew[k * N * N + j * N + i] = 0.125 * (u[(k-1) * N * N + j * N + i] + u[(k+1) * N * N + j * N + i] + 
+                                                    u[k * N * N + (j-1) * N + i] + u[k * N * N + (j+1) * N + i] + 
+                                                    u[k * N * N + j * N + (i-1)] + u[k * N * N + j * N + (i+1)] + 
+                                                    u[k * N * N + j * N + i]);
+        }
+    }
+}
+
+void jacobi_parallel(double *u, double *unew, int n, int niter) {
+    double *d_u, *d_unew;
+    int size = N * N * N * sizeof(double);
+    
+    cudaMalloc((void**)&d_u, size);
+    cudaMalloc((void**)&d_unew, size);
+    
+    cudaMemcpy(d_u, u, size, cudaMemcpyHostToDevice);
+    
+    dim3 blockSize(256);
+    dim3 gridSize((N * N * N + blockSize.x - 1) / blockSize.x);
+    
+    for(int iter = 0; iter < niter; iter++) {
+        jacobi_kernel<<<gridSize, blockSize>>>(d_u, d_unew);
+        
+        cudaMemcpy(u, d_u, size, cudaMemcpyDeviceToHost);
+    }
+    
+    cudaFree(d_u);
+    cudaFree(d_unew);
+}
+
+int main() {
+    double *u, *unew;
+    int n = N, niter = NITER;
+    u = (double*)malloc(N * N * N * sizeof(double));
+    unew = (double*)malloc(N * N * N * sizeof(double));
+    
+    // Initialize u with values
+    
+    jacobi_parallel(u, unew, n, niter);
+    
+    // Print the final result
+    
+    free(u);
+    free(unew);
+}
+```
+
+Output 8:
+```c
+#include <stdio.h>
+
+#define N 10
+#define NITER 1000
+
+__global__ void jacobi_parallel_kernel(double *u, double *unew, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    int k = blockIdx.z * blockDim.z + threadIdx.z;
+
+    if (i >= 1 && i < n - 1 && j >= 1 && j < n - 1 && k >= 1 && k < n - 1) {
+        unew[i + j*n + k*n*n] = 0.125 * (u[(i-1) + j*n + k*n*n] + u[(i+1) + j*n + k*n*n] + u[i + (j-1)*n + k*n*n] +
+                                          u[i + (j+1)*n + k*n*n] + u[i + j*n + (k-1)*n*n] + u[i + j*n + (k+1)*n*n] + u[i + j*n + k*n*n]);
+    }
+}
+
+void jacobi_parallel(double *u, double *unew, int n, int niter) {
+    double *d_u, *d_unew;
+    int size = n * n * n * sizeof(double);
+
+    cudaMalloc((void **)&d_u, size);
+    cudaMalloc((void **)&d_unew, size);
+
+    cudaMemcpy(d_u, u, size, cudaMemcpyHostToDevice);
+
+    dim3 blockDim(8, 8, 8);
+    dim3 gridDim((n + blockDim.x - 1) / blockDim.x, (n + blockDim.y - 1) / blockDim.y, (n + blockDim.z - 1) / blockDim.z);
+
+    for (int iter = 0; iter < niter; iter++) {
+        jacobi_parallel_kernel<<<gridDim, blockDim>>>(d_u, d_unew, n);
+        cudaMemcpy(unew, d_unew, size, cudaMemcpyDeviceToHost);
+
+        double *temp = d_u;
+        d_u = d_unew;
+        d_unew = temp;
+    }
+
+    cudaFree(d_u);
+    cudaFree(d_unew);
+}
+
+int main() {
+    double *u, *unew;
+    u = (double *)malloc(N * N * N * sizeof(double));
+    unew = (double *)malloc(N * N * N * sizeof(double));
+
+    for (int i = 0; i < N * N * N; i++) {
+        u[i] = 1.0;
+    }
+
+    jacobi_parallel(u, unew, N, NITER);
+
+    free(u);
+    free(unew);
+
+    return 0;
+}
+```
+In the code above, we have implemented a CUDA version of the `jacobi_parallel` subroutine in C. The `jacobi_parallel_kernel` function defines the operation to be performed on each element of the grid using CUDA parallelization. The `jacobi_parallel` function copies the data to the device, launches the CUDA kernel, copies the result back to the host, and performs the Jacobi iteration for a specified number of iterations.
+
+Please note that you will need to have CUDA installed on your system to compile and run this code.
+
+Output 9:
+C and CUDA implementation:
+
+```c
+#include <stdio.h>
+
+void jacobi_parallel(double *u, double *unew, int n, int niter) {
+    int i, j, k, iter;
+    for (iter = 0; iter < niter; iter++) {
+        for (k = 1; k < n - 1; k++) {
+            for (j = 1; j < n - 1; j++) {
+                for (i = 1; i < n - 1; i++) {
+                    unew[i + j*n + k*n*n] = 0.125 * (u[(i-1) + j*n + k*n*n] + u[(i+1) + j*n + k*n*n] +
+                                                      u[i + (j-1)*n + k*n*n] + u[i + (j+1)*n + k*n*n] +
+                                                      u[i + j*n + (k-1)*n*n] + u[i + j*n + (k+1)*n*n] +
+                                                      u[i + j*n + k*n*n]);
+                }
+            }
+        }
+        for(int i = 0; i < n*n*n; i++) {
+            u[i] = unew[i];
+        }
+    }
+}
+```
+
+CUDA version:
+
+```c
+#include <stdio.h>
+
+__global__ void jacobi_parallel_cuda(double *u, double *unew, int n, int niter) {
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    int j = threadIdx.y + blockIdx.y * blockDim.y;
+    int k = threadIdx.z + blockIdx.z * blockDim.z;
+    
+    if (i < n-1 && j < n-1 && k < n-1) {
+        unew[i + j*n + k*n*n] = 0.125 * (u[(i-1) + j*n + k*n*n] + u[(i+1) + j*n + k*n*n] +
+                                          u[i + (j-1)*n + k*n*n] + u[i + (j+1)*n + k*n*n] +
+                                          u[i + j*n + (k-1)*n*n] + u[i + j*n + (k+1)*n*n] +
+                                          u[i + j*n + k*n*n]);
+    }
+    
+    __syncthreads();
+    
+    if (i == 0 && j == 0 && k == 0) {
+        for(int i = 0; i < n*n*n; i++) {
+            u[i] = unew[i];
+        }
+    }
+}
+``` 
+
+Please note that this CUDA code assumes a 3D grid of blocks and threads to match the 3 nested loops.
+
+Output 10:
+```c
+#include <stdio.h>
+#include <stdlib.h>
+
+__global__ void jacobi_kernel(double *u, double *unew, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    int k = blockIdx.z * blockDim.z + threadIdx.z;
+
+    if (i >= 1 && i < n-1 && j >= 1 && j < n-1 && k >= 1 && k < n-1) {
+        int idx = i + j*n + k*n*n;
+        unew[idx] = 0.125 * (u[(i-1) + j*n + k*n*n] + u[(i+1) + j*n + k*n*n] +
+                            u[i + (j-1)*n + k*n*n] + u[i + (j+1)*n + k*n*n] +
+                            u[i + j*n + (k-1)*n*n] + u[i + j*n + (k+1)*n*n] +
+                            u[i + j*n + k*n*n]);
+    }
+}
+
+void jacobi_parallel(double *u, double *unew, int n, int niter) {
+    int size = n*n*n*sizeof(double);
+    double *d_u, *d_unew;
+
+    cudaMalloc(&d_u, size);
+    cudaMalloc(&d_unew, size);
+
+    cudaMemcpy(d_u, u, size, cudaMemcpyHostToDevice);
+
+    dim3 threadsPerBlock(8, 8, 8);
+    dim3 numBlocks((n + 7) / 8, (n + 7) / 8, (n + 7) / 8);
+
+    for (int iter = 0; iter < niter; iter++) {
+        jacobi_kernel<<<numBlocks, threadsPerBlock>>>(d_u, d_unew, n);
+        cudaMemcpy(unew, d_unew, size, cudaMemcpyDeviceToHost);
+        cudaMemcpy(u, unew, size, cudaMemcpyHostToDevice);
+    }
+
+    cudaFree(d_u);
+    cudaFree(d_unew);
+}
+```
+(Note: This code assumes that arrays `u` and `unew` are 3D with dimensions `n x n x n`. The CUDA kernel is designed to run on a 3D grid of blocks and threads to process the 3D array in parallel.)
+

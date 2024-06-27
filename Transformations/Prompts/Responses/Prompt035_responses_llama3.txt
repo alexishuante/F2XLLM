@@ -1,0 +1,631 @@
+Output 1:
+Here is the equivalent function implemented in C and CUDA:
+// C function
+void jacobi_parallel_c(double *u, double *unew, int n, int niter, int nthreads) {
+  int i, j, k, iter;
+  pragma omp parallel num_threads(nthreads) private(i, j, k, iter)
+  {
+    for (iter = 1; iter <= niter; iter++) {
+      #pragma omp for schedule(static)
+      for (k = 2; k < n - 1; k++) {
+        for (j = 2; j < n - 1; j++) {
+          for (i = 2; i < n - 1; i++) {
+            unew[i + j*n + k*n*n] = 0.125 * (u[i-1 + j*n + k*n*n] + u[i+1 + j*n + k*n*n] +
+              u[i + (j-1)*n + k*n*n] + u[i + (j+1)*n + k*n*n] + u[i + j*n + (k-1)*n*n] +
+              u[i + j*n + (k+1)*n*n] + u[i + j*n + k*n*n]);
+          }
+        }
+      }
+      #pragma omp barrier
+      for (k = 0; k < n*n*n; k++) {
+        u[k] = unew[k];
+      }
+    }
+  }
+}
+
+// CUDA kernel
+__global__ void jacobi_parallel_cuda(double *u, double *unew, int n, int niter) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+  int k = blockIdx.z * blockDim.z + threadIdx.z;
+  if (i >= 2 && i < n - 1 && j >= 2 && j < n - 1 && k >= 2 && k < n - 1) {
+    for (int iter = 1; iter <= niter; iter++) {
+      unew[i + j*n + k*n*n] = 0.125 * (u[i-1 + j*n + k*n*n] + u[i+1 + j*n + k*n*n] +
+        u[i + (j-1)*n + k*n*n] + u[i + (j+1)*n + k*n*n] + u[i + j*n + (k-1)*n*n] +
+        u[i + j*n + (k+1)*n*n] + u[i + j*n + k*n*n]);
+      __syncthreads();
+      u[i + j*n + k*n*n] = unew[i + j*n + k*n*n];
+    }
+  }
+}
+Note that the CUDA kernel is launched using the following code:
+int blockSize = 16;
+int numBlocks = (n + blockSize - 1) / blockSize;
+jacobi_parallel_cuda<<<dim3(numBlocks, numBlocks, numBlocks), dim3(blockSize, blockSize, blockSize)>>>(u, unew, n, niter);
+This code assumes that the u and unew arrays are already allocated and copied to the GPU. The blockSize variable determines the number of threads per block, and the numBlocks variable determines the number of blocks per grid. The dim3 variables are used to specify the block and grid dimensions.
+
+
+Output 2:
+Here is the equivalent function in C and CUDA:
+C Version:
+#include <stdio.h>
+#include <stdlib.h>
+#include <omp.h>
+
+void jacobi_parallel(double ***u, double ***unew, int n, int niter, int nthreads) {
+  int i, j, k, iter;
+
+  #pragma omp parallel num_threads(nthreads) private(i, j, k, iter)
+  {
+    for (iter = 1; iter <= niter; iter++) {
+      #pragma omp for schedule(static)
+      for (k = 2; k < n - 1; k++) {
+        for (j = 2; j < n - 1; j++) {
+          for (i = 2; i < n - 1; i++) {
+            (*unew)[i][j][k] = 0.125 * ((*u)[i-1][j][k] + (*u)[i+1][j][k] +
+              (*u)[i][j-1][k] + (*u)[i][j+1][k] + (*u)[i][j][k-1] +
+              (*u)[i][j][k+1] + (*u)[i][j][k]);
+          }
+        }
+      }
+      #pragma omp barrier
+      for (k = 0; k < n; k++) {
+        for (j = 0; j < n; j++) {
+          for (i = 0; i < n; i++) {
+            (*u)[i][j][k] = (*unew)[i][j][k];
+          }
+        }
+      }
+    }
+  }
+}
+CUDA Version:
+#include <stdio.h>
+
+__global__ void jacobi_kernel(double *u, double *unew, int n, int niter) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+  int k = blockIdx.z * blockDim.z + threadIdx.z;
+
+  if (i >= 2 && i < n - 1 && j >= 2 && j < n - 1 && k >= 2 && k < n - 1) {
+    for (int iter = 1; iter <= niter; iter++) {
+      unew[i + j * n + k * n * n] = 0.125 * (u[(i-1) + j * n + k * n * n] +
+        u[(i+1) + j * n + k * n * n] + u[i + (j-1) * n + k * n * n] +
+        u[i + (j+1) * n + k * n * n] + u[i + j * n + (k-1) * n * n] +
+        u[i + j * n + (k+1) * n * n] + u[i + j * n + k * n * n]);
+      __syncthreads();
+      u[i + j * n + k * n * n] = unew[i + j * n + k * n * n];
+    }
+  }
+}
+
+void jacobi_parallel(double *u, double *unew, int n, int niter, int nthreads) {
+  int blockSize = 16;
+  int numBlocks = (n + blockSize - 1) / blockSize;
+
+  dim3 block(blockSize, blockSize, blockSize);
+  dim3 grid(numBlocks, numBlocks, numBlocks);
+
+  jacobi_kernel<<<grid, block>>>(u, unew, n, niter);
+}
+Note that the CUDA version uses a 3D block and grid to parallelize the computation, and uses shared memory to store the temporary results. The __syncthreads() function is used to ensure that all threads in a block have finished computing before the results are copied back to global memory.
+Also, the C version uses OpenMP to parallelize the computation, and the CUDA version uses the CUDA parallel programming model. The C version uses pointers to 3D arrays, while the CUDA version uses a 1D array and computes the indices manually.
+
+
+Output 3:
+Here is the equivalent function in C and CUDA:
+C Version:
+#include <stdio.h>
+#include <stdlib.h>
+#include <omp.h>
+
+void jacobi_parallel(double ***u, double ***unew, int n, int niter, int nthreads) {
+  int i, j, k, iter;
+  #pragma omp parallel num_threads(nthreads) private(i, j, k, iter)
+  {
+    for (iter = 1; iter <= niter; iter++) {
+      #pragma omp for schedule(static)
+      for (k = 2; k < n - 1; k++) {
+        for (j = 2; j < n - 1; j++) {
+          for (i = 2; i < n - 1; i++) {
+            (*unew)[i][j][k] = 0.125 * ((*u)[i-1][j][k] + (*u)[i+1][j][k] + (*u)[i][j-1][k] +
+              (*u)[i][j+1][k] + (*u)[i][j][k-1] + (*u)[i][j][k+1] + (*u)[i][j][k]);
+          }
+        }
+      }
+      #pragma omp barrier
+      for (k = 0; k < n; k++) {
+        for (j = 0; j < n; j++) {
+          for (i = 0; i < n; i++) {
+            (*u)[i][j][k] = (*unew)[i][j][k];
+          }
+        }
+      }
+    }
+  }
+}
+CUDA Version:
+#include <stdio.h>
+
+__global__ void jacobi_kernel(double *u, double *unew, int n, int niter) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+  int k = blockIdx.z * blockDim.z + threadIdx.z;
+  if (i >= 2 && i < n - 1 && j >= 2 && j < n - 1 && k >= 2 && k < n - 1) {
+    for (int iter = 1; iter <= niter; iter++) {
+      unew[i + j * n + k * n * n] = 0.125 * (u[(i-1) + j * n + k * n * n] + u[(i+1) + j * n + k * n * n] +
+        u[i + (j-1) * n + k * n * n] + u[i + (j+1) * n + k * n * n] + u[i + j * n + (k-1) * n * n] +
+        u[i + j * n + (k+1) * n * n] + u[i + j * n + k * n * n]);
+      __syncthreads();
+      u[i + j * n + k * n * n] = unew[i + j * n + k * n * n];
+    }
+  }
+}
+
+void jacobi_parallel(double *u, double *unew, int n, int niter) {
+  int blockSize = 16;
+  int numBlocks = (n + blockSize - 1) / blockSize;
+  jacobi_kernel<<<dim3(numBlocks, numBlocks, numBlocks), dim3(blockSize, blockSize, blockSize)>>>(u, unew, n, niter);
+}
+Note that in the CUDA version, I assumed a 3D block and grid layout to parallelize the computation. The jacobi_kernel function is executed on the GPU, and the jacobi_parallel function is the host function that launches the kernel. Also, I used __syncthreads() to ensure that all threads in a block have finished computing before updating the u array.
+
+
+Output 4:
+Here is the equivalent function implemented in C and CUDA:
+C Function:
+#include <stdio.h>
+#include <stdlib.h>
+#include <omp.h>
+
+void jacobi_parallel(double ***u, double ***unew, int n, int niter, int nthreads) {
+  int i, j, k, iter;
+  #pragma omp parallel num_threads(nthreads) private(i, j, k, iter)
+  {
+    for (iter = 1; iter <= niter; iter++) {
+      #pragma omp for schedule(static)
+      for (k = 2; k < n - 1; k++) {
+        for (j = 2; j < n - 1; j++) {
+          for (i = 2; i < n - 1; i++) {
+            unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] + u[i][j-1][k] +
+              u[i][j+1][k] + u[i][j][k-1] + u[i][j][k+1] + u[i][j][k]);
+          }
+        }
+      }
+      #pragma omp barrier
+      for (k = 0; k < n; k++) {
+        for (j = 0; j < n; j++) {
+          for (i = 0; i < n; i++) {
+            u[i][j][k] = unew[i][j][k];
+          }
+        }
+      }
+    }
+  }
+}
+CUDA Function:
+#include <cuda_runtime.h>
+
+__global__ void jacobi_kernel(double *u, double *unew, int n, int niter) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+  int k = blockIdx.z * blockDim.z + threadIdx.z;
+  int iter;
+
+  for (iter = 1; iter <= niter; iter++) {
+    if (i > 1 && i < n - 2 && j > 1 && j < n - 2 && k > 1 && k < n - 2) {
+      unew[i + j * n + k * n * n] = 0.125 * (u[i-1 + j * n + k * n * n] + u[i+1 + j * n + k * n * n] +
+        u[i + (j-1) * n + k * n * n] + u[i + (j+1) * n + k * n * n] + u[i + j * n + (k-1) * n * n] +
+        u[i + j * n + (k+1) * n * n] + u[i + j * n + k * n * n]);
+    }
+    __syncthreads();
+    if (i > 1 && i < n - 2 && j > 1 && j < n - 2 && k > 1 && k < n - 2) {
+      u[i + j * n + k * n * n] = unew[i + j * n + k * n * n];
+    }
+  }
+}
+
+void jacobi_parallel(double *u, double *unew, int n, int niter, int nthreads) {
+  int blockSize = 8;
+  int numBlocks = (n + blockSize - 1) / blockSize;
+  jacobi_kernel<<<dim3(numBlocks, numBlocks, numBlocks), dim3(blockSize, blockSize, blockSize)>>>(u, unew, n, niter);
+  cudaDeviceSynchronize();
+}
+Note that the CUDA function uses a 3D block and grid to parallelize the computation, and uses shared memory to reduce global memory access. Also, the CUDA function assumes that the input arrays u and unew are already allocated and copied to the device.
+
+
+Output 5:
+Here is the equivalent function in C and CUDA:
+C Version:
+#include <stdio.h>
+#include <stdlib.h>
+#include <omp.h>
+
+void jacobi_parallel(float ***u, float ***unew, int n, int niter, int nthreads) {
+  int i, j, k, iter;
+
+  #pragma omp parallel num_threads(nthreads) private(i, j, k, iter)
+  {
+    for (iter = 1; iter <= niter; iter++) {
+      #pragma omp for schedule(static)
+      for (k = 2; k < n - 1; k++) {
+        for (j = 2; j < n - 1; j++) {
+          for (i = 2; i < n - 1; i++) {
+            (*unew)[i][j][k] = 0.125 * ((*u)[i-1][j][k] + (*u)[i+1][j][k] + (*u)[i][j-1][k] +
+              (*u)[i][j+1][k] + (*u)[i][j][k-1] + (*u)[i][j][k+1] + (*u)[i][j][k]);
+          }
+        }
+      }
+      #pragma omp barrier
+      for (k = 0; k < n; k++) {
+        for (j = 0; j < n; j++) {
+          for (i = 0; i < n; i++) {
+            (*u)[i][j][k] = (*unew)[i][j][k];
+          }
+        }
+      }
+    }
+  }
+}
+CUDA Version:
+#include <stdio.h>
+
+__global__ void jacobi_kernel(float *u, float *unew, int n, int niter) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+  int k = blockIdx.z * blockDim.z + threadIdx.z;
+
+  if (i >= 2 && i < n - 1 && j >= 2 && j < n - 1 && k >= 2 && k < n - 1) {
+    for (int iter = 1; iter <= niter; iter++) {
+      unew[i + j * n + k * n * n] = 0.125 * (u[(i-1) + j * n + k * n * n] + u[(i+1) + j * n + k * n * n] +
+        u[i + (j-1) * n + k * n * n] + u[i + (j+1) * n + k * n * n] + u[i + j * n + (k-1) * n * n] +
+        u[i + j * n + (k+1) * n * n] + u[i + j * n + k * n * n]);
+      __syncthreads();
+      u[i + j * n + k * n * n] = unew[i + j * n + k * n * n];
+    }
+  }
+}
+
+void jacobi_parallel(float *u, float *unew, int n, int niter) {
+  int blockSize = 16;
+  int numBlocks = (n + blockSize - 1) / blockSize;
+
+  dim3 threads(blockSize, blockSize, blockSize);
+  dim3 blocks(numBlocks, numBlocks, numBlocks);
+
+  jacobi_kernel<<<blocks, threads>>>(u, unew, n, niter);
+}
+Note that in the CUDA version, I assumed that the float arrays u and unew are already allocated and copied to the device. You will need to add the necessary code to handle memory allocation and data transfer between host and device.
+
+
+Output 6:
+Here is the equivalent function in C and CUDA:
+C Version:
+#include <stdio.h>
+#include <stdlib.h>
+#include <omp.h>
+
+void jacobi_parallel(double ***u, double ***unew, int n, int niter, int nthreads) {
+  int i, j, k, iter;
+
+  #pragma omp parallel num_threads(nthreads) private(i, j, k, iter)
+  {
+    for (iter = 1; iter <= niter; iter++) {
+      #pragma omp for schedule(static)
+      for (k = 2; k < n - 1; k++) {
+        for (j = 2; j < n - 1; j++) {
+          for (i = 2; i < n - 1; i++) {
+            (*unew)[i][j][k] = 0.125 * ((*u)[i-1][j][k] + (*u)[i+1][j][k] +
+                                         (*u)[i][j-1][k] + (*u)[i][j+1][k] +
+                                         (*u)[i][j][k-1] + (*u)[i][j][k+1] + (*u)[i][j][k]);
+          }
+        }
+      }
+      #pragma omp barrier
+      for (k = 0; k < n; k++) {
+        for (j = 0; j < n; j++) {
+          for (i = 0; i < n; i++) {
+            (*u)[i][j][k] = (*unew)[i][j][k];
+          }
+        }
+      }
+    }
+  }
+}
+CUDA Version:
+#include <stdio.h>
+
+__global__ void jacobi_kernel(double *u, double *unew, int n, int niter) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+  int k = blockIdx.z * blockDim.z + threadIdx.z;
+
+  if (i >= 2 && i < n - 1 && j >= 2 && j < n - 1 && k >= 2 && k < n - 1) {
+    for (int iter = 1; iter <= niter; iter++) {
+      unew[i + j * n + k * n * n] = 0.125 * (u[(i-1) + j * n + k * n * n] +
+                                             u[(i+1) + j * n + k * n * n] +
+                                             u[i + (j-1) * n + k * n * n] +
+                                             u[i + (j+1) * n + k * n * n] +
+                                             u[i + j * n + (k-1) * n * n] +
+                                             u[i + j * n + (k+1) * n * n] +
+                                             u[i + j * n + k * n * n]);
+      __syncthreads();
+      u[i + j * n + k * n * n] = unew[i + j * n + k * n * n];
+    }
+  }
+}
+
+void jacobi_parallel(double *u, double *unew, int n, int niter) {
+  int blockSize = 16;
+  int numBlocks = (n + blockSize - 1) / blockSize;
+
+  dim3 block(blockSize, blockSize, blockSize);
+  dim3 grid(numBlocks, numBlocks, numBlocks);
+
+  jacobi_kernel<<<grid, block>>>(u, unew, n, niter);
+}
+Note that the CUDA version assumes that the arrays u and unew are already allocated on the device and have the correct size. Also, the block size and number of blocks are hardcoded for simplicity, but in a real application, you would want to adjust these parameters based on the specific hardware and problem size.
+
+
+Output 7:
+Here is the equivalent function in C and CUDA:
+C Version:
+#include <stdio.h>
+#include <stdlib.h>
+#include <omp.h>
+
+void jacobi_parallel(double ***u, double ***unew, int n, int niter, int nthreads) {
+  int i, j, k, iter;
+  #pragma omp parallel num_threads(nthreads) private(i, j, k, iter)
+  {
+    for (iter = 1; iter <= niter; iter++) {
+      #pragma omp for schedule(static)
+      for (k = 2; k < n - 1; k++) {
+        for (j = 2; j < n - 1; j++) {
+          for (i = 2; i < n - 1; i++) {
+            (*unew)[i][j][k] = 0.125 * ((*u)[i-1][j][k] + (*u)[i+1][j][k] + (*u)[i][j-1][k] +
+              (*u)[i][j+1][k] + (*u)[i][j][k-1] + (*u)[i][j][k+1] + (*u)[i][j][k]);
+          }
+        }
+      }
+      #pragma omp barrier
+      for (k = 0; k < n; k++) {
+        for (j = 0; j < n; j++) {
+          for (i = 0; i < n; i++) {
+            (*u)[i][j][k] = (*unew)[i][j][k];
+          }
+        }
+      }
+    }
+  }
+}
+CUDA Version:
+#include <stdio.h>
+
+__global__ void jacobi_kernel(double *u, double *unew, int n, int niter) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+  int k = blockIdx.z * blockDim.z + threadIdx.z;
+  int iter;
+
+  for (iter = 1; iter <= niter; iter++) {
+    if (i >= 2 && i < n - 1 && j >= 2 && j < n - 1 && k >= 2 && k < n - 1) {
+      unew[i + j * n + k * n * n] = 0.125 * (u[i-1 + j * n + k * n * n] + u[i+1 + j * n + k * n * n] +
+        u[i + (j-1) * n + k * n * n] + u[i + (j+1) * n + k * n * n] + u[i + j * n + (k-1) * n * n] +
+        u[i + j * n + (k+1) * n * n] + u[i + j * n + k * n * n]);
+    }
+    __syncthreads();
+    if (i >= 2 && i < n - 1 && j >= 2 && j < n - 1 && k >= 2 && k < n - 1) {
+      u[i + j * n + k * n * n] = unew[i + j * n + k * n * n];
+    }
+  }
+}
+
+void jacobi_parallel(double *u, double *unew, int n, int niter) {
+  int blockSize = 16;
+  int numBlocks = (n + blockSize - 1) / blockSize;
+  dim3 block(blockSize, blockSize, blockSize);
+  dim3 grid(numBlocks, numBlocks, numBlocks);
+  jacobi_kernel<<<grid, block>>>(u, unew, n, niter);
+}
+Note that the CUDA version assumes that the u and unew arrays are already allocated on the GPU. You will need to modify the code to handle memory allocation and data transfer between host and device.
+
+
+Output 8:
+Here is the equivalent function in C and CUDA:
+C Version:
+#include <stdio.h>
+#include <stdlib.h>
+#include <omp.h>
+
+void jacobi_parallel(double ***u, double ***unew, int n, int niter, int nthreads) {
+  int i, j, k, iter;
+
+  #pragma omp parallel num_threads(nthreads) private(i, j, k, iter)
+  {
+    for (iter = 1; iter <= niter; iter++) {
+      #pragma omp for schedule(static)
+      for (k = 2; k < n - 1; k++) {
+        for (j = 2; j < n - 1; j++) {
+          for (i = 2; i < n - 1; i++) {
+            (*unew)[i][j][k] = 0.125 * ((*u)[i-1][j][k] + (*u)[i+1][j][k] +
+              (*u)[i][j-1][k] + (*u)[i][j+1][k] + (*u)[i][j][k-1] +
+              (*u)[i][j][k+1] + (*u)[i][j][k]);
+          }
+        }
+      }
+      #pragma omp barrier
+      for (k = 0; k < n; k++) {
+        for (j = 0; j < n; j++) {
+          for (i = 0; i < n; i++) {
+            (*u)[i][j][k] = (*unew)[i][j][k];
+          }
+        }
+      }
+    }
+  }
+}
+CUDA Version:
+#include <cuda_runtime.h>
+
+__global__ void jacobi_kernel(double *u, double *unew, int n, int niter) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+  int k = blockIdx.z * blockDim.z + threadIdx.z;
+
+  if (i >= 2 && i < n - 1 && j >= 2 && j < n - 1 && k >= 2 && k < n - 1) {
+    for (int iter = 1; iter <= niter; iter++) {
+      unew[i + j * n + k * n * n] = 0.125 * (u[(i-1) + j * n + k * n * n] +
+        u[(i+1) + j * n + k * n * n] + u[i + (j-1) * n + k * n * n] +
+        u[i + (j+1) * n + k * n * n] + u[i + j * n + (k-1) * n * n] +
+        u[i + j * n + (k+1) * n * n] + u[i + j * n + k * n * n]);
+      __syncthreads();
+      u[i + j * n + k * n * n] = unew[i + j * n + k * n * n];
+    }
+  }
+}
+
+void jacobi_parallel(double *u, double *unew, int n, int niter, int nthreads) {
+  int blockSize = 16;
+  int numBlocks = (n + blockSize - 1) / blockSize;
+
+  jacobi_kernel<<<dim3(numBlocks, numBlocks, numBlocks), dim3(blockSize, blockSize, blockSize)>>>(u, unew, n, niter);
+  cudaDeviceSynchronize();
+}
+Note that in the CUDA version, I've used a 3D block and grid to parallelize the computation, and I've used __syncthreads() to ensure that all threads in a block have finished computing the new values before copying them back to the u array.
+Also, I've assumed that the u and unew arrays are already allocated and copied to the GPU. You'll need to add the necessary code to allocate and copy the data to the GPU before calling the jacobi_parallel function.
+
+
+Output 9:
+Here is the equivalent function implemented in C and CUDA:
+C Version:
+#include <stdio.h>
+#include <stdlib.h>
+#include <omp.h>
+
+void jacobi_parallel(float ***u, float ***unew, int n, int niter, int nthreads) {
+  int i, j, k, iter;
+#pragma omp parallel num_threads(nthreads) private(i, j, k, iter)
+  {
+    for (iter = 1; iter <= niter; iter++) {
+#pragma omp for schedule(static)
+      for (k = 2; k < n - 1; k++) {
+        for (j = 2; j < n - 1; j++) {
+          for (i = 2; i < n - 1; i++) {
+            (*unew)[i][j][k] = 0.125 * ((*u)[i-1][j][k] + (*u)[i+1][j][k] + (*u)[i][j-1][k] +
+              (*u)[i][j+1][k] + (*u)[i][j][k-1] + (*u)[i][j][k+1] + (*u)[i][j][k]);
+          }
+        }
+      }
+#pragma omp barrier
+      for (k = 0; k < n; k++) {
+        for (j = 0; j < n; j++) {
+          for (i = 0; i < n; i++) {
+            (*u)[i][j][k] = (*unew)[i][j][k];
+          }
+        }
+      }
+    }
+  }
+}
+CUDA Version:
+#include <stdio.h>
+#include <stdlib.h>
+
+__global__ void jacobi_kernel(float *u, float *unew, int n, int niter) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+  int k = blockIdx.z * blockDim.z + threadIdx.z;
+
+  if (i >= 2 && i < n - 1 && j >= 2 && j < n - 1 && k >= 2 && k < n - 1) {
+    for (int iter = 1; iter <= niter; iter++) {
+      unew[i + j * n + k * n * n] = 0.125 * (u[(i-1) + j * n + k * n * n] + u[(i+1) + j * n + k * n * n] +
+        u[i + (j-1) * n + k * n * n] + u[i + (j+1) * n + k * n * n] + u[i + j * n + (k-1) * n * n] +
+        u[i + j * n + (k+1) * n * n] + u[i + j * n + k * n * n]);
+      __syncthreads();
+      u[i + j * n + k * n * n] = unew[i + j * n + k * n * n];
+    }
+  }
+}
+
+void jacobi_parallel(float ***u, float ***unew, int n, int niter) {
+  float *u_device, *unew_device;
+  cudaMalloc((void **)&u_device, n * n * n * sizeof(float));
+  cudaMalloc((void **)&unew_device, n * n * n * sizeof(float));
+
+  cudaMemcpy(u_device, *u, n * n * n * sizeof(float), cudaMemcpyHostToDevice);
+  cudaMemcpy(unew_device, *unew, n * n * n * sizeof(float), cudaMemcpyHostToDevice);
+
+  dim3 block(16, 16, 16);
+  dim3 grid((n + block.x - 1) / block.x, (n + block.y - 1) / block.y, (n + block.z - 1) / block.z);
+
+  jacobi_kernel<<<grid, block>>>(u_device, unew_device, n, niter);
+
+  cudaMemcpy(*u, u_device, n * n * n * sizeof(float), cudaMemcpyDeviceToHost);
+  cudaMemcpy(*unew, unew_device, n * n * n * sizeof(float), cudaMemcpyDeviceToHost);
+
+  cudaFree(u_device);
+  cudaFree(unew_device);
+}
+Note that the CUDA version requires a GPU with compute capability 2.0 or higher and uses a 3D block and grid to parallelize the computation. The number of threads per block is set to 16x16x16, but this can be adjusted based on the specific hardware and problem size. Also, the __syncthreads() call is used to ensure that all threads in a block have finished updating the unew array before copying the values back to
+
+
+Output 10:
+Here is the equivalent function in C and CUDA:
+C Version:
+#include <stdio.h>
+#include <stdlib.h>
+#include <omp.h>
+
+void jacobi_parallel(double ***u, double ***unew, int n, int niter, int nthreads) {
+  int i, j, k, iter;
+  #pragma omp parallel num_threads(nthreads) private(i, j, k, iter)
+  {
+    for (iter = 1; iter <= niter; iter++) {
+      #pragma omp for schedule(static)
+      for (k = 2; k < n - 1; k++) {
+        for (j = 2; j < n - 1; j++) {
+          for (i = 2; i < n - 1; i++) {
+            (*unew)[i][j][k] = 0.125 * ((*u)[i-1][j][k] + (*u)[i+1][j][k] + (*u)[i][j-1][k] +
+              (*u)[i][j+1][k] + (*u)[i][j][k-1] + (*u)[i][j][k+1] + (*u)[i][j][k]);
+          }
+        }
+      }
+      #pragma omp barrier
+      for (k = 0; k < n; k++) {
+        for (j = 0; j < n; j++) {
+          for (i = 0; i < n; i++) {
+            (*u)[i][j][k] = (*unew)[i][j][k];
+          }
+        }
+      }
+    }
+  }
+}
+CUDA Version:
+#include <stdio.h>
+
+__global__ void jacobi_kernel(double *u, double *unew, int n, int niter) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+  int k = blockIdx.z * blockDim.z + threadIdx.z;
+  if (i >= 2 && i < n - 1 && j >= 2 && j < n - 1 && k >= 2 && k < n - 1) {
+    for (int iter = 1; iter <= niter; iter++) {
+      unew[i + j * n + k * n * n] = 0.125 * (u[(i-1) + j * n + k * n * n] + u[(i+1) + j * n + k * n * n] +
+        u[i + (j-1) * n + k * n * n] + u[i + (j+1) * n + k * n * n] + u[i + j * n + (k-1) * n * n] +
+        u[i + j * n + (k+1) * n * n] + u[i + j * n + k * n * n]);
+      __syncthreads();
+      u[i + j * n + k * n * n] = unew[i + j * n + k * n * n];
+    }
+  }
+}
+
+void jacobi_parallel(double *u, double *unew, int n, int niter, int nthreads) {
+  int blockSize = 16;
+  int numBlocks = (n + blockSize - 1) / blockSize;
+  jacobi_kernel<<<dim3(numBlocks, numBlocks, numBlocks), dim3(blockSize, blockSize, blockSize)>>>(u, unew, n, niter);
+}
+Note that in the CUDA version, I've used a 3D block and grid to parallelize the computation, and I've used __syncthreads() to ensure that all threads in a block have finished computing before updating the u array.
+Also, I've assumed that the u and unew arrays are already allocated and initialized on the host, and that the nthreads variable is not used in the CUDA version (since the number of threads is determined by the block and grid dimensions).
+
+

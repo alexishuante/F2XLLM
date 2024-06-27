@@ -1,0 +1,861 @@
+Output 1:
+Absolutely! Below are the implementations in C and OpenACC for the sparse matrix-vector multiplication (SpMV) function and in C and HIP for the AXPY operation.
+
+### SpMV in C and OpenACC
+```c
+#include <stdio.h>
+#include <openacc.h>
+
+void spmv_parallel(int n, int nnz, const float *val, const int *row, const int *col, const float *x, float *y) {
+  #pragma acc parallel loop present(val[0:nnz], row[0:n+1], col[0:nnz], x[0:n]) copyout(y[0:n])
+  for (int i = 0; i < n; i++) {
+    y[i] = 0.0;
+    for (int j = row[i]; j < row[i + 1]; j++) {
+      y[i] += val[j] * x[col[j]];
+    }
+  }
+}
+```
+
+### AXPY in C and HIP
+To compile these, you will need to have the HIP runtime and compiler installed.
+
+```c
+#include <hip/hip_runtime.h>
+
+__global__ void saxpy_kernel(int n, float a, const float *x, float *y) {
+    int i = blockDim.x * blockIdx.x + threadIdx.x;
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+void saxpy_parallel(int n, float a, const float *x, float *y) {
+    float *d_x, *d_y;
+  
+    size_t size = n * sizeof(float);
+  
+    // Allocate GPU memory
+    hipMalloc((void **)&d_x, size);
+    hipMalloc((void **)&d_y, size);
+  
+    // Copy data from host to device
+    hipMemcpy(d_x, x, size, hipMemcpyHostToDevice);
+    hipMemcpy(d_y, y, size, hipMemcpyHostToDevice);
+  
+    // Define grid and block sizes
+    int blockSize = 256;
+    int numBlocks = (n + blockSize - 1) / blockSize;
+  
+    // Launch the kernel
+    hipLaunchKernelGGL(saxpy_kernel, numBlocks, blockSize, 0, 0, n, a, d_x, d_y);
+  
+    // Copy the result back to host
+    hipMemcpy(y, d_y, size, hipMemcpyDeviceToHost);
+  
+    // Free GPU memory
+    hipFree(d_x);
+    hipFree(d_y);
+}
+```
+
+### Usage Example
+For both implementations, here's how you'd call them in a main function or any other context:
+
+```c
+int main() {
+    // Example for spmv_parallel
+    int n = 5;
+    int nnz = 9;
+    float val[] = {1, 3, 1, 4, 2, 6, 5, 2, 7};
+    int row[] = {0, 2, 3, 5, 7, 9};
+    int col[] = {0, 1, 0, 2, 1, 2, 3, 2, 4};
+    float x[] = {1, 2, 3, 4, 5};
+    float y[5] = {0};
+
+    spmv_parallel(n, nnz, val, row, col, x, y);
+
+    for (int i = 0; i < n; i++) {
+        printf("%f ", y[i]);
+    }
+    printf("\n");
+
+    // Example for saxpy_parallel
+    int m = 10;
+    float a = 2.0f;
+    float hx[] = {1,2,3,4,5,6,7,8,9,10};
+    float hy[] = {10,9,8,7,6,5,4,3,2,1};
+
+    saxpy_parallel(m, a, hx, hy);
+
+    for (int i = 0; i < m; i++) {
+        printf("%f ", hy[i]);
+    }
+    printf("\n");
+
+    return 0;
+}
+```
+
+Compile these with the appropriate flags:
+
+For the SpMV function with OpenACC:
+```sh
+gcc -fopenacc -o spmv_example spmv_example.c
+```
+
+For the AXPY function with HIP:
+```sh
+hipcc -o saxpy_example saxpy_example.c
+```
+
+Output 2:
+Certainly! Below are the requested functions:
+
+### For Sparse Matrix-Vector Multiplication (SpMV) in C and OpenACC:
+
+```c
+#include <openacc.h>
+
+void spmv_parallel(int n, int nnz, const float *val, const int *row, const int *col, const float *x, float *y) {
+    #pragma acc parallel loop copyin(val[0:nnz], row[0:n+1], col[0:nnz], x[0:n]) copyout(y[0:n])
+    for (int i = 0; i < n; i++) {
+        y[i] = 0.0f;
+        for (int j = row[i]; j < row[i+1]; j++) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+```
+
+### For AXPY (SAXPY operation) in C and HIP:
+
+```c
+#include <hip/hip_runtime.h>
+
+__global__ void saxpy_kernel(int n, float a, const float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+void saxpy_parallel(int n, float a, const float *x, float *y) {
+    float *d_x, *d_y;
+    size_t size = n * sizeof(float);
+
+    // Allocate device memory
+    hipMalloc((void **)&d_x, size);
+    hipMalloc((void **)&d_y, size);
+
+    // Copy data from host to device
+    hipMemcpy(d_x, x, size, hipMemcpyHostToDevice);
+    hipMemcpy(d_y, y, size, hipMemcpyHostToDevice);
+
+    // Define number of threads per block and number of blocks
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+
+    // Launch the HIP kernel
+    hipLaunchKernelGGL(saxpy_kernel, dim3(blocksPerGrid), dim3(threadsPerBlock), 0, 0, n, a, d_x, d_y);
+
+    // Copy result from device to host
+    hipMemcpy(y, d_y, size, hipMemcpyDeviceToHost);
+
+    // Free device memory
+    hipFree(d_x);
+    hipFree(d_y);
+}
+```
+
+### Explanation:
+1. **SpMV function in C with OpenACC**:
+   - This uses `#pragma acc parallel loop` to parallelize the outer loop.
+   - Array slices in the pragma directives (`copyin`, `copyout`) ensure correct data movement between host and device.
+
+2. **AXPY function in C with HIP**:
+   - The `__global__` keyword denotes a GPU kernel.
+   - Memory management functions (`hipMalloc`, `hipMemcpy`, `hipFree`) are used to handle device memory.
+   - The kernel is launched with an appropriate number of blocks and threads to cover the data size.
+   - After kernel execution, data is copied back to the host.
+
+Ensure that the HIP environment is correctly set up and that the compiler, such as `hipcc`, is used to compile the HIP code. Similarly, for OpenACC, an appropriate OpenACC-enabled compiler, like `pgcc` from the NVIDIA HPC SDK, should be used.
+
+Output 3:
+Certainly! Below are the implementations for the two subroutines:
+
+### Sparse Matrix-Vector Multiplication (SpMV) using C and OpenACC
+Here's the equivalent C function for `spmv_parallel` implemented using OpenACC:
+
+```c
+#include <stdio.h>
+
+void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    #pragma acc parallel loop present(val, row, col, x) copyout(y[0:n])
+    for (int i = 0; i < n; i++) {
+        y[i] = 0.0f;
+        for (int j = row[i]; j < row[i+1]; j++) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+
+/* Example usage */
+int main() {
+    // Example data initialization: n=4, nnz=6
+    int n = 4;
+    int nnz = 6;
+    float val[] = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0}; // Non-zero values
+    int row[] = {0, 2, 3, 5, 6}; // Row pointers
+    int col[] = {0, 1, 2, 0, 2, 1}; // Column indices
+    float x[] = {1.0, 2.0, 3.0, 4.0}; // Input vector
+    float y[4]; // Output vector
+
+    #pragma acc data copyin(val[0:nnz], row[0:n+1], col[0:nnz], x[0:n]) copyout(y[0:n])
+    {
+        spmv_parallel(n, nnz, val, row, col, x, y);
+    }
+
+    // Print the result
+    for (int i = 0; i < n; i++) {
+        printf("%f ", y[i]);
+    }
+    printf("\n");
+    
+    return 0;
+}
+```
+
+### AXPY Operation using C and HIP
+Here's the equivalent C function for `saxpy_parallel` implemented using HIP:
+
+```c
+#include <hip/hip_runtime.h>
+#include <stdio.h>
+
+__global__ void saxpy_parallel(int n, float a, const float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+void saxpy(int n, float a, const float *x, float *y) {
+    float *d_x, *d_y;
+    cudaMalloc((void**)&d_x, n*sizeof(float));
+    cudaMalloc((void**)&d_y, n*sizeof(float));
+    
+    cudaMemcpy(d_x, x, n*sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_y, y, n*sizeof(float), cudaMemcpyHostToDevice);
+    
+    int blockSize = 256;
+    int numBlocks = (n + blockSize - 1) / blockSize;
+    
+    hipLaunchKernelGGL(saxpy_parallel, dim3(numBlocks), dim3(blockSize), 0, 0, n, a, d_x, d_y);
+    
+    cudaMemcpy(y, d_y, n*sizeof(float), cudaMemcpyDeviceToHost);
+    
+    cudaFree(d_x);
+    cudaFree(d_y);
+}
+
+/* Example usage */
+int main() {
+    int n = 100;
+    float a = 2.0f;
+    float x[100], y[100];
+
+    // Initialize x and y arrays
+    for (int i = 0; i < n; i++) {
+        x[i] = i * 1.0f;
+        y[i] = i * 2.0f;
+    }
+
+    saxpy(n, a, x, y);
+
+    // Print the result
+    for (int i = 0; i < n; i++) {
+        printf("%f ", y[i]);
+    }
+    printf("\n");
+
+    return 0;
+}
+```
+
+These functions implement the sparse matrix-vector multiplication (SpMV) and the AXPY operation using the respective GPU programming models. The OpenACC version uses directives to parallelize the loops on a GPU, while the HIP version directly utilizes HIP kernels to perform the computation. The implementations also include example usage to demonstrate how to initialize data and call the functions.
+
+Output 4:
+Let's look at the implementations for the specified operations, one for SpMV in C with OpenACC, and another for AXPY in C with HIP.
+
+### SpMV Operation in C with OpenACC
+The provided Fortran subroutine for SpMV will be translated into a C function using OpenACC directives:
+
+```c
+#include <openacc.h>
+
+void spmv_parallel(int n, int nnz, float* val, int* row, int* col, float* x, float* y) {
+    #pragma acc data copyin(val[0:nnz], row[0:n+1], col[0:nnz], x[0:n]) copyout(y[0:n])
+    {
+        #pragma acc parallel loop
+        for (int i = 0; i < n; i++) {
+            y[i] = 0.0f;
+            for (int j = row[i]; j < row[i + 1]; j++) {
+                y[i] += val[j] * x[col[j]];
+            }
+        }
+    }
+}
+```
+
+### AXPY Operation in C with HIP
+The provided Fortran subroutine for AXPY will be translated into a C function using HIP directives:
+
+```c
+#include <hip/hip_runtime.h>
+
+__global__ void saxpy_kernel(int n, float a, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+void saxpy_parallel(int n, float a, float *x, float *y) {
+    float *d_x, *d_y;
+    hipMalloc(&d_x, n * sizeof(float));
+    hipMalloc(&d_y, n * sizeof(float));
+
+    hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
+    hipMemcpy(d_y, y, n * sizeof(float), hipMemcpyHostToDevice);
+
+    int blockSize = 256;
+    int numBlocks = (n + blockSize - 1) / blockSize;
+
+    hipLaunchKernelGGL(saxpy_kernel, numBlocks, blockSize, 0, 0, n, a, d_x, d_y);
+
+    hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
+
+    hipFree(d_x);
+    hipFree(d_y);
+}
+```
+
+Both functions use parallel computing paradigms suitable for the respective operations:
+
+1. **SpMV (Sparse Matrix-Vector Multiplication)**:
+    - Utilizes OpenACC to parallelize the outer loop that iterates over the rows of the matrix.
+    - Reduces data movement and communication between the host and device by using `copyin` and `copyout` clauses.
+
+2. **AXPY (AX plus Y)**:
+    - Utilizes HIP (Heterogeneous-computing Interface for Portability) to parallelize the operation on the GPU.
+    - Defines a HIP kernel (`saxpy_kernel`) that each thread executes in parallel.
+    - Handles memory transfers between the host and device explicitly for `x` and `y` arrays.
+
+Make sure that you have the appropriate OpenACC and HIP runtime environments installed and configured in your development setup to compile and run these examples successfully.
+
+Output 5:
+Certainly! Below are the C and OpenACC implementations for the `spmv_parallel` subroutine and the C and HIP implementations for the `saxpy_parallel` subroutine originally in Fortran.
+
+### Sparse Matrix-Vector Multiplication with OpenACC
+
+#### Fortran Code
+```fortran
+subroutine spmv_parallel(n, nnz, val, row, col, x, y)
+    integer, intent(in) :: n, nnz
+    real, intent(in) :: val(nnz), x(n)
+    integer, intent(in) :: row(n+1), col(nnz)
+    real, intent(out) :: y(n)
+    integer i, j
+    !$ACC PARALLEL LOOP DEFAULT(PRESENT) COPYIN(val, row, col, x) COPYOUT(y)
+    do i = 1, n
+      y(i) = 0.0
+      do j = row(i), row(i+1)-1
+        y(i) = y(i) + val(j) * x(col(j))
+      enddo
+    enddo
+    !$ACC END PARALLEL LOOP
+  end subroutine spmv_parallel
+```
+
+#### C and OpenACC Implementation
+
+```c
+#include <openacc.h>
+
+void spmv_parallel(int n, int nnz, const float *val, const int *row, const int *col, const float *x, float *y) {
+    #pragma acc parallel loop copyin(val[0:nnz], row[0:n+1], col[0:nnz], x[0:n]) copyout(y[0:n])
+    for (int i = 0; i < n; i++) {
+        y[i] = 0.0f;
+        for (int j = row[i]; j < row[i + 1]; j++) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+```
+
+### AXPY Operation with HIP
+
+#### Fortran Code
+```fortran
+subroutine saxpy_parallel(n, a, x, y)
+    implicit none
+    integer, intent(in) :: n
+    real, intent(in) :: a
+    real, intent(in) :: x(n)
+    real, intent(inout) :: y(n)
+    integer :: i
+    !$OMP PARALLEL DO
+    do i = 1, n
+        y(i) = a * x(i) + y(i)
+    end do
+    !$OMP END PARALLEL DO
+end subroutine saxpy_parallel
+```
+
+#### C and HIP Implementation
+
+```c
+#include <hip/hip_runtime.h>
+#include <stdio.h>
+
+__global__ void saxpy_kernel(int n, float a, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+void saxpy_parallel(int n, float a, float *x, float *y) {
+    float *d_x, *d_y;
+
+    // Allocate memory on GPU
+    hipMalloc(&d_x, n * sizeof(float));
+    hipMalloc(&d_y, n * sizeof(float));
+
+    // Copy data to GPU
+    hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
+    hipMemcpy(d_y, y, n * sizeof(float), hipMemcpyHostToDevice);
+
+    // Launch the kernel with sufficient blocks and threads
+    int blockSize = 256;
+    int numBlocks = (n + blockSize - 1) / blockSize;
+    hipLaunchKernelGGL(saxpy_kernel, dim3(numBlocks), dim3(blockSize), 0, 0, n, a, d_x, d_y);
+
+    // Copy result back to host
+    hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
+
+    // Free GPU memory
+    hipFree(d_x);
+    hipFree(d_y);
+}
+```
+
+In these implementations, we've translated the parallelism directives from OpenACC and OpenMP in Fortran to equivalent constructs in C using OpenACC and HIP, respectively. This allows efficient parallel computation on GPUs.
+
+Output 6:
+Certainly! Below are the implementations of the two subroutines you mentioned:
+
+### SpMV in C and OpenACC
+
+For the Sparse Matrix-Vector Multiplication (SpMV) operation in C using OpenACC, the translation from Fortran would look something like this:
+
+```c
+#include <openacc.h>
+
+void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    #pragma acc parallel loop present(val, row, col, x) copyout(y)
+    for (int i = 0; i < n; i++) {
+        y[i] = 0.0f;
+        for (int j = row[i]; j < row[i+1]; j++) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+```
+
+### AXPY in C and HIP
+
+For the AXPY operation (y = a*x + y) in C using HIP, here's the equivalent of the Fortran routine using OpenMP:
+
+```c
+#include <hip/hip_runtime.h>
+#include <stdio.h>
+
+// HIP Kernel for SAXPY
+__global__
+void saxpy_parallel(int n, float a, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+void run_saxpy_parallel(int n, float a, float *x, float *y) {
+    float *d_x, *d_y;
+
+    // Allocate memory on the device
+    hipMalloc(&d_x, n * sizeof(float));
+    hipMalloc(&d_y, n * sizeof(float));
+
+    // Copy data from host to device
+    hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
+    hipMemcpy(d_y, y, n * sizeof(float), hipMemcpyHostToDevice);
+
+    // Define the grid and block dimensions
+    int blockSize = 256;
+    int numBlocks = (n + blockSize - 1) / blockSize;
+
+    // Launch the SAXPY Kernel
+    hipLaunchKernelGGL(saxpy_parallel, dim3(numBlocks), dim3(blockSize), 0, 0, n, a, d_x, d_y);
+
+    // Copy the result back to the host
+    hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
+
+    // Free device memory
+    hipFree(d_x);
+    hipFree(d_y);
+}
+```
+
+### Explanation
+
+#### SpMV in C and OpenACC
+
+- **`acc parallel loop`:** This directive tells the OpenACC runtime to parallelize the following loop.
+- **`present/ copyout`:** These clauses indicate data already present on the device and specify what data to transfer back to the host, respectively.
+
+#### AXPY in C and HIP
+
+- **`__global__`:** This qualifier makes `saxpy_parallel` a HIP kernel function that will run on the GPU.
+- **`hipMalloc, hipMemcpy`:** Functions for memory management between host and device.
+- **`hipLaunchKernelGGL`:** Function to launch a kernel on the GPU.
+- **`blockIdx`, `blockDim`, `threadIdx`:** Built-in variables in CUDA/HIP programming for indexing threads and blocks.
+
+By providing these two implementations, you will be able to perform SpMV with OpenACC in C as well as AXPY with HIP in C by leveraging GPU acceleration.
+
+Output 7:
+Let's start by converting the Fortran subroutine `spmv_parallel` to a function in C using OpenACC, followed by converting the `saxpy_parallel` subroutine to a function in C using HIP.
+
+### Sparse Matrix-Vector Multiplication (SpMV) using OpenACC
+
+Here is the equivalent C function using OpenACC for the `spmv_parallel` subroutine:
+
+```c
+#include <openacc.h>
+
+void spmv_parallel(int n, int nnz, const float *val, const int *row, const int *col, const float *x, float *y) {
+    #pragma acc parallel loop present(val[0:nnz], row[0:n+1], col[0:nnz], x[0:n]) copyout(y[0:n])
+    for (int i = 0; i < n; ++i) {
+        y[i] = 0.0f;
+        for (int j = row[i]; j < row[i + 1]; ++j) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+```
+
+### AXPY using HIP
+
+Here is the equivalent C function using HIP for the `saxpy_parallel` subroutine:
+
+```c
+#include <hip/hip_runtime.h>
+
+__global__ void saxpy_kernel(int n, float a, const float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+void saxpy_parallel(int n, float a, const float *x, float *y) {
+    int blockSize = 256; // Number of threads per block
+    int numBlocks = (n + blockSize - 1) / blockSize; // Number of blocks
+
+    // Allocate device memory
+    float *d_x, *d_y;
+    hipMalloc((void **)&d_x, n * sizeof(float));
+    hipMalloc((void **)&d_y, n * sizeof(float));
+
+    // Copy data from host to device
+    hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
+    hipMemcpy(d_y, y, n * sizeof(float), hipMemcpyHostToDevice);
+
+    // Launch kernel
+    hipLaunchKernelGGL(saxpy_kernel, numBlocks, blockSize, 0, 0, n, a, d_x, d_y);
+
+    // Copy result back to host
+    hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
+
+    // Free device memory
+    hipFree(d_x);
+    hipFree(d_y);
+}
+```
+
+These conversions take into account the corresponding parallel pragmas and directives for OpenACC in the C function for SpMV, and HIP for the AXPY operation. Before running these code snippets, ensure you have the necessary compilers and runtimes for OpenACC (e.g., PGI compilers) and HIP (e.g., ROCm) installed and correctly configured.
+
+Output 8:
+Certainly! Below are the C and GPU accelerated versions of the provided Fortran subroutines: one using OpenACC for sparse matrix-vector multiplication (SpMV), and the other using HIP for the AXPY operation.
+
+### Sparse Matrix-Vector Multiplication (SpMV) using C and OpenACC
+
+Here's the C implementation of the SpMV with OpenACC:
+
+```c
+#include <stdio.h>
+
+void spmv_parallel(int n, int nnz, const float *val, const int *row, const int *col, const float *x, float *y) {
+    #pragma acc parallel loop present(val[:nnz], row[:n+1], col[:nnz], x[:n]) copyout(y[:n])
+    for (int i = 0; i < n; i++) {
+        y[i] = 0.0f;
+        for (int j = row[i]; j < row[i + 1]; j++) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+
+int main() {
+    // Example usage of spmv_parallel
+    int n = 4;
+    int nnz = 9;
+    float val[] = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0};
+    int row[] = {0, 3, 4, 7, 9};
+    int col[] = {0, 1, 2, 1, 0, 2, 3, 1, 3};
+    float x[] = {1.0, 2.0, 3.0, 4.0};
+    float y[4];
+
+    spmv_parallel(n, nnz, val, row, col, x, y);
+
+    for (int i = 0; i < n; i++) {
+        printf("y[%d] = %f\n", i, y[i]);
+    }
+
+    return 0;
+}
+```
+
+### AXPY Operation using C and HIP
+
+Here's the C implementation of the AXPY operation with HIP:
+
+```c
+#include <stdio.h>
+#include <hip/hip_runtime.h>
+
+__global__ void saxpy_kernel(int n, float a, const float* x, float* y) {
+    int i = blockDim.x * blockIdx.x + threadIdx.x;
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+void saxpy_parallel(int n, float a, const float* x, float* y) {
+    float *d_x, *d_y;
+
+    hipMalloc(&d_x, n * sizeof(float));
+    hipMalloc(&d_y, n * sizeof(float));
+    
+    hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
+    hipMemcpy(d_y, y, n * sizeof(float), hipMemcpyHostToDevice);
+
+    int blockSize = 256;
+    int numBlocks = (n + blockSize - 1) / blockSize;
+    hipLaunchKernelGGL(saxpy_kernel, numBlocks, blockSize, 0, 0, n, a, d_x, d_y);
+
+    hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
+
+    hipFree(d_x);
+    hipFree(d_y);
+}
+
+int main() {
+    // Example usage of saxpy_parallel
+    int n = 10;
+    float a = 2.0f;
+    float x[] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f, 9.0f, 10.0f};
+    float y[] = {10.0f, 9.0f, 8.0f, 7.0f, 6.0f, 5.0f, 4.0f, 3.0f, 2.0f, 1.0f};
+
+    saxpy_parallel(n, a, x, y);
+
+    for (int i = 0; i < n; i++) {
+        printf("y[%d] = %f\n", i, y[i]);
+    }
+
+    return 0;
+}
+```
+
+### Explanation:
+1. **SpMV Using OpenACC**:
+    - The `spmv_parallel` C function performs the sparse matrix-vector multiplication.
+    - The `#pragma acc parallel loop` directive is used to parallelize the outer loop to compute the result.
+    - The `row`, `col`, `val`, and `x` arrays are passed to the device, and `y` is used for output.
+
+2. **AXPY Using HIP**:
+    - The `saxpy_kernel` function is defined as a `__global__` kernel to perform the computation on the GPU.
+    - The `saxpy_parallel` function allocates GPU memory, copies data to the GPU, launches the kernel, and copies the result back.
+    - The kernel function computes the AXPY operation in parallel on the GPU.
+
+These implementations provide a good starting point for utilizing parallel computing on GPUs using OpenACC and HIP.
+
+Output 9:
+Let's tackle the conversion of the given Fortran subroutines to their C equivalents using OpenACC for the Sparse matrix–vector multiplication (SpMV) and HIP for the AXPY operation.
+
+### C with OpenACC for SpMV
+
+First, let's convert the `spmv_parallel` subroutine.
+
+**Fortran code:**
+```fortran
+subroutine spmv_parallel(n, nnz, val, row, col, x, y)
+    integer, intent(in) :: n, nnz
+    real, intent(in) :: val(nnz), x(n)
+    integer, intent(in) :: row(n+1), col(nnz)
+    real, intent(out) :: y(n)
+    integer i, j
+    !$ACC PARALLEL LOOP DEFAULT(PRESENT) COPYIN(val, row, col, x) COPYOUT(y)
+    do i = 1, n
+      y(i) = 0.0
+      do j = row(i), row(i+1)-1
+        y(i) = y(i) + val(j) * x(col(j))
+      enddo
+    enddo
+    !$ACC END PARALLEL LOOP
+  end subroutine spmv_parallel
+```
+
+**C Code with OpenACC:**
+```c
+#include <stdlib.h>
+
+void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    #pragma acc parallel loop present(val[0:nnz], row[0:n+1], col[0:nnz], x[0:n]) copyout(y[0:n])
+    for (int i = 0; i < n; i++) {
+        y[i] = 0.0f;
+        for (int j = row[i]; j < row[i+1]; j++) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+```
+
+### C with HIP for AXPY
+
+Next, we convert the `saxpy_parallel` subroutine.
+
+**Fortran code:**
+```fortran
+subroutine saxpy_parallel(n, a, x, y)
+    implicit none
+    integer, intent(in) :: n
+    real, intent(in) :: a
+    real, intent(in) :: x(n)
+    real, intent(inout) :: y(n)
+    integer :: i
+    !$OMP PARALLEL DO
+    do i = 1, n
+        y(i) = a * x(i) + y(i)
+    end do
+    !$OMP END PARALLEL DO
+end subroutine saxpy_parallel
+```
+
+**C Code with HIP:**
+```c
+#include <hip/hip_runtime.h>
+
+__global__ void saxpy_kernel(int n, float a, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+void saxpy_parallel(int n, float a, float *x, float *y) {
+    float *d_x, *d_y;
+    hipMalloc(&d_x, n * sizeof(float));
+    hipMalloc(&d_y, n * sizeof(float));
+    
+    hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
+    hipMemcpy(d_y, y, n * sizeof(float), hipMemcpyHostToDevice);
+
+    int blockSize = 256;  // Typical block size
+    int gridSize = (n + blockSize - 1) / blockSize;
+    
+    hipLaunchKernelGGL(saxpy_kernel, dim3(gridSize), dim3(blockSize), 0, 0, n, a, d_x, d_y);
+
+    hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
+    
+    hipFree(d_x);
+    hipFree(d_y);
+}
+```
+
+In this code:
+
+1. **HIP Kernel:** The HIP kernel `saxpy_kernel` performs the AXPY computation on each element.
+2. **Grid and Block Sizes:** The grid and block size are set to handle the parallel computation.
+3. **Memory Management:** Memory management functions (`hipMalloc`, `hipMemcpy`, and `hipFree`) are used to allocate and transfer memory between the host and the device.
+
+Output 10:
+Absolutely! Here are the equivalent C implementations using OpenACC and HIP for the given Fortran subroutines.
+
+### C Implementation of Sparse Matrix-Vector Multiplication (SpMV) using OpenACC
+
+The given Fortran subroutine is translated to a C function using OpenACC directives as follows:
+
+```c
+#include <openacc.h>
+
+void spmv_parallel(int n, int nnz, const float *val, const int *row, const int *col, const float *x, float *y) {
+    #pragma acc parallel loop present(val[0:nnz], row[0:n+1], col[0:nnz], x[0:n]) copyout(y[0:n])
+    for (int i = 0; i < n; i++) {
+        y[i] = 0.0;
+        #pragma acc loop
+        for (int j = row[i]; j < row[i+1]; j++) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+```
+
+### C Implementation of AXPY using HIP
+
+HIP (Heterogeneous-Compute Interface for Portability) is used to parallelize the AXPY operation in the equivalent C function.
+
+```c
+#include <hip/hip_runtime.h>
+
+__global__ void saxpy_kernel(int n, float a, const float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+void saxpy_parallel(int n, float a, const float *x, float *y) {
+    const int blockSize = 256;
+    const int numBlocks = (n + blockSize - 1) / blockSize;
+    hipLaunchKernelGGL(saxpy_kernel, dim3(numBlocks), dim3(blockSize), 0, 0, n, a, x, y);
+    hipDeviceSynchronize();
+}
+```
+
+### Explanation
+
+1. **SpMV using OpenACC:**
+   - The `spmv_parallel` function computes y = A*x where A is a sparse matrix stored in Compressed Sparse Row (CSR) format.
+   - Given arrays `val`, `row`, and `col` represent the CSR matrix.
+   - The `#pragma acc parallel loop` directive parallelizes the outer loop over rows.
+   - The `#pragma acc loop` directive inside the row loop parallelizes over the non-zero elements of each row.
+
+2. **AXPY using HIP:**
+   - The `saxpy_kernel` is a GPU kernel that performs the operation y = a*x + y.
+   - The `saxpy_parallel` function sets up and launches the HIP kernel.
+   - `hipLaunchKernelGGL` is used to launch the kernel with enough threads to cover all elements in the vectors.
+   - `hipDeviceSynchronize()` ensures that the CPU waits for the kernel to complete before proceeding.
+
+These implementations ensure that the high-level parallelism indicated in the Fortran subroutines is translated to the equivalent C code using OpenACC and HIP, respectively.
+
