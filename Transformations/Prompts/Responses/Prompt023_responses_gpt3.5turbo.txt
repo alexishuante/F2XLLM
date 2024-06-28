@@ -1,0 +1,367 @@
+Output 1:
+Here is the C and HIP implementation of the gemv_parallel subroutine:
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+
+void gemv_parallel(int n, float *A, float *x, float *y) {
+    #pragma omp target teams distribute parallel for map(to:A[:n*n],x[:n]) map(from:y[:n])
+    for (int i = 0; i < n; i++) {
+        float sum = 0.0;
+        for (int j = 0; j < n; j++) {
+            sum += A[i*n + j] * x[j];
+        }
+        y[i] = sum;
+    }
+}
+
+int main() {
+    int n = 3;
+    float A[3][3] = {{1.0, 2.0, 3.0}, {4.0, 5.0, 6.0}, {7.0, 8.0, 9.0}};
+    float x[3] = {1.0, 2.0, 3.0};
+    float y[3];
+
+    gemv_parallel(n, &A[0][0], x, y);
+
+    for (int i = 0; i < n; i++) {
+        printf("y[%d] = %f\n", i, y[i]);
+    }
+
+    return 0;
+}
+```
+
+In this implementation, the gemv_parallel function uses OpenMP directives to parallelize the computation of the matrix-vector multiplication. The HIP framework is used to offload the computation to the GPU. The input matrices A and x are mapped to the device, and the resulting vector y is mapped back from the device after the computation.
+
+Please make sure to have the necessary setup for compiling and running HIP and OpenMP programs before trying to run this code.
+
+Output 2:
+Here is a function implemented in C and HIP that performs the GEMV operation:
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <hip/hip_runtime.h>
+
+void gemv_parallel(int n, float *A, float *x, float *y) {
+    hipLaunchKernelGGL(kernel_gemv_parallel, dim3((n+255)/256, 1, 1), dim3(256, 1, 1), 0, 0, n, A, x, y);
+}
+
+__global__ void kernel_gemv_parallel(int n, float *A, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        float sum = 0.0;
+        for (int j = 0; j < n; j++) {
+            sum += A[i*n + j] * x[j];
+        }
+        y[i] = sum;
+    }
+}
+
+int main() {
+    int n = 4;
+    float A[16] = {1.0, 2.0, 3.0, 4.0,
+                   5.0, 6.0, 7.0, 8.0,
+                   9.0, 10.0, 11.0, 12.0,
+                   13.0, 14.0, 15.0, 16.0};
+    float x[4] = {1.0, 2.0, 3.0, 4.0};
+    float y[4];
+    
+    gemv_parallel(n, A, x, y);
+    
+    printf("Result vector y:\n");
+    for (int i = 0; i < n; i++) {
+        printf("%f\n", y[i]);
+    }
+    
+    return 0;
+}
+```
+
+In the above code, we have defined a function `gemv_parallel` in C that uses HIP to launch a kernel `kernel_gemv_parallel` on the GPU to perform the GEMV operation in parallel. The `kernel_gemv_parallel` function is responsible for computing the matrix-vector multiplication for each element of the output vector `y`.
+
+You can compile and run this code with a HIP-enabled compiler and GPU to perform the GEMV operation in a parallel manner.
+
+Output 3:
+```c
+#include <hip/hip_runtime.h>
+
+__global__ void gemv_parallel_kernel(int n, float* A, float* x, float* y){
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if(i < n){
+        float sum = 0.0;
+        for(int j = 0; j < n; j++){
+            sum += A[i * n + j] * x[j];
+        }
+        y[i] = sum;
+    }
+}
+
+void gemv_parallel(int n, float* A, float* x, float* y){
+    int block_size = 256;
+    int grid_size = (n + block_size - 1) / block_size;
+    
+    hipLaunchKernelGGL(gemv_parallel_kernel, dim3(grid_size), dim3(block_size), 0, 0, n, A, x, y);
+}
+```
+
+Output 4:
+Here is the equivalent function in C and HIP:
+
+```c
+#include <hip/hip_runtime.h>
+
+__global__ void gemv_parallel(int n, float *A, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    if (i < n) {
+        float sum = 0.0f;
+        
+        for (int j = 0; j < n; j++) {
+            sum += A[i * n + j] * x[j];
+        }
+        
+        y[i] = sum;
+    }
+}
+
+void gemv(int n, float *h_A, float *h_x, float *h_y) {
+    float *d_A, *d_x, *d_y;
+    
+    hipMalloc(&d_A, n * n * sizeof(float));
+    hipMalloc(&d_x, n * sizeof(float));
+    hipMalloc(&d_y, n * sizeof(float));
+    
+    hipMemcpy(d_A, h_A, n * n * sizeof(float), hipMemcpyHostToDevice);
+    hipMemcpy(d_x, h_x, n * sizeof(float), hipMemcpyHostToDevice);
+    
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    
+    gemv_parallel<<<blocksPerGrid, threadsPerBlock>>>(n, d_A, d_x, d_y);
+    
+    hipMemcpy(h_y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
+    
+    hipFree(d_A);
+    hipFree(d_x);
+    hipFree(d_y);
+}
+```
+
+This C and HIP implementation of the GEMV operation uses a CUDA kernel to perform the matrix-vector multiplication in parallel on the GPU. The `gemv` function allocates memory on the GPU, copies the input matrices `A` and `x` to the GPU, launches the kernel with the appropriate grid and block dimensions, and then copies the result vector `y` back to the host.
+
+Please note that you will need an appropriate HIP installation and GPU device to run this code.
+
+Output 5:
+Here is the equivalent function implemented in C and HIP that computes a GEMV operation:
+
+```c
+#include <hip/hip_runtime.h>
+#include <stdio.h>
+
+__global__ void gemv_parallel(int n, float *A, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        float sum = 0.0f;
+        for (int j = 0; j < n; j++) {
+            sum += A[i * n + j] * x[j];
+        }
+        y[i] = sum;
+    }
+}
+
+void gemv(int n, float *A, float *x, float *y) {
+    float *d_A, *d_x, *d_y;
+    hipMalloc(&d_A, n*n*sizeof(float));
+    hipMalloc(&d_x, n*sizeof(float));
+    hipMalloc(&d_y, n*sizeof(float));
+
+    hipMemcpy(d_A, A, n*n*sizeof(float), hipMemcpyHostToDevice);
+    hipMemcpy(d_x, x, n*sizeof(float), hipMemcpyHostToDevice);
+
+    dim3 blockSize(256);
+    dim3 gridSize((n + blockSize.x - 1) / blockSize.x);
+
+    gemv_parallel<<<gridSize, blockSize>>>(n, d_A, d_x, d_y);
+    hipMemcpy(y, d_y, n*sizeof(float), hipMemcpyDeviceToHost);
+
+    hipFree(d_A);
+    hipFree(d_x);
+    hipFree(d_y);
+}
+
+int main() {
+    int n = 3;
+    float A[3][3] = {{1.0, 2.0, 3.0}, {4.0, 5.0, 6.0}, {7.0, 8.0, 9.0}};
+    float x[3] = {1.0, 2.0, 3.0};
+    float y[3];
+
+    gemv(n, (float*)A, x, y);
+
+    printf("Resulting vector y:\n");
+    for (int i = 0; i < n; i++) {
+        printf("%f ", y[i]);
+    }
+    printf("\n");
+
+    return 0;
+}
+```
+
+This C code uses the HIP library to perform the matrix-vector multiplication operation in parallel on a GPU. The `gemv` function allocates memory on the device, copies the input data to the device, launches the kernel function `gemv_parallel`, and then copies the result back to the host. The main function initializes the input matrices and vectors, calls the `gemv` function, and prints the resulting vector `y`.
+
+Output 6:
+Here is a C and HIP implementation of the subroutine gemv_parallel:
+
+```c
+#include <hip/hip_runtime.h>
+
+__global__ void gemv_parallel(int n, float *A, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        float sum = 0.0;
+        for (int j = 0; j < n; j++) {
+            sum += A[i * n + j] * x[j];
+        }
+        y[i] = sum;    
+    }
+}
+
+void gemv_parallel_wrapper(int n, float *A, float *x, float *y) {
+    hipLaunchKernelGGL(gemv_parallel, dim3((n + 255) / 256), dim3(256), 0, 0, n, A, x, y);
+}
+``` 
+
+In this implementation, the `gemv_parallel` function is defined as a HIP kernel that performs the matrix-vector multiplication in parallel using GPU threads. The `gemv_parallel_wrapper` function is used to launch the HIP kernel with the necessary grid and block dimensions.
+
+Note: This code assumes that the input arrays `A`, `x`, and `y` are already allocated and populated with the appropriate values.
+
+Output 7:
+```c
+void gemv_parallel(int n, float *A, float *x, float *y) {
+    #pragma omp parallel for
+    for (int i = 0; i < n; i++) {
+        float sum = 0.0;
+        for (int j = 0; j < n; j++) {
+            sum += A[i*n + j] * x[j];
+        }
+        y[i] = sum;
+    }
+}
+```
+
+Output 8:
+Here is a function implemented in C and HIP that performs a GEMV operation:
+
+```c
+#include <hip/hip_runtime.h>
+
+__global__ void gemv_kernel(int n, float *A, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    float sum = 0.0;
+
+    if (i < n) {
+        for (int j = 0; j < n; j++) {
+            sum += A[i * n + j] * x[j];
+        }
+        y[i] = sum;
+    }
+}
+
+void gemv_parallel(int n, float *A, float *x, float *y) {
+    float *d_A, *d_x, *d_y;
+
+    hipMalloc(&d_A, n * n * sizeof(float));
+    hipMalloc(&d_x, n * sizeof(float));
+    hipMalloc(&d_y, n * sizeof(float));
+
+    hipMemcpy(d_A, A, n * n * sizeof(float), hipMemcpyHostToDevice);
+    hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
+
+    hipLaunchKernelGGL(gemv_kernel, dim3((n + 255) / 256), dim3(256), 0, 0, n, d_A, d_x, d_y);
+
+    hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
+
+    hipFree(d_A);
+    hipFree(d_x);
+    hipFree(d_y);
+}
+```
+
+This function defines a kernel `gemv_kernel` that performs the actual matrix-vector multiplication. The `gemv_parallel` function allocates memory on the GPU, copies the input data to the device, launches the kernel using HIP, and then copies the result back to the host.
+
+Output 9:
+Here is the C and HIP implementation of the subroutine gemv_parallel in Fortran with OpenMP:
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <hip/hip_runtime.h>
+
+#define N 100
+
+void gemv_parallel(int n, float *A, float *x, float *y) {
+    int i, j;
+    float sum;
+
+    hipLaunchKernelGGL(HIP_KERNEL_NAME(gemv_kernel), dim3(N), dim3(1), 0, 0, n, A, x, y);
+}
+
+__global__ void gemv_kernel(int n, float *A, float *x, float *y) {
+    int i = blockIdx.x;
+
+    float sum = 0.0;
+    for (int j = 0; j < n; j++) {
+        sum += A[i*n + j] * x[j];
+    }
+
+    y[i] = sum;
+}
+``` 
+
+This C and HIP implementation captures the essence of the Fortran subroutine gemv_parallel with OpenMP by using HIP kernel launch and a GPU kernel function for the GEMV operation.
+
+Output 10:
+Here is the C and HIP implementation of the given subroutine gemv_parallel:
+
+```c
+#include <hip/hip_runtime.h>
+
+__global__ void gemv_kernel(int n, float* A, float* x, float* y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        float sum = 0.0;
+        for (int j = 0; j < n; j++) {
+            sum += A[i * n + j] * x[j];
+        }
+        y[i] = sum;
+    }
+}
+
+void gemv_parallel(int n, float* h_A, float* h_x, float* h_y) {
+    float* d_A, *d_x, *d_y;
+    hipMalloc(&d_A, n * n * sizeof(float));
+    hipMalloc(&d_x, n * sizeof(float));
+    hipMalloc(&d_y, n * sizeof(float));
+
+    hipMemcpy(d_A, h_A, n * n * sizeof(float), hipMemcpyHostToDevice);
+    hipMemcpy(d_x, h_x, n * sizeof(float), hipMemcpyHostToDevice);
+
+    int blockSize = 256;
+    int gridSize = (n + blockSize - 1) / blockSize;
+
+    gemv_kernel<<<gridSize, blockSize>>>(n, d_A, d_x, d_y);
+
+    hipMemcpy(h_y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
+
+    hipFree(d_A);
+    hipFree(d_x);
+    hipFree(d_y);
+}
+```
+
+In this C and HIP implementation, we define a kernel function `gemv_kernel` that performs the matrix-vector multiplication operation in parallel on the GPU. The `gemv_parallel` function first allocates memory on the GPU, copies the input matrices `A` and `x` from host to device, launches the kernel with appropriate grid and block sizes, and then copies the result vector `y` back to the host.
+
+You can call the `gemv_parallel` function with the appropriate input matrices `A` and `x` to compute the Generalized matrix-vector multiplication (GEMV) operation on a GPU using HIP.
+

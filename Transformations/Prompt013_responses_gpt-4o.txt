@@ -1,0 +1,718 @@
+Output 1:
+Certainly! Below is an equivalent implementation of the Fortran `gemv_parallel` subroutine in C using OpenACC directives. This function computes the Generalized Matrix-Vector multiplication (GEMV) operation in parallel.
+
+### Fortran Code Equivalent in C with OpenACC
+
+```c
+#include <stdio.h>
+
+// Function declaration
+void gemv_parallel(int n, float A[n][n], float x[n], float y[n]);
+
+// Main function to call gemv_parallel
+int main() {
+    int n = 3;
+    float A[3][3] = { {1.0, 2.0, 3.0}, {4.0, 5.0, 6.0}, {7.0, 8.0, 9.0} };
+    float x[3] = {1.0, 1.0, 1.0};
+    float y[3];
+
+    gemv_parallel(n, A, x, y);
+
+    for(int i = 0; i < n; i++) {
+        printf("%f ", y[i]);
+    }
+    printf("\n");
+
+    return 0;
+}
+
+// Function definition
+void gemv_parallel(int n, float A[n][n], float x[n], float y[n]) {
+    int i, j;
+
+    #pragma acc parallel loop private(j)
+    for (i = 0; i < n; i++) {
+        float sum = 0.0;
+        for (j = 0; j < n; j++) {
+            sum += A[i][j] * x[j];
+        }
+        y[i] = sum;
+    }
+}
+```
+
+### Explanation:
+
+- **Function Declaration and Definition**: The function `gemv_parallel` takes the order of the matrix `n`, the matrix `A` of size `n x n`, the vector `x` of size `n`, and it outputs the result vector `y` of size `n`.
+
+- **Main Function**:
+  - Initializes a `3x3` matrix `A` and a vector `x` of size `3`.
+  - Calls the `gemv_parallel` function to compute the matrix-vector multiplication.
+  - Prints the resulting vector `y`.
+
+- **OpenACC Directives**:
+  - `#pragma acc parallel loop private(j)` directive is used to parallelize the outer loop (`for (i = 0; i < n; i++)`) and ensure loop variable `j` is treated as private within the parallel region.
+  - In the inner loop, the `sum` variable accumulates the dot product of the i-th row of `A` and the vector `x`.
+
+This implementation will run the outer loop in parallel on supported GPU architectures when compiled with an OpenACC-compatible compiler.
+
+Output 2:
+To translate the provided Fortran subroutine into a C function with OpenACC, we will follow the logic of the Fortran implementation closely, adapting the code to fit C syntax and OpenACC directives. Here’s how you can achieve it:
+
+### Fortran Subroutine (Given)
+```fortran
+subroutine gemv_parallel(n, A, x, y)
+    implicit none
+    integer, intent(in) :: n
+    real, intent(in) :: A(n, n)
+    real, intent(in) :: x(n)
+    real, intent(out) :: y(n)
+    integer :: i, j
+    real :: sum
+    !$OMP PARALLEL DO PRIVATE(j, sum)
+    do i = 1, n
+        sum = 0.0
+        do j = 1, n
+            sum = sum + A(i, j) * x(j)
+        end do
+        y(i) = sum
+    end do
+    !$OMP END PARALLEL DO
+end subroutine gemv_parallel
+```
+
+### C Function with OpenACC
+```c
+#include <openacc.h>
+
+void gemv_parallel(int n, float A[n][n], float x[n], float y[n]) {
+    int i, j;
+    float sum;
+
+    #pragma acc parallel loop private(j, sum) present(A, x, y)
+    for (i = 0; i < n; i++) {
+        sum = 0.0f;
+        for (j = 0; j < n; j++) {
+            sum += A[i][j] * x[j];
+        }
+        y[i] = sum;
+    }
+}
+```
+
+### Explanation:
+1. **Function Signature**: 
+   - The function `gemv_parallel` takes four parameters: an integer `n` representing the dimension of the matrix and vectors, a 2D array `A`, and two 1D arrays `x` and `y`.
+
+2. **Variable Declaration**: 
+   - `i` and `j` are loop indices.
+   - `sum` is a float variable used to store intermediate results within the inner loop.
+
+3. **OpenACC Directives**:
+   - `#pragma acc parallel loop`: This directive tells the compiler to parallelize the following loop using OpenACC. The `private(j, sum)` clause indicates that each thread will have its own private copy of `j` and `sum`.
+   - `present(A, x, y)`: This clause informs the compiler that arrays `A`, `x`, and `y` are already present in device memory, avoiding unnecessary data transfers.
+
+4. **Loop Nest**:
+   - The outer loop iterates over the rows of the matrix.
+   - The inner loop computes the dot product of the `i`-th row of `A` with vector `x` and stores the result in `y[i]`.
+
+### Usage:
+To use the above function, ensure that your device supports OpenACC and that you compile the code with an appropriate compiler such as PGI, GCC with OpenACC support, or any other compiler supporting OpenACC.
+
+### Example Main Function (for Testing):
+```c
+#include <stdio.h>
+#include <accel.h>
+
+void gemv_parallel(int n, float A[n][n], float x[n], float y[n]);
+
+int main() {
+    int n = 3;
+    float A[3][3] = {{1, 2, 3}, {4, 5, 6}, {7, 8, 9}};
+    float x[3] = {1, 1, 1};
+    float y[3];
+
+    gemv_parallel(n, A, x, y);
+
+    for (int i = 0; i < n; i++) {
+        printf("%f ", y[i]);
+    }
+    printf("\n");
+
+    return 0;
+}
+```
+This provided testing code initializes a 3x3 matrix `A`, a vector `x`, and runs the `gemv_parallel` function, printing out the resulting vector `y`.
+
+Output 3:
+Sure, here is an equivalent function implemented in C and OpenACC to perform the Generalized matrix-vector multiplication (GEMV) operation described by your Fortran subroutine:
+
+```c
+#include <stdlib.h>
+#include <stdio.h>
+
+void gemv_parallel(int n, float* A, float* x, float* y) {
+    int i, j;
+    #pragma acc parallel loop private(i, j)
+    for (i = 0; i < n; i++) {
+        float sum = 0;
+        #pragma acc loop reduction(+:sum)
+        for (j = 0; j < n; j++) {
+            sum += A[i * n + j] * x[j];
+        }
+        y[i] = sum;
+    }
+}
+
+int main() {
+    int n = 3;
+    float A[9] = {1.0, 2.0, 3.0, 
+                  4.0, 5.0, 6.0, 
+                  7.0, 8.0, 9.0};
+    float x[3] = {1.0, 1.0, 1.0};
+    float y[3];
+
+    gemv_parallel(n, A, x, y);
+
+    for (int i = 0; i < n; i++) {
+        printf("%f ", y[i]);
+    }
+    printf("\n");
+
+    return 0;
+}
+```
+
+In the `gemv_parallel` function, the matrix `A` is stored in row-major order. This means that a two-dimensional array `A` from Fortran is actually stored in a one-dimensional array in C, and we access elements as `A[i * n + j]`.
+
+Here's a quick breakdown of the OpenACC directives used:
+
+- `#pragma acc parallel loop private(i, j)`: This directive tells the compiler to parallelize the outer loop. The `private` clause declares `i` and `j` as private variables for each parallel thread.
+- `#pragma acc loop reduction(+:sum)`: This directive is used inside the parallelized region for the inner loop to sum elements safely across all threads. The `reduction(+:sum)` clause ensures that the `sum` variable is accumulated correctly across iterations of the loop.
+
+For the example matrix and vector provided, this will correctly compute the result of the matrix-vector multiplication and print the result.
+
+Make sure to compile the program with an OpenACC-capable compiler, such as the PGI compiler, using the appropriate flags to enable OpenACC. For example:
+
+```sh
+pgcc -acc -Minfo=accel -o gemv_parallel gemv_parallel.c
+```
+
+Remember that OpenACC offloading might require running the program on a machine with a supported GPU and the appropriate runtime environment.
+
+Output 4:
+Certainly! Below is an equivalent function implemented in C using OpenACC to perform a generalized matrix-vector multiplication (GEMV) operation similar to the provided Fortran and OpenMP implementation.
+
+```c
+#include <stdio.h>
+
+void gemv_parallel(int n, float *A, float *x, float *y) {
+    int i, j;
+    #pragma acc parallel loop private(j)
+    for (i = 0; i < n; i++) {
+        float sum = 0.0;
+        #pragma acc loop reduction(+:sum)
+        for (j = 0; j < n; j++) {
+            sum += A[i * n + j] * x[j];
+        }
+        y[i] = sum;
+    }
+}
+
+int main() {
+    // Example usage
+    int n = 4;
+    float A[16] = 
+    {
+        1.0, 2.0, 3.0, 4.0,
+        5.0, 6.0, 7.0, 8.0,
+        9.0, 10.0, 11.0, 12.0,
+        13.0, 14.0, 15.0, 16.0
+    };
+    float x[4] = {1.0, 2.0, 3.0, 4.0};
+    float y[4]; 
+
+    gemv_parallel(n, A, x, y);
+
+    // Print the result
+    for (int i = 0; i < n; i++) {
+        printf("y[%d] = %f\n", i, y[i]);
+    }
+
+    return 0;
+}
+```
+
+### Explanation:
+1. **Function Definition**:
+   - The function `gemv_parallel` takes four parameters: 
+     - `n` (the dimension of the matrix and vectors), 
+     - `A` (the matrix stored in a 1D array in row-major order), 
+     - `x` (the input vector),
+     - `y` (the output vector).
+   
+2. **OpenACC Directives**:
+   - `#pragma acc parallel loop`: This directive parallelizes the outer loop over `i`.
+   - `#pragma acc loop reduction(+:sum)`: This directive parallelizes the inner loop over `j` and ensures correct summation in a parallel context using a reduction clause.
+
+3. **Memory Layout**:
+   - The matrix `A` is stored as a 1D array in row-major order. Hence, accessing element `(i, j)` in a 2D array `A` can be done with `A[i * n + j]`.
+
+4. **Reduction Clause**:
+   - The reduction clause ensures that the addition operation for `sum` is performed correctly in a parallel environment by combining partial sums from different threads safely.
+
+5. **Main Function**:
+   - An example usage of the `gemv_parallel` function is provided. It initializes a matrix `A`, a vector `x`, and calls the function to compute the output vector `y`.
+   - The result is printed to verify the operation.
+
+This code should be compiled with an OpenACC capable compiler, for example, the `pgcc` compiler from the PGI suite or the `nvcc` compiler from NVIDIA's suite if you’re targeting GPUs.
+
+Output 5:
+To create a C version of the given Fortran subroutine that uses OpenACC for parallelization, you can follow the general structure of the code and the key operations while making adjustments for the syntax and parallelization directives of OpenACC. Here's how you can implement it:
+
+### Fortran with OpenMP subroutine
+We'll translate this to:
+
+### C with OpenACC function
+
+```c
+#include <stdio.h>
+
+// Function prototype
+void gemv_parallel(int n, float A[n][n], float x[n], float y[n]);
+
+void gemv_parallel(int n, float A[n][n], float x[n], float y[n]) {
+    int i, j;
+    float sum;
+
+    #pragma acc parallel loop private(j, sum) copyin(A[0:n][0:n],x[0:n]) copyout(y[0:n])
+    for (i = 0; i < n; i++) {
+        sum = 0.0;
+        for (j = 0; j < n; j++) {
+            sum += A[i][j] * x[j];
+        }
+        y[i] = sum;
+    }
+}
+
+// Example usage
+int main() {
+    int n = 3;
+    float A[3][3] = {
+        {1.0, 2.0, 3.0},
+        {4.0, 5.0, 6.0},
+        {7.0, 8.0, 9.0}
+    };
+    float x[3] = {1.0, 1.0, 1.0};
+    float y[3];
+
+    gemv_parallel(n, A, x, y);
+
+    int i;
+    for (i=0; i<n; i++) {
+        printf("y[%d] = %f\n", i, y[i]);
+    }
+
+    return 0;
+}
+```
+
+### Explanation:
+1. **Function Prototype**: `void gemv_parallel(int n, float A[n][n], float x[n], float y[n]);`
+    - The function takes the matrix `A`, the input vector `x`, and the output vector `y`.
+
+2. **Parallel Directive with OpenACC**:
+    - `#pragma acc parallel loop private(j, sum) copyin(A[0:n][0:n],x[0:n]) copyout(y[0:n])`
+    - This directive will parallelize the outer loop with private copies of `j` and `sum` for each parallel thread. 
+    - It also specifies that `A` and `x` arrays are inputs to the device and `y` array is the output from the device.
+
+3. **Loop Structure**:
+    - The loop structure follows the nested do-loops from the Fortran code.
+    - The outer loop runs over `i`, and the inner loop over `j`, accumulating the product `A[i][j] * x[j]` into `sum`.
+
+4. **Output**:
+    - The results are stored in the `y` array.
+
+### Compilation:
+To compile and run this program with OpenACC support, ensure you have an OpenACC-compliant compiler such as PGI or NVIDIA HPC SDK. The flags you need typically include something like `-acc` to enable OpenACC.
+
+Example using PGI compiler:
+```sh
+pgcc -acc -o gemv_parallel gemv_parallel.c
+./gemv_parallel
+```
+
+Make sure to adapt the compilation command based on your compiler's specifics and version.
+
+Output 6:
+Certainly! To port the given Fortran subroutine using OpenMP to C using OpenACC, we need to adapt the matrix-vector multiplication code. Below is a function in C that performs the Generalized matrix-vector multiplication (GEMV) operation in parallel using OpenACC:
+
+Fortran version:
+```fortran
+subroutine gemv_parallel(n, A, x, y)
+    implicit none
+    integer, intent(in) :: n
+    real, intent(in) :: A(n, n)
+    real, intent(in) :: x(n)
+    real, intent(out) :: y(n)
+    integer :: i, j
+    real :: sum
+    !$OMP PARALLEL DO PRIVATE(j, sum)
+    do i = 1, n
+        sum = 0.0
+        do j = 1, n
+            sum = sum + A(i, j) * x(j)
+        end do
+        y(i) = sum
+    end do
+    !$OMP END PARALLEL DO
+end subroutine gemv_parallel
+```
+
+Equivalent C version with OpenACC:
+```c
+#include <stdio.h>
+
+void gemv_parallel(int n, float A[n][n], float x[n], float y[n]) {
+    int i, j;
+    float sum;
+
+    #pragma acc parallel loop private(j, sum) present(A, x, y)
+    for (i = 0; i < n; i++) {
+        sum = 0.0f;
+        #pragma acc loop reduction(+:sum)
+        for (j = 0; j < n; j++) {
+            sum += A[i][j] * x[j];
+        }
+        y[i] = sum;
+    }
+}
+
+int main() {
+    int n = 3; // Example size
+    float A[3][3] = {{1, 2, 3}, {4, 5, 6}, {7, 8, 9}};
+    float x[3] = {1, 2, 3};
+    float y[3];
+
+    #pragma acc data copyin(A, x) copyout(y)
+    {
+        gemv_parallel(n, A, x, y);
+    }
+
+    for (int i = 0; i < n; i++) {
+        printf("%f ", y[i]);
+    }
+    printf("\n");
+
+    return 0;
+}
+```
+
+**Explanation:**
+1. **Function Signature**: `void gemv_parallel` is defined to take the matrix `A`, vectors `x` and `y`, and an integer `n` which denotes the size of the matrix and vectors.
+2. **Parallel Region**: `#pragma acc parallel loop` is used to parallelize the outer loop over rows `i`.
+3. **Reduction**: Inside the loop, `sum` is used to accumulate the results of the element-wise multiplication. `#pragma acc loop reduction(+:sum)` ensures that the reductions on `sum` are handled correctly in parallel.
+4. **Data Movement**: The `#pragma acc data copyin(A, x) copyout(y)` directive ensures the correct movement of data between the host and the device.
+
+This code is a direct translation of the Fortran OpenMP approach to C with OpenACC, taking care of parallelization aspects suitable for GPUs or other accelerators supported by OpenACC.
+
+Output 7:
+Below is a C function that performs the same generalized matrix-vector multiplication (GEMV) operation as described in your Fortran subroutine. This function uses OpenACC for parallelization. The OpenACC directives allow you to offload computations to a GPU or other accelerators if available.
+
+```c
+#include <stdio.h>
+
+// Function prototype
+void gemv_parallel(int n, float *A, float *x, float *y);
+
+int main() {
+    int n = 4; // Size of the matrix and vectors (example value)
+    float A[4][4] = {  // Example 4x4 matrix
+        {1, 2, 3, 4},
+        {5, 6, 7, 8},
+        {9, 10, 11, 12},
+        {13, 14, 15, 16}
+    };
+    float x[4] = {1, 1, 1, 1}; // Example input vector
+    float y[4]; // Result vector
+
+    gemv_parallel(n, (float *)A, x, y);
+
+    // Print the result
+    for (int i = 0; i < n; i++) {
+        printf("%f ", y[i]);
+    }
+    printf("\n");
+
+    return 0;
+}
+
+void gemv_parallel(int n, float *A, float *x, float *y) {
+    #pragma acc data copyin(A[0:n*n], x[0:n]) copyout(y[0:n])
+    #pragma acc parallel loop
+    for (int i = 0; i < n; i++) {
+        float sum = 0.0f;
+        #pragma acc loop reduction(+:sum)
+        for (int j = 0; j < n; j++) {
+            sum += A[i * n + j] * x[j]; // Access A in row-major order
+        }
+        y[i] = sum;
+    }
+}
+```
+
+### Explanation:
+- **Data Parallelization with OpenACC**:
+  1. **Data Transfer Directives**: 
+     - `#pragma acc data copyin(A[0:n*n], x[0:n]) copyout(y[0:n])`: This directive ensures that the arrays `A` and `x` are copied to the device (e.g., GPU) before the computation and `y` is copied back to the host afterwards.
+  2. **Parallel Looping**:
+     - `#pragma acc parallel loop`: This parallelizes the outer loop over `i`. Each iteration of the loop can be executed independently on different cores or GPU threads.
+     - `#pragma acc loop reduction(+:sum)`: This specifies that the `sum` variable is a reduction variable. The reduction operation (`+`) sums up the contributions from each iteration in the inner loop.
+
+- **Pointer Arithmetic**:
+  - Unlike Fortran, C does not have built-in support for 2D array notation unless specifying exact dimensions at compile time. Hence, `A` is passed as a single-dimensional float array, and indices are manually computed using pointer arithmetic (`A[i * n + j]`).
+
+- **Row-major Order**:
+  - In C, arrays are stored in row-major order. Therefore, the array access `A[i * n + j]` correctly addresses the elements of `A`.
+
+### Additional Notes:
+- Ensure the appropriate compiler flags are used to enable OpenACC support. For example, with the PGI compiler: `pgcc -acc -Minfo=accel -o gemv_parallel gemv_parallel.c`.
+- Modify the matrix size `n` and contents of `A` and `x` as per your requirement to test the function with different data.
+
+This function will compute the same GEMV operation while utilizing the potential parallel processing power of the underlying hardware.
+
+Output 8:
+Sure, I'll convert your Fortran and OpenMP subroutine into a C and OpenACC function. Below is the code:
+
+### C Implementation with OpenACC
+
+```c
+#include <stdio.h>
+
+// Function prototype
+void gemv_parallel(int n, float *A, float *x, float *y);
+
+void gemv_parallel(int n, float *A, float *x, float *y) {
+    int i, j;
+    float sum;
+
+    #pragma acc parallel loop private(j, sum) present(A[0:n*n], x[0:n], y[0:n])
+    for (i = 0; i < n; i++) {
+        sum = 0.0f;
+        for (j = 0; j < n; j++) {
+            sum += A[i * n + j] * x[j];
+        }
+        y[i] = sum;
+    }
+}
+
+int main() {
+    // Example usage
+    int i, j;
+    int n = 4; 
+    float A[16] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}; 
+    float x[4] = {1, 1, 1, 1}; 
+    float y[4] = {0, 0, 0, 0}; 
+
+    // Transferring memory to device
+    #pragma acc enter data copyin(A[0:n*n], x[0:n]) create(y[0:n])
+
+    gemv_parallel(n, A, x, y);
+
+    // Transferring results back to the host
+    #pragma acc exit data copyout(y[0:n]) delete(A[0:n*n], x[0:n])
+
+    for (i = 0; i < n; i++) {
+        printf("%f\n", y[i]);
+    }
+
+    return 0;
+}
+```
+
+### Explanation:
+
+1. **Function Prototype and Definition**: The function `gemv_parallel` is defined to perform the Generalized matrix-vector multiplication (GEMV) using OpenACC.
+
+2. **Function Parameters**:
+   - `n`: The size of the matrix and vectors.
+   - `A`: A pointer to the first element of a 2D matrix (stored in row-major order).
+   - `x`: A pointer to the first element of the input vector.
+   - `y`: A pointer to the first element of the output vector.
+
+3. **OpenACC Directives**:
+   - `#pragma acc parallel loop`: This directive indicates that the following `for` loop should be parallelized. In combination with `private` for the `j` and `sum` variables, it ensures each thread has its local instances of these variables.
+   - `#pragma acc enter data` and `#pragma acc exit data`: These directives are used to manage the data transfer between the host and the accelerator device. The `copyin` clause transfers input data to the device, while the `copyout` clause transfers the result back to the host. The `create` clause creates memory on the device for the output vector.
+
+4. **Main Function**: A simple main function is provided to demonstrate how to call `gemv_parallel`. It initializes example data, handles memory management for the device, calls the parallel GEMV function, and prints the result.
+
+Compile the program using an appropriate compiler with OpenACC support, such as PGI compilers or the NVIDIA HPC SDK. For example:
+
+```sh
+pgcc -acc -Minfo=accel gemv.c -o gemv
+```
+
+Then run the executable:
+
+```sh
+./gemv
+```
+
+This program will perform the GEMV operation on the input matrix `A` and vector `x` and print the resulting vector `y`.
+
+Output 9:
+Certainly! Below is the equivalent function in C using OpenACC for parallelization that computes the GEMV operation.
+
+### Fortran Subroutine (Reference)
+```fortran
+subroutine gemv_parallel(n, A, x, y)
+    implicit none
+    integer, intent(in) :: n
+    real, intent(in) :: A(n, n)
+    real, intent(in) :: x(n)
+    real, intent(out) :: y(n)
+    integer :: i, j
+    real :: sum
+    !$OMP PARALLEL DO PRIVATE(j, sum)
+    do i = 1, n
+        sum = 0.0
+        do j = 1, n
+            sum = sum + A(i, j) * x(j)
+        end do
+        y(i) = sum
+    end do
+    !$OMP END PARALLEL DO
+end subroutine gemv_parallel
+```
+
+### Equivalent C Function with OpenACC
+```c
+#include <stdio.h>
+#include <stdlib.h>
+
+void gemv_parallel(int n, float *A, float *x, float *y) {
+    int i, j;
+
+    #pragma acc parallel loop private(j)
+    for (i = 0; i < n; i++) {
+        float sum = 0.0;
+        #pragma acc loop reduction(+:sum)
+        for (j = 0; j < n; j++) {
+            sum += A[i * n + j] * x[j];
+        }
+        y[i] = sum;
+    }
+}
+
+/* Example use case */
+int main() {
+    int n = 4;
+    float A[16] = {1, 2, 3, 4, 
+                   5, 6, 7, 8, 
+                   9, 10, 11, 12, 
+                   13, 14, 15, 16};
+    float x[4] = {1, 1, 1, 1};
+    float y[4] = {0, 0, 0, 0};
+
+    gemv_parallel(n, A, x, y);
+
+    for (int i = 0; i < n; i++) {
+        printf("%f\n", y[i]);
+    }
+
+    return 0;
+}
+```
+
+### Explanation:
+1. **Parallel Directive**: The `#pragma acc parallel loop` directive tells the compiler to parallelize the outer loop. This is somewhat equivalent to `!$OMP PARALLEL DO` in OpenMP.
+2. **Reduction Directive**: The `#pragma acc loop reduction(+:sum)` directive ensures that the update to the `sum` variable is done atomically across the iterations of the inner loop, similar to how OpenMP handles reductions.
+
+### Note:
+1. **Data Layout**: The 2D array `A` is represented as a 1D array in C, stored in row-major order. That's why we use the index `i * n + j` to access the elements.
+2. **OpenACC Usage**: To compile the code using an OpenACC-enabled compiler (e.g., PGI or NVIDIA HPC SDK), appropriate compiler-specific flags are required, such as `-acc` for PGI.
+
+In a production environment, you should also include error checking and more robust memory management, particularly if you're dynamically allocating the arrays.
+
+Output 10:
+Certainly! Below is an equivalent implementation of the given Fortran subroutine in C using OpenACC. This C function will perform the Generalized matrix-vector multiplication (GEMV) operation.
+
+### Fortran Subroutine (For Reference):
+```fortran
+subroutine gemv_parallel(n, A, x, y)
+    implicit none
+    integer, intent(in) :: n
+    real, intent(in) :: A(n, n)
+    real, intent(in) :: x(n)
+    real, intent(out) :: y(n)
+    integer :: i, j
+    real :: sum
+    !$OMP PARALLEL DO PRIVATE(j, sum)
+    do i = 1, n
+        sum = 0.0
+        do j = 1, n
+            sum = sum + A(i, j) * x(j)
+        end do
+        y(i) = sum
+    end do
+    !$OMP END PARALLEL DO
+end subroutine gemv_parallel
+```
+
+### Equivalent C Function with OpenACC:
+```c
+#include <stdio.h>
+
+void gemv_parallel(int n, float *A, float *x, float *y) {
+    int i, j;
+    float sum;
+
+    #pragma acc parallel loop private(j, sum) copyin(A[0:n*n], x[0:n]) copyout(y[0:n])
+    for (i = 0; i < n; ++i) {
+        sum = 0.0;
+        for (j = 0; j < n; ++j) {
+            sum += A[i * n + j] * x[j];
+        }
+        y[i] = sum;
+    }
+}
+
+int main() {
+    int n = 3;
+    float A[9] = {1, 2, 3, 4, 5, 6, 7, 8, 9}; // 3x3 matrix
+    float x[3] = {1, 2, 3}; // 3 element vector
+    float y[3]; // Result vector
+
+    gemv_parallel(n, A, x, y);
+
+    // Print the result
+    for (int i = 0; i < n; ++i) {
+        printf("%f ", y[i]);
+    }
+    printf("\n");
+
+    return 0;
+}
+```
+
+### Explanation:
+1. **Function Signature and Parameters**:
+    - The function `gemv_parallel` takes the dimension `n`, matrix `A`, vector `x`, and output vector `y` as parameters.
+    - The matrix `A` is stored in a flattened 1D array of size `n*n`.
+
+2. **OpenACC Directives**:
+    - `#pragma acc parallel loop` is used to parallelize the outer loop (`for (i = 0; i < n; ++i)`).
+        - `private(j, sum)` declares variables `j` and `sum` as private to each parallel thread.
+        - `copyin(A[0:n*n], x[0:n])` ensures that arrays `A` and `x` are copied into the device.
+        - `copyout(y[0:n])` ensures that the result `y` is copied back to the host after execution.
+
+3. **Matrix-Vector Multiplication**:
+    - The multiplication logic inside the loops calculates the dot product for each row `i` of the matrix `A` against the vector `x`.
+
+4. **Main Function**:
+    - An example matrix `A` and vector `x` are defined.
+    - The `gemv_parallel` function is called.
+    - The result vector `y` is printed.
+
+This is an efficient implementation leveraging OpenACC for parallel execution on suitable devices, like GPUs or multi-core CPUs.
+

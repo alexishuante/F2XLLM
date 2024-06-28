@@ -1,0 +1,626 @@
+Output 1:
+Here is the C and CUDA implementation of the GEMM operation:
+
+```c
+#include <stdio.h>
+
+__global__ void gemm_kernel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if (i < m && j < n) {
+        double temp = 0.0;
+        for (int l = 0; l < k; l++) {
+            temp += a[i * lda + l] * b[l * ldb + j];
+        }
+        c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+    }
+}
+
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+    double *d_a, *d_b, *d_c;
+
+    cudaMalloc(&d_a, sizeof(double) * m * k);
+    cudaMalloc(&d_b, sizeof(double) * k * n);
+    cudaMalloc(&d_c, sizeof(double) * m * n);
+    
+    cudaMemcpy(d_a, a, sizeof(double) * m * k, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_b, b, sizeof(double) * k * n, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_c, c, sizeof(double) * m * n, cudaMemcpyHostToDevice);
+    
+    dim3 threadsPerBlock(16, 16);
+    dim3 numBlocks((m + threadsPerBlock.x - 1) / threadsPerBlock.x, (n + threadsPerBlock.y - 1) / threadsPerBlock.y);
+
+    gemm_kernel<<<numBlocks, threadsPerBlock>>>(m, n, k, alpha, d_a, lda, d_b, ldb, beta, d_c, ldc);
+
+    cudaMemcpy(c, d_c, sizeof(double) * m * n, cudaMemcpyDeviceToHost);
+
+    cudaFree(d_a);
+    cudaFree(d_b);
+    cudaFree(d_c);
+}
+
+int main() {
+    int m = 3, n = 4, k = 2;
+    double alpha = 1.0, beta = 1.0;
+    double a[3][2] = {{1.0, 2.0}, {3.0, 4.0}, {5.0, 6.0}};
+    double b[2][4] = {{1.0, 2.0, 3.0, 4.0}, {5.0, 6.0, 7.0, 8.0}};
+    double c[3][4] = {{0.0}};
+
+    gemm_parallel(m, n, k, alpha, (double *)a, 2, (double *)b, 4, beta, (double *)c, 4);
+
+    for (int i = 0; i < m; i++) {
+        for (int j = 0; j < n; j++) {
+            printf("%.2f ", c[i][j]);
+        }
+        printf("\n");
+    }
+
+    return 0;
+}
+```
+
+This implementation uses CUDA to perform the GEMM operation in parallel on the GPU. The `gemm_kernel` function performs the matrix multiplication for each element of the output matrix `c`, and the `gemm_parallel` function handles memory allocation, data transfer, and kernel invocation. The main function shows an example of performing a GEMM operation on two matrices `a` and `b` to produce the resulting matrix `c`.
+
+Output 2:
+Here is the equivalent function implemented in C and CUDA:
+
+```c
+#include <stdio.h>
+
+__global__ void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    
+    if (i < m && j < n) {
+        double temp = 0.0;
+        for (int l = 0; l < k; l++) {
+            temp += a[i * lda + l] * b[l * ldb + j];
+        }
+        c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+    }
+}
+
+void gemm_c(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+    double *d_a, *d_b, *d_c;
+    int size_a = m * k * sizeof(double);
+    int size_b = k * n * sizeof(double);
+    int size_c = m * n * sizeof(double);
+    
+    cudaMalloc(&d_a, size_a);
+    cudaMalloc(&d_b, size_b);
+    cudaMalloc(&d_c, size_c);
+    
+    cudaMemcpy(d_a, a, size_a, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_b, b, size_b, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_c, c, size_c, cudaMemcpyHostToDevice);
+    
+    dim3 threadsPerBlock(16, 16);
+    dim3 numBlocks((m + threadsPerBlock.x - 1) / threadsPerBlock.x, (n + threadsPerBlock.y - 1) / threadsPerBlock.y);
+    
+    gemm_parallel<<<numBlocks, threadsPerBlock>>>(m, n, k, alpha, d_a, lda, d_b, ldb, beta, d_c, ldc);
+    
+    cudaMemcpy(c, d_c, size_c, cudaMemcpyDeviceToHost);
+    
+    cudaFree(d_a);
+    cudaFree(d_b);
+    cudaFree(d_c);
+}
+
+int main() {
+    int m = 3, n = 3, k = 2;
+    double alpha = 1.0, beta = 1.0;
+    double a[3][2] = {{1.0, 2.0}, {3.0, 4.0}, {5.0, 6.0}};
+    double b[2][3] = {{1.0, 2.0, 3.0}, {4.0, 5.0, 6.0}};
+    double c[3][3] = {{0.0}};
+    
+    gemm_c(m, n, k, alpha, (double *)a, k, (double *)b, n, beta, (double *)c, n);
+    
+    for (int i = 0; i < m; i++) {
+        for (int j = 0; j < n; j++) {
+            printf("%f ", c[i][j]);
+        }
+        printf("\n");
+    }
+    
+    return 0;
+}
+```
+
+In this code, the `gemm_c` function calculates the Generalized Matrix Multiplication using CUDA. The `gemm_parallel` kernel function is called by `gemm_c` to be executed in parallel on the GPU. The main function initializes the matrices `a`, `b`, and `c` and calls the `gemm_c` function to perform the matrix multiplication operation.
+
+Output 3:
+```c
+#include <stdio.h>
+
+#define TILE_SIZE 16
+
+__global__
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+    int i = blockIdx.x * TILE_SIZE + threadIdx.x;
+    int j = blockIdx.y * TILE_SIZE + threadIdx.y;
+    
+    if (i < m && j < n) {
+        double temp = 0.0;
+        for (int l = 0; l < k; l++) {
+            temp += a[i * lda + l] * b[l * ldb + j];
+        }
+        c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+    }
+}
+
+int main() {
+    int m = 1024, n = 1024, k = 1024;
+    double alpha = 1.0, beta = 0.0;
+    
+    double *a, *b, *c;
+    cudaMallocManaged(&a, m * k * sizeof(double));
+    cudaMallocManaged(&b, k * n * sizeof(double));
+    cudaMallocManaged(&c, m * n * sizeof(double));
+    
+    // Initialize a and b matrices
+    
+    dim3 blockSize(TILE_SIZE, TILE_SIZE);
+    dim3 gridSize((m + TILE_SIZE - 1) / TILE_SIZE, (n + TILE_SIZE - 1) / TILE_SIZE);
+    
+    gemm_parallel<<<gridSize, blockSize>>>(m, n, k, alpha, a, k, b, n, beta, c, n);
+    cudaDeviceSynchronize();
+    
+    // Free allocated memory
+    
+    return 0;
+}
+```
+
+Output 4:
+Here is the equivalent function implemented in C and CUDA to compute the Generalized Matrix Multiplication (GEMM) operation:
+
+```c
+#include <stdio.h>
+
+__global__ void gemm_kernel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+    int i = blockIdx.y * blockDim.y + threadIdx.y;
+    int j = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (i < m && j < n) {
+        double temp = 0.0;
+        for (int l = 0; l < k; l++) {
+            temp += a[i*lda + l] * b[l*ldb + j];
+        }
+        c[i*ldc + j] = alpha * temp + beta * c[i*ldc + j];
+    }
+}
+
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+    double *d_a, *d_b, *d_c;
+    cudaMalloc(&d_a, m * k * sizeof(double));
+    cudaMalloc(&d_b, k * n * sizeof(double));
+    cudaMalloc(&d_c, m * n * sizeof(double));
+
+    cudaMemcpy(d_a, a, m * k * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_b, b, k * n * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_c, c, m * n * sizeof(double), cudaMemcpyHostToDevice);
+
+    dim3 block_size(16, 16);
+    dim3 grid_size((n + block_size.x - 1) / block_size.x, (m + block_size.y - 1) / block_size.y);
+
+    gemm_kernel<<<grid_size, block_size>>>(m, n, k, alpha, d_a, lda, d_b, ldb, beta, d_c, ldc);
+
+    cudaMemcpy(c, d_c, m * n * sizeof(double), cudaMemcpyDeviceToHost);
+
+    cudaFree(d_a);
+    cudaFree(d_b);
+    cudaFree(d_c);
+}
+
+int main() {
+    int m = 3, n = 3, k = 3;
+    double alpha = 1.0, beta = 0.0;
+    double a[3][3] = {{1.0, 2.0, 3.0}, {4.0, 5.0, 6.0}, {7.0, 8.0, 9.0}};
+    double b[3][3] = {{1.0, 2.0, 3.0}, {4.0, 5.0, 6.0}, {7.0, 8.0, 9.0}};
+    double c[3][3] = {{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}};
+
+    gemm_parallel(m, n, k, alpha, (double*)a, k, (double*)b, n, beta, (double*)c, n);
+
+    for (int i = 0; i < m; i++) {
+        for (int j = 0; j < n; j++) {
+            printf("%.2f ", c[i][j]);
+        }
+        printf("\n");
+    }
+
+    return 0;
+}
+```
+
+This code defines a CUDA kernel `gemm_kernel` that performs the matrix multiplication and then calls this kernel in the `gemm_parallel` function. The `main` function demonstrates how to use the `gemm_parallel` function to multiply two matrices and print the result.
+
+Output 5:
+```c
+#include <stdio.h>
+
+#define SIZE 1000 // Size of matrices
+
+__global__ void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    
+    if(i < m && j < n) {
+        double temp = 0.0;
+        for(int l = 0; l < k; l++) {
+            temp += a[i * lda + l] * b[l * ldb + j];
+        }
+        c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+    }
+}
+
+int main() {
+    int m = SIZE, n = SIZE, k = SIZE;
+    double alpha = 1.0, beta = 1.0;
+    double *a, *b, *c;
+    double *d_a, *d_b, *d_c;
+    int lda = k, ldb = n, ldc = n;
+    
+    // Allocate memory for matrices a, b, c on host
+    a = (double*)malloc(m * k * sizeof(double));
+    b = (double*)malloc(k * n * sizeof(double));
+    c = (double*)malloc(m * n * sizeof(double));
+    
+    // Initialize matrices a and b
+    for(int i = 0; i < m * k; i++) {
+        a[i] = 1.0;
+    }
+    for(int i = 0; i < k * n; i++) {
+        b[i] = 2.0;
+    }
+    
+    // Allocate memory for matrices a, b, c on device
+    cudaMalloc(&d_a, m * k * sizeof(double));
+    cudaMalloc(&d_b, k * n * sizeof(double));
+    cudaMalloc(&d_c, m * n * sizeof(double));
+    
+    // Copy matrices a and b from host to device
+    cudaMemcpy(d_a, a, m * k * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_b, b, k * n * sizeof(double), cudaMemcpyHostToDevice);
+    
+    dim3 blockSize(32, 32);
+    dim3 gridSize((m + blockSize.x - 1) / blockSize.x, (n + blockSize.y - 1) / blockSize.y);
+    
+    // Call kernel function
+    gemm_parallel<<<gridSize, blockSize>>>(m, n, k, alpha, d_a, lda, d_b, ldb, beta, d_c, ldc);
+    
+    // Copy matrix c from device to host
+    cudaMemcpy(c, d_c, m * n * sizeof(double), cudaMemcpyDeviceToHost);
+    
+    // Free memory
+    free(a);
+    free(b);
+    free(c);
+    cudaFree(d_a);
+    cudaFree(d_b);
+    cudaFree(d_c);
+    
+    return 0;
+}
+```
+
+Output 6:
+```c
+#include <stdio.h>
+
+__global__ void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    
+    if (i < m && j < n) {
+        double temp = 0.0;
+        for (int l = 0; l < k; l++) {
+            temp += a[i * lda + l] * b[l * ldb + j];
+        }
+        c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+    }
+}
+
+int main() {
+    int m = 1000, n = 1000, k = 1000;
+    double alpha = 1.0, beta = 1.0;
+    double *a, *b, *c;
+    
+    // Allocate memory and initialize arrays a, b, c
+    
+    // CUDA memory allocation
+    double *d_a, *d_b, *d_c;
+    cudaMalloc(&d_a, m * k * sizeof(double));
+    cudaMalloc(&d_b, k * n * sizeof(double));
+    cudaMalloc(&d_c, m * n * sizeof(double));
+    
+    // Copy data from host to device
+    cudaMemcpy(d_a, a, m * k * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_b, b, k * n * sizeof(double), cudaMemcpyHostToDevice);
+    
+    // Kernel launch
+    dim3 threadsPerBlock(16, 16);
+    dim3 numBlocks((m + 15) / 16, (n + 15) / 16);
+    gemm_parallel<<<numBlocks, threadsPerBlock>>>(m, n, k, alpha, d_a, k, d_b, n, beta, d_c, n);
+    
+    // Copy results back to host
+    cudaMemcpy(c, d_c, m * n * sizeof(double), cudaMemcpyDeviceToHost);
+    
+    // Free memory
+    cudaFree(d_a);
+    cudaFree(d_b);
+    cudaFree(d_c);
+    
+    // Free host memory
+    
+    return 0;
+}
+```
+
+Output 7:
+```c
+#include <stdio.h>
+
+__global__ void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    
+    if(i < m && j < n)
+    {
+        double temp = 0.0;
+        for(int l = 0; l < k; l++)
+        {
+            temp += a[i * lda + l] * b[l * ldb + j];
+        }
+        c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+    }
+}
+
+int main()
+{
+    int m = 1000;
+    int n = 1000;
+    int k = 1000;
+    double alpha = 1.0;
+    double beta = 0.0;
+    
+    double *a, *b, *c;
+    cudaMallocManaged(&a, m * k * sizeof(double));
+    cudaMallocManaged(&b, k * n * sizeof(double));
+    cudaMallocManaged(&c, m * n * sizeof(double));
+    
+    // Initialize matrices a and b
+    
+    int lda = k;
+    int ldb = n;
+    int ldc = n;
+    
+    dim3 blockSize(16, 16);
+    dim3 gridSize((m + blockSize.x - 1) / blockSize.x, (n + blockSize.y - 1) / blockSize.y);
+    
+    gemm_parallel<<<gridSize, blockSize>>>(m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+    
+    cudaDeviceSynchronize();
+    
+    // Print or use result matrix c
+    
+    cudaFree(a);
+    cudaFree(b);
+    cudaFree(c);
+    
+    return 0;
+}
+```
+In this CUDA implementation, the `gemm_parallel` function is the CUDA kernel that performs the Generalized Matrix multiplication operation. The grid and block dimensions are set according to the problem size, and each thread computes a specific element of the output matrix `c`. The result is stored in the `c` matrix, which can be used or displayed after synchronizing the device.
+
+Output 8:
+Here is the C and CUDA implementation of the GEMM operation based on the subroutine given in Fortran with OpenMP:
+
+C Implementation:
+```c
+#include <stdio.h>
+
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+    #pragma omp parallel for
+    for (int j = 0; j < n; j++) {
+        for (int i = 0; i < m; i++) {
+            double temp = 0.0;
+            for (int l = 0; l < k; l++) {
+                temp += a[i*lda + l] * b[l*ldb + j];
+            }
+            c[i*ldc + j] = alpha * temp + beta * c[i*ldc + j];
+        }
+    }
+}
+
+int main() {
+    int m = 3, n = 2, k = 4;
+    double alpha = 1.0, beta = 0.0;
+    double a[3][4] = {{1.0, 2.0, 3.0, 4.0}, {5.0, 6.0, 7.0, 8.0}, {9.0, 10.0, 11.0, 12.0}};
+    double b[4][2] = {{1.0, 2.0}, {3.0, 4.0}, {5.0, 6.0}, {7.0, 8.0}};
+    double c[3][2] = {{0.0, 0.0}, {0.0, 0.0}, {0.0, 0.0}};
+
+    gemm_parallel(m, n, k, alpha, &a[0][0], k, &b[0][0], n, beta, &c[0][0], n);
+
+    printf("Resultant matrix C:\n");
+    for (int i = 0; i < m; i++) {
+        for (int j = 0; j < n; j++) {
+            printf("%0.1f ", c[i][j]);
+        }
+        printf("\n");
+    }
+
+    return 0;
+}
+```
+
+CUDA Implementation:
+```c
+#include <stdio.h>
+
+__global__ void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    
+    if(i < m && j < n) {
+        double temp = 0.0;
+        for (int l = 0; l < k; l++) {
+            temp += a[i*lda + l] * b[l*ldb + j];
+        }
+        c[i*ldc + j] = alpha * temp + beta * c[i*ldc + j];
+    }
+}
+
+int main() {
+    int m = 3, n = 2, k = 4;
+    double alpha = 1.0, beta = 0.0;
+    double a[3][4] = {{1.0, 2.0, 3.0, 4.0}, {5.0, 6.0, 7.0, 8.0}, {9.0, 10.0, 11.0, 12.0}};
+    double b[4][2] = {{1.0, 2.0}, {3.0, 4.0}, {5.0, 6.0}, {7.0, 8.0}};
+    double c[3][2] = {{0.0, 0.0}, {0.0, 0.0}, {0.0, 0.0}};
+    double *d_a, *d_b, *d_c;
+
+    cudaMalloc(&d_a, m*k*sizeof(double));
+    cudaMalloc(&d_b, k*n*sizeof(double));
+    cudaMalloc(&d_c, m*n*sizeof(double));
+
+    cudaMemcpy(d_a, &a[0][0], m*k*sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_b, &b[0][0], k*n*sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_c, &c[0][0], m*n*sizeof(double), cudaMemcpyHostToDevice);
+
+    dim3 threadsPerBlock(8, 8);
+    dim3 numBlocks((m + threadsPerBlock.x - 1) / threadsPerBlock.x, (n + threadsPerBlock.y - 1) / threadsPerBlock.y);
+
+    gemm_parallel<<<numBlocks, threadsPerBlock>>>(m, n, k, alpha, d_a, k, d_b, n, beta, d_c, n);
+
+    cudaMemcpy(&c[0][0], d_c, m*n*sizeof(double), cudaMemcpyDeviceToHost);
+
+    cudaFree(d_a);
+    cudaFree(d_b);
+    cudaFree(d_c);
+
+    printf("Resultant matrix C:\n");
+    for (int i = 0; i < m; i++) {
+        for (int j = 0; j < n; j++) {
+            printf("%0.1f ", c[i][j]);
+        }
+        printf("\n");
+    }
+
+    return 0;
+}
+```
+
+Note: The CUDA implementation requires a CUDA-enabled GPU and the CUDA toolkit to compile and run.
+
+Output 9:
+Here is the equivalent function implemented in C and CUDA:
+
+```c
+#include <stdio.h>
+
+__global__ void gemm_kernel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    
+    if (i < m && j < n) {
+        double temp = 0.0;
+        for (int l = 0; l < k; l++) {
+            temp += a[i * lda + l] * b[l * ldb + j];
+        }
+        c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+    }
+}
+
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+    int size_a = lda * k;
+    int size_b = ldb * n;
+    int size_c = ldc * n;
+
+    double *d_a, *d_b, *d_c;
+    cudaMalloc(&d_a, sizeof(double) * size_a);
+    cudaMalloc(&d_b, sizeof(double) * size_b);
+    cudaMalloc(&d_c, sizeof(double) * size_c);
+
+    cudaMemcpy(d_a, a, sizeof(double) * size_a, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_b, b, sizeof(double) * size_b, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_c, c, sizeof(double) * size_c, cudaMemcpyHostToDevice);
+
+    dim3 blockSize(16, 16);
+    dim3 gridSize((m + blockSize.x - 1) / blockSize.x, (n + blockSize.y - 1) / blockSize.y);
+    
+    gemm_kernel <<<gridSize, blockSize>>> (m, n, k, alpha, d_a, lda, d_b, ldb, beta, d_c, ldc);
+
+    cudaMemcpy(c, d_c, sizeof(double) * size_c, cudaMemcpyDeviceToHost);
+
+    cudaFree(d_a);
+    cudaFree(d_b);
+    cudaFree(d_c);
+}
+
+int main() {
+    int m = 3, n = 3, k = 3, lda = 3, ldb = 3, ldc = 3;
+    double alpha = 1.0, beta = 0.0;
+    double a[3][3] = {{1.0, 2.0, 3.0}, {4.0, 5.0, 6.0}, {7.0, 8.0, 9.0}};
+    double b[3][3] = {{1.0, 2.0, 3.0}, {4.0, 5.0, 6.0}, {7.0, 8.0, 9.0}};
+    double c[3][3] = {{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}};
+
+    gemm_parallel(m, n, k, alpha, (double *)a, lda, (double *)b, ldb, beta, (double *)c, ldc);
+
+    printf("Result:\n");
+    for (int i = 0; i < m; i++) {
+        for (int j = 0; j < n; j++) {
+            printf("%f ", c[i][j]);
+        }
+        printf("\n");
+    }
+
+    return 0;
+}
+``` 
+
+This C code implements a GEMM operation using CUDA parallel processing. The main function initializes matrices A and B, calls the `gemm_parallel` function, and then prints the result matrix C.
+
+Output 10:
+```c
+#include <stdio.h>
+#include <stdlib.h>
+
+// Kernel function for GEMM operation
+__global__ void gemm_kernel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if (i < m && j < n) {
+        double temp = 0.0;
+        for (int l = 0; l < k; l++) {
+            temp += a[i * lda + l] * b[l * ldb + j];
+        }
+        c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+    }
+}
+
+// Wrapper function for GEMM operation
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+    double *d_a, *d_b, *d_c;
+    cudaMalloc(&d_a, m * k * sizeof(double));
+    cudaMalloc(&d_b, k * n * sizeof(double));
+    cudaMalloc(&d_c, m * n * sizeof(double));
+
+    cudaMemcpy(d_a, a, m * k * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_b, b, k * n * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_c, c, m * n * sizeof(double), cudaMemcpyHostToDevice);
+
+    dim3 block(16, 16);
+    dim3 grid((m + block.x - 1) / block.x, (n + block.y - 1) / block.y);
+
+    gemm_kernel<<<grid, block>>>(m, n, k, alpha, d_a, lda, d_b, ldb, beta, d_c, ldc);
+
+    cudaMemcpy(c, d_c, m * n * sizeof(double), cudaMemcpyDeviceToHost);
+
+    cudaFree(d_a);
+    cudaFree(d_b);
+    cudaFree(d_c);
+}
+```
+

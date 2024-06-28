@@ -1,0 +1,143 @@
+Code Block 1:
+void spmv_parallel(int n, int nnz, float* val, int* row, int* col, float* x, float* y) {
+    int i, j;
+
+    // OpenACC parallel region
+    #pragma acc parallel loop copyin(val[0:nnz], row[0:n+1], col[0:nnz], x[0:n]) copyout(y[0:n])
+    for (i = 0; i < n; ++i) {
+        y[i] = 0.0;
+        
+        #pragma acc loop reduction(+:y[i])
+        for (j = row[i]; j < row[i+1]; ++j) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+
+Code Block 2:
+void spmv_parallel(int n, int nnz, const float *val, const int *row, const int *col, const float *x, float *y) {
+    int i, j;
+
+    #pragma acc parallel loop present(val[0:nnz], row[0:n+1], col[0:nnz], x[0:n], y[0:n])
+    for (i = 0; i < n; i++) {
+        y[i] = 0.0f;
+        #pragma acc loop reduction(+:y[i])
+        for (j = row[i]; j < row[i+1]; j++) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+
+Code Block 3:
+void spmv_parallel(int n, int nnz, const float *val, const int *row, const int *col, const float *x, float *y) {
+    int i, j;
+
+    #pragma acc parallel loop present(val[0:nnz], row[0:n+1], col[0:nnz], x[0:n], y[0:n])
+    for (i = 0; i < n; i++) {
+        y[i] = 0.0f;
+        #pragma acc loop seq
+        for (j = row[i]; j < row[i + 1]; j++) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+
+Code Block 4:
+void spmv_parallel(int n, int nnz, const float *val, const int *row, const int *col, const float *x, float *y) {
+    int i, j;
+    #pragma acc parallel loop present(val[0:nnz], row[0:n+1], col[0:nnz], x[0:n], y[0:n]) private(i, j)
+    for (i = 0; i < n; i++) {
+        float sum = 0.0;
+        for (j = row[i]; j < row[i + 1]; j++) {
+            sum += val[j] * x[col[j]];
+        }
+        y[i] = sum;
+    }
+}
+
+Code Block 5:
+void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    // OpenACC parallel directive to distribute the loop iterations across multiple threads
+    #pragma acc parallel loop copyin(val[0:nnz], row[0:n+1], col[0:nnz], x[0:n]) copyout(y[0:n])
+    for (int i = 0; i < n; i++) {
+        y[i] = 0.0f; // Initialize y[i]
+
+        // Inner loop to perform the multiplication and summation
+        #pragma acc loop
+        for (int j = row[i]; j < row[i + 1]; j++) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+
+Code Block 6:
+void spmv_parallel(int n, int nnz, const float *val, const int *row, const int *col, const float *x, float *y) {
+    int i, j;
+
+    #pragma acc parallel loop present(val[0:nnz], row[0:n+1], col[0:nnz], x[0:n], y[0:n])
+    for (i = 0; i < n; i++) {
+        float sum = 0.0f;
+        #pragma acc loop reduction(+:sum)
+        for (j = row[i]; j < row[i+1]; j++) {
+            sum += val[j] * x[col[j]];
+        }
+        y[i] = sum;
+    }
+}
+
+Code Block 7:
+y
+    for (int i = 0; i < n; ++i) {
+        y[i] = 0.0f;
+    }
+
+Code Block 8:
+void spmv_parallel(int n, int nnz, const float *val, const int *row, const int *col, const float *x, float *y) {
+    int i, j;
+
+    // Initialize output vector y
+    #pragma acc parallel loop copyin(val[0:nnz], row[0:n+1], col[0:nnz], x[0:n]) copyout(y[0:n])
+    for (i = 0; i < n; ++i) {
+        y[i] = 0.0;
+    }
+
+    // Perform the SpMV operation
+    #pragma acc parallel loop copyin(val[0:nnz], row[0:n+1], col[0:nnz], x[0:n]) copy(y[0:n]) private(j)
+    for (i = 0; i < n; ++i) {
+        for (j = row[i]; j < row[i+1]; ++j) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+
+Code Block 9:
+void spmv_parallel(int n, int nnz, const float *val, const int *row, const int *col, const float *x, float *y) {
+    #pragma acc parallel loop gang vector present(val, row, col, x, y)
+    for (int i = 0; i < n; i++) {
+        y[i] = 0.0;
+        #pragma acc loop vector
+        for (int j = row[i]; j < row[i+1]; j++) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+
+Code Block 10:
+void spmv_parallel(int n, int nnz, const float *val, const int *row, const int *col, const float *x, float *y) {
+    int i, j;
+
+    // Initialize the output vector y to zero
+    for (i = 0; i < n; i++) {
+        y[i] = 0.0;
+    }
+
+    // Use OpenACC parallel loop to perform the SpMV
+    #pragma acc parallel loop present(val[0:nnz], row[0:n+1], col[0:nnz], x[0:n], y[0:n])
+    for (i = 0; i < n; i++) {
+        #pragma acc loop seq
+        for (j = row[i]; j < row[i + 1]; j++) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+

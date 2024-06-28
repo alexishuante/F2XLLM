@@ -1,0 +1,282 @@
+Code Block 1:
+void jacobi_parallel(double *u, double *unew, int n, int niter, int nthreads) {
+    int i, j, k, iter;
+    #pragma omp parallel num_threads(nthreads) private(i, j, k, iter)
+    {
+        for (iter = 0; iter < niter; iter++) {
+            #pragma omp for schedule(static)
+            for (k = 1; k < n - 1; k++) {
+                for (j = 1; j < n - 1; j++) {
+                    for (i = 1; i < n - 1; i++) {
+                        unew[i + j*n + k*n*n] = 0.125 * (u[(i-1) + j*n + k*n*n] + u[(i+1) + j*n + k*n*n] + u[i + (j-1)*n + k*n*n] +
+                            u[i + (j+1)*n + k*n*n] + u[i + j*n + (k-1)*n*n] + u[i + j*n + (k+1)*n*n] + u[i + j*n + k*n*n]);
+                    }
+                }
+            }
+
+            #pragma omp barrier
+
+            #pragma omp for
+            for (int idx = 0; idx < n*n*n; idx++) {
+                u[idx] = unew[idx];
+            }
+        }
+    }
+}
+
+Code Block 2:
+void jacobi_parallel(double* u, double* unew, int n, int niter, int nthreads) {
+    int i, j, k, iter;
+    hipLaunchKernelGGL(kernel, dim3((n-2)/16+1, (n-2)/16+1, (n-2)/8+1), dim3(16, 16, 8), 0, 0, u, unew, n);
+
+    for(iter = 0; iter < niter; iter++) {
+        hipLaunchKernelGGL(jacobi_kernel, dim3((n-2)/16+1, (n-2)/16+1, (n-2)/8+1), dim3(16, 16, 8), 0, 0, u, unew, n);
+
+        hipDeviceSynchronize();
+        cudaMemcpy(u, unew, n*n*n*sizeof(double), hipMemcpyDeviceToDevice);
+    }
+}
+
+Code Block 3:
+void jacobi(double *u, double *unew, int n, int niter, int nthreads) {
+    double *d_u, *d_unew;
+    size_t size = n * n * n * sizeof(double);
+
+    hipMalloc(&d_u, size);
+    hipMalloc(&d_unew, size);
+    
+    hipMemcpy(d_u, u, size, hipMemcpyHostToDevice);
+
+    dim3 block(16, 16, 16);
+    dim3 grid((n+block.x-1)/block.x, (n+block.y-1)/block.y, (n+block.z-1)/block.z);
+
+    for (int iter = 0; iter < niter; iter++) {
+        jacobi_parallel<<<grid, block>>>(d_u, d_unew, n);
+        hipDeviceSynchronize();
+        
+        hipMemcpy(u, d_u, size, hipMemcpyDeviceToHost);
+    }
+
+    hipFree(d_u);
+    hipFree(d_unew);
+}
+
+__global__ void jacobi_parallel(double *u, double *unew, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    int k = blockIdx.z * blockDim.z + threadIdx.z;
+
+    if (i > 0 && i < n - 1 && j > 0 && j < n - 1 && k > 0 && k < n - 1) {
+        unew[i + j*n + k*n*n] = 0.125 * (u[(i-1) + j*n + k*n*n] + u[(i+1) + j*n + k*n*n] +
+                                          u[i + (j-1)*n + k*n*n] + u[i + (j+1)*n + k*n*n] +
+                                          u[i + j*n + (k-1)*n*n] + u[i + j*n + (k+1)*n*n] +
+                                          u[i + j*n + k*n*n]);
+    }
+}
+
+Code Block 4:
+void jacobi(double *u, double *unew, int n, int niter, int nthreads) {
+    double *d_u, *d_unew;
+    int size = n * n * n * sizeof(double);
+    
+    hipMalloc(&d_u, size);
+    hipMalloc(&d_unew, size);
+    
+    hipMemcpy(d_u, u, size, hipMemcpyHostToDevice);
+    
+    dim3 blockDim(32, 32, 1);
+    dim3 gridDim((n + blockDim.x - 1) / blockDim.x, (n + blockDim.y - 1) / blockDim.y, (n + blockDim.z - 1) / blockDim.z);
+    
+    for (int iter = 0; iter < niter; iter++) {
+        jacobi_parallel<<<gridDim, blockDim>>>(d_u, d_unew, n);
+        hipMemcpy(unew, d_unew, size, hipMemcpyDeviceToHost);
+        hipMemcpy(d_u, unew, size, hipMemcpyHostToDevice);
+    }
+    
+    hipFree(d_u);
+    hipFree(d_unew);
+}
+
+__global__ void jacobi_parallel(double *u, double *unew, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    int k = blockIdx.z * blockDim.z + threadIdx.z;
+    
+    if (i > 0 && i < n-1 && j > 0 && j < n-1 && k > 0 && k < n-1) {
+        unew[i + j*n + k*n*n] = 0.125 * (u[(i-1) + j*n + k*n*n] + u[(i+1) + j*n + k*n*n] + 
+                                         u[i + (j-1)*n + k*n*n] + u[i + (j+1)*n + k*n*n] +
+                                         u[i + j*n + (k-1)*n*n] + u[i + j*n + (k+1)*n*n] +
+                                         u[i + j*n + k*n*n]);
+    }
+}
+
+Code Block 5:
+void jacobi_parallel(double* u, double* unew, int n, int niter, int nthreads) {
+    double *d_u, *d_unew;
+    int size = n * n * n * sizeof(double);
+
+    // Allocate device memory
+    hipMalloc(&d_u, size);
+    hipMalloc(&d_unew, size);
+
+    // Copy data to device
+    hipMemcpy(d_u, u, size, hipMemcpyHostToDevice);
+
+    // Define execution configuration
+    dim3 block(BLOCK_SIZE_X, BLOCK_SIZE_Y, BLOCK_SIZE_Z);
+    dim3 grid((n + BLOCK_SIZE_X - 1) / BLOCK_SIZE_X, (n + BLOCK_SIZE_Y - 1) / BLOCK_SIZE_Y, (n + BLOCK_SIZE_Z - 1) / BLOCK_SIZE_Z);
+
+    // Perform Jacobi iteration on device
+    for (int iter = 0; iter < niter; iter++) {
+        jacobi_kernel<<<grid, block>>>(d_u, d_unew, n);
+        hipMemcpy(u, unew, size, hipMemcpyDeviceToDevice);
+        hipDeviceSynchronize();
+    }
+
+    // Copy result back to host
+    hipMemcpy(u, d_u, size, hipMemcpyDeviceToHost);
+
+    // Free device memory
+    hipFree(d_u);
+    hipFree(d_unew);
+}
+
+__global__ void jacobi_kernel(double* u, double* unew, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    int k = blockIdx.z * blockDim.z + threadIdx.z;
+
+    if (i > 0 && i < n - 1 && j > 0 && j < n - 1 && k > 0 && k < n - 1) {
+        int idx = i + j*n + k*n*n;
+        unew[idx] = 0.125 * (u[idx - 1] + u[idx + 1] + u[idx - n] + u[idx + n] + u[idx - n*n] + u[idx + n*n] + u[idx]);
+    }
+}
+
+Code Block 6:
+void jacobi_parallel(double *u, double *unew, int n, int niter, int nthreads) {
+    int i, j, k, iter;
+    #pragma omp parallel num_threads(nthreads) private(i, j, k, iter)
+    {
+        for(iter = 0; iter < niter; iter++) {
+            #pragma omp for schedule(static)
+            for(k = 1; k < n - 1; k++) {
+                for(j = 1; j < n - 1; j++) {
+                    for(i = 1; i < n - 1; i++) {
+                        unew[i + j*n + k*n*n] = 0.125 * (u[(i-1) + j*n + k*n*n] + u[(i+1) + j*n + k*n*n] + u[i + (j-1)*n + k*n*n] 
+                            + u[i + (j+1)*n + k*n*n] + u[i + j*n + (k-1)*n*n] + u[i + j*n + (k+1)*n*n] + u[i + j*n + k*n*n]);
+                    }
+                }
+            }
+            #pragma omp barrier
+            #pragma omp single
+            {
+                memcpy(u, unew, sizeof(double) * n * n * n);
+            }
+        }
+    }
+}
+
+Code Block 7:
+void jacobi_parallel(float *u, float *unew, int n, int niter, int nthreads) {
+    int i, j, k, iter;
+    hipStream_t stream;
+    hipStreamCreate(&stream);
+
+    for(iter = 0; iter < niter; iter++) {
+        for(k = 1; k < n - 1; k++) {
+            for(j = 1; j < n - 1; j++) {
+                for(i = 1; i < n - 1; i++) {
+                    int index = i + j * n + k * n * n;
+                    unew[index] = 0.125f * (u[index - n] + u[index + n] +
+                                            u[index - n * n] + u[index + n * n] +
+                                            u[index - 1] + u[index + 1] + u[index]);
+                }
+            }
+        }
+        
+        hipMemcpy(u, unew, n * n * n * sizeof(float), hipMemcpyDeviceToDevice);
+    }
+    
+    hipStreamDestroy(stream);
+}
+
+Code Block 8:
+void jacobi_parallel(double *u, double *unew, int n, int niter, int nthreads) {
+    double *d_u, *d_unew;
+    hipMalloc(&d_u, n * n * n * sizeof(double));
+    hipMalloc(&d_unew, n * n * n * sizeof(double));
+    
+    hipMemcpy(d_u, u, n * n * n * sizeof(double), hipMemcpyHostToDevice);
+
+    dim3 blockSize(16, 16, 16);
+    dim3 gridSize((n + blockSize.x - 1) / blockSize.x, (n + blockSize.y - 1) / blockSize.y, (n + blockSize.z - 1) / blockSize.z);
+
+    for (int iter = 0; iter < niter; iter++) {
+        jacobi_parallel_kernel<<<gridSize, blockSize>>>(d_u, d_unew, n);
+        
+        hipMemcpy(d_unew, d_u, n * n * n * sizeof(double), hipMemcpyDeviceToDevice);
+    }
+
+    hipMemcpy(u, d_u, n * n * n * sizeof(double), hipMemcpyDeviceToHost);
+
+    hipFree(d_u);
+    hipFree(d_unew);
+}
+
+__global__ void jacobi_parallel_kernel(double *u, double *unew, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    int k = blockIdx.z * blockDim.z + threadIdx.z;
+
+    if (i < n && j < n && k < n && i > 0 && j > 0 && k > 0 && i < n - 1 && j < n - 1 && k < n - 1) {
+        unew[i + n * (j + n * k)] = 0.125 * (u[(i-1) + n * (j + n * k)] + u[(i+1) + n * (j + n * k)] 
+                                          + u[i + n * ((j-1) + n * k)] + u[i + n * ((j+1) + n * k)] 
+                                          + u[i + n * (j + n * (k-1))] + u[i + n * (j + n * (k+1))] 
+                                          + u[i + n * (j + n * k)]);
+    }
+}
+
+Code Block 9:
+void jacobi_parallel(double *u, double *unew, int n, int niter, int nthreads) {
+    int i, j, k, iter;
+
+    for(iter = 0; iter < niter; iter++) {
+        hipLaunchKernelGGL([=] __device__(int i, int j, int k) {
+            unew[i + n*j + n*n*k] = 0.125 * (u[(i-1) + n*j + n*n*k] + u[(i+1) + n*j + n*n*k] + u[i + n*(j-1) + n*n*k] 
+                + u[i + n*(j+1) + n*n*k] + u[i + n*j + n*n*(k-1)] + u[i + n*j + n*n*(k+1)] + u[i + n*j + n*n*k]);
+        }, dim3(n-2, n-2, n-2), dim3(1, 1, 1));
+        
+        hipDeviceSynchronize();
+        
+        hipLaunchKernelGGL([=] __device__(int i, int j, int k) {
+            u[i + n*j + n*n*k] = unew[i + n*j + n*n*k];
+        }, dim3(n, n, n), dim3(1, 1, 1));
+        
+        hipDeviceSynchronize();
+    }
+}
+
+Code Block 10:
+void jacobi_parallel(double *u, double *unew, int n, int niter, int nthreads) {
+    int i, j, k, iter;
+    #pragma omp parallel num_threads(nthreads) private(i, j, k, iter)
+    {
+        for (iter = 0; iter < niter; iter++) {
+            #pragma omp for schedule(static)
+            for (k = 1; k < n - 1; k++) {
+                for (j = 1; j < n - 1; j++) {
+                    for (i = 1; i < n - 1; i++) {
+                        unew[i + j*n + k*n*n] = 0.125 * (u[(i-1) + j*n + k*n*n] + u[(i+1) + j*n + k*n*n] + u[i + (j-1)*n + k*n*n] 
+                                                        + u[i + (j+1)*n + k*n*n] + u[i + j*n + (k-1)*n*n] + u[i + j*n + (k+1)*n*n] + u[i + j*n + k*n*n]);
+                    }
+                }
+            }
+            #pragma omp barrier
+            #pragma omp for schedule(static)
+            for (int l = 0; l < n*n*n; l++) {
+                u[l] = unew[l];
+            }
+        }
+    }
+}
+

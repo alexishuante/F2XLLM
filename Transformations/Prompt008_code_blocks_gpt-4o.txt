@@ -1,0 +1,325 @@
+Code Block 1:
+void jacobi_parallel(double ***u, double ***unew, int n, int niter) {
+    int i, j, k, iter;
+
+    for (iter = 0; iter < niter; iter++) {
+        #pragma omp parallel for collapse(3) private(i, j, k)
+        for (k = 1; k < n - 1; k++) {
+            for (j = 1; j < n - 1; j++) {
+                for (i = 1; i < n - 1; i++) {
+                    unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] +
+                                             u[i][j-1][k] + u[i][j+1][k] +
+                                             u[i][j][k-1] + u[i][j][k+1] +
+                                             u[i][j][k]);
+                }
+            }
+        }
+
+        // Update the u array with the new values
+        #pragma omp parallel for collapse(3)
+        for (k = 0; k < n; k++) {
+            for (j = 0; j < n; j++) {
+                for (i = 0; i < n; i++) {
+                    u[i][j][k] = unew[i][j][k];
+                }
+            }
+        }
+    }
+}
+
+Code Block 2:
+void jacobi_parallel(double ***u, double ***unew, int n, int niter) {
+    int i, j, k, iter;
+
+    for (iter = 1; iter <= niter; iter++) {
+        #pragma omp parallel for collapse(3) private(i, j, k)
+        for (k = 1; k < n - 1; k++) {
+            for (j = 1; j < n - 1; j++) {
+                for (i = 1; i < n - 1; i++) {
+                    unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] + 
+                                             u[i][j-1][k] + u[i][j+1][k] + 
+                                             u[i][j][k-1] + u[i][j][k+1] + 
+                                             u[i][j][k]);
+                }
+            }
+        }
+        // Update u with the contents of unew
+        #pragma omp parallel for collapse(3) private(i, j, k)
+        for (k = 0; k < n; k++) {
+            for (j = 0; j < n; j++) {
+                for (i = 0; i < n; i++) {
+                    u[i][j][k] = unew[i][j][k];
+                }
+            }
+        }
+    }
+}
+
+Code Block 3:
+void jacobi_parallel(double ***u, double ***unew, int n, int niter) {
+    int iter, i, j, k;
+
+    for (iter = 0; iter < niter; iter++) {
+        #pragma omp parallel for collapse(3) private(i, j, k)
+        for (k = 1; k < n - 1; k++) {
+            for (j = 1; j < n - 1; j++) {
+                for (i = 1; i < n - 1; i++) {
+                    unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] +
+                                             u[i][j-1][k] + u[i][j+1][k] +
+                                             u[i][j][k-1] + u[i][j][k+1] +
+                                             u[i][j][k]);
+                }
+            }
+        }
+
+        #pragma omp parallel for collapse(3) private(i, j, k)
+        for (k = 0; k < n; k++) {
+            for (j = 0; j < n; j++) {
+                for (i = 0; i < n; i++) {
+                    u[i][j][k] = unew[i][j][k];
+                }
+            }
+        }
+    }
+}
+
+Code Block 4:
+void jacobi_parallel(double *u, double *unew, int n, int niter) {
+    int i, j, k, iter;
+
+    // Ensure we handle the 3D array indexing correctly
+    #define U(i, j, k) u[(i) * n * n + (j) * n + (k)]
+    #define UNEW(i, j, k) unew[(i) * n * n + (j) * n + (k)]
+
+    for (iter = 1; iter <= niter; ++iter) {
+        // Parallelize the loops with OpenMP
+        #pragma omp parallel for collapse(3) private(i, j, k) shared(u, unew)
+        for (k = 1; k < n-1; ++k) {
+            for (j = 1; j < n-1; ++j) {
+                for (i = 1; i < n-1; ++i) {
+                    UNEW(i, j, k) = 0.125 * (U(i-1, j, k) + U(i+1, j, k) + 
+                                             U(i, j-1, k) + U(i, j+1, k) + 
+                                             U(i, j, k-1) + U(i, j, k+1) + 
+                                             U(i, j, k));
+                }
+            }
+        }
+
+        // Update the old array with the new values
+        #pragma omp parallel for collapse(3) private(i, j, k) shared(u, unew)
+        for (k = 0; k < n; ++k) {
+            for (j = 0; j < n; ++j) {
+                for (i = 0; i < n; ++i) {
+                    U(i, j, k) = UNEW(i, j, k);
+                }
+            }
+        }
+    }
+    
+    // Undefine the macros to avoid potential conflicts elsewhere
+    #undef U
+    #undef UNEW
+}
+
+Code Block 5:
+void jacobi_parallel(double ***u, double ***unew, int n, int niter) {
+    int i, j, k, iter;
+
+    #pragma omp parallel for private(i, j, k) collapse(3)
+    for (iter = 0; iter < niter; iter++) {
+        for (k = 1; k < n - 1; k++) {
+            for (j = 1; j < n - 1; j++) {
+                for (i = 1; i < n - 1; i++) {
+                    unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] +
+                                             u[i][j-1][k] + u[i][j+1][k] +
+                                             u[i][j][k-1] + u[i][j][k+1] + 
+                                             u[i][j][k]);
+                }
+            }
+        }
+
+        #pragma omp parallel for private(i, j, k) collapse(3)
+        for (k = 1; k < n - 1; k++) {
+            for (j = 1; j < n - 1; j++) {
+                for (i = 1; i < n - 1; i++) {
+                    u[i][j][k] = unew[i][j][k];
+                }
+            }
+        }
+    }
+}
+
+Code Block 6:
+void jacobi_parallel(double *u, double *unew, int n, int niter) {
+    int i, j, k, iter;
+
+    #pragma omp parallel private(i, j, k, iter)
+    {
+        for (iter = 1; iter <= niter; iter++) {
+            #pragma omp for collapse(3)
+            for (k = 1; k < n - 1; k++) {
+                for (j = 1; j < n - 1; j++) {
+                    for (i = 1; i < n - 1; i++) {
+                        unew[i*n*n + j*n + k] = 0.125 * (
+                            u[(i-1)*n*n + j*n + k] +
+                            u[(i+1)*n*n + j*n + k] +
+                            u[i*n*n + (j-1)*n + k] +
+                            u[i*n*n + (j+1)*n + k] +
+                            u[i*n*n + j*n + (k-1)] +
+                            u[i*n*n + j*n + (k+1)] +
+                            u[i*n*n + j*n + k]
+                        );
+                    }
+                }
+            }
+
+            #pragma omp for collapse(3)
+            for (k = 1; k < n - 1; k++) {
+                for (j = 1; j < n - 1; j++) {
+                    for (i = 1; i < n - 1; i++) {
+                        u[i*n*n + j*n + k] = unew[i*n*n + j*n + k];
+                    }
+                }
+            }
+        }
+    }
+}
+
+Code Block 7:
+void jacobi_parallel(double ***u, double ***unew, int n, int niter) {
+    int i, j, k, iter;
+
+    for (iter = 0; iter < niter; ++iter) {
+        #pragma omp parallel for collapse(3) private(i, j, k)
+        for (k = 1; k < n - 1; ++k) {
+            for (j = 1; j < n - 1; ++j) {
+                for (i = 1; i < n - 1; ++i) {
+                    unew[i][j][k] = 0.125 * (u[i - 1][j][k] + u[i + 1][j][k] +
+                                             u[i][j - 1][k] + u[i][j + 1][k] +
+                                             u[i][j][k - 1] + u[i][j][k + 1] +
+                                             u[i][j][k]);
+                }
+            }
+        }
+
+        // Copy unew to u
+        #pragma omp parallel for collapse(3) private(i, j, k)
+        for (k = 0; k < n; ++k) {
+            for (j = 0; j < n; ++j) {
+                for (i = 0; i < n; ++i) {
+                    u[i][j][k] = unew[i][j][k];
+                }
+            }
+        }
+    }
+}
+
+Code Block 8:
+void jacobi_parallel(double *u, double *unew, int n, int niter) {
+    int i, j, k, iter;
+
+    #pragma omp parallel private(i, j, k, iter)
+    {
+        for (iter = 1; iter <= niter; iter++) {
+            #pragma omp for collapse(3)
+            for (k = 1; k < n - 1; k++) {
+                for (j = 1; j < n - 1; j++) {
+                    for (i = 1; i < n - 1; i++) {
+                        int idx = i + n * (j + n * k);
+                        int idx_im1 = (i - 1) + n * (j + n * k);
+                        int idx_ip1 = (i + 1) + n * (j + n * k);
+                        int idx_jm1 = i + n * ((j - 1) + n * k);
+                        int idx_jp1 = i + n * ((j + 1) + n * k);
+                        int idx_km1 = i + n * (j + n * (k - 1));
+                        int idx_kp1 = i + n * (j + n * (k + 1));
+                        unew[idx] = 0.125 * (u[idx_im1] + u[idx_ip1] + u[idx_jm1] +
+                                            u[idx_jp1] + u[idx_km1] + u[idx_kp1] + u[idx]);
+                    }
+                }
+            }
+
+            #pragma omp single
+            {
+                for (k = 1; k < n - 1; k++) {
+                    for (j = 1; j < n - 1; j++) {
+                        for (i = 1; i < n - 1; i++) {
+                            int idx = i + n * (j + n * k);
+                            u[idx] = unew[idx];
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+Code Block 9:
+void jacobi_parallel(double ***u, double ***unew, int n, int niter) {
+    int i, j, k, iter;
+
+    // Main iteration loop
+    for (iter = 0; iter < niter; iter++) {
+        // Parallel region with OpenMP 3D collapse
+        #pragma omp parallel for collapse(3) private(i, j, k)
+        for (k = 1; k < n - 1; k++) {
+            for (j = 1; j < n - 1; j++) {
+                for (i = 1; i < n - 1; i++) {
+                    unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] +
+                                             u[i][j-1][k] + u[i][j+1][k] +
+                                             u[i][j][k-1] + u[i][j][k+1] +
+                                             u[i][j][k]);
+                }
+            }
+        }
+        
+        // Copy unew to u
+        #pragma omp parallel for collapse(3)
+        for (k = 0; k < n; k++) {
+            for (j = 0; j < n; j++) {
+                for (i = 0; i < n; i++) {
+                    u[i][j][k] = unew[i][j][k];
+                }
+            }
+        }
+    }
+}
+
+Code Block 10:
+void jacobi_parallel(double ***u, double ***unew, int n, int niter) {
+    int i, j, k, iter;
+
+    // Allocating arrays if not already allocated
+    // Assuming u and unew are already allocated as [n][n][n]
+
+    #pragma omp parallel private(i, j, k, iter)
+    {
+        for (iter = 1; iter <= niter; iter++) {
+            // Parallelizing the nested loops using OpenMP
+            #pragma omp for collapse(3)
+            for (k = 1; k < n - 1; k++) {
+                for (j = 1; j < n - 1; j++) {
+                    for (i = 1; i < n - 1; i++) {
+                        unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] + 
+                                                 u[i][j-1][k] + u[i][j+1][k] + 
+                                                 u[i][j][k-1] + u[i][j][k+1] + 
+                                                 u[i][j][k]);
+                    }
+                }
+            }
+            
+            // Synchronize threads
+            #pragma omp barrier
+            
+            // Copy new values into the old array in parallel
+            #pragma omp for collapse(3)
+            for (k = 0; k < n; k++) {
+                for (j = 0; j < n; j++) {
+                    for (i = 0; i < n; i++) {
+                        u[i][j][k] = unew[i][j][k];
+                    }
+                }
+            }
+        }
+    }
+}
+
