@@ -4,7 +4,7 @@ from io import open
 import os
 
 # Assuming the source file contains the functions as provided
-source_file_path = 'functions.cpp'
+# source_file_path = 'functions.cpp'
 libraries_needed = """
 #include <stdio.h>
 #include <stdlib.h>
@@ -35,11 +35,41 @@ axpy_code_template_after_call = """(n, a, x, y);
     return 0;
 }
 """
+
+
+
 gemv_code_template_before_call = """
 
+int main() {
+    const int n = 15;
+    float A[n][n], x[n], y[n];
 
+    // Initialize the matrix and vectors
+    for (int i = 0; i < n; ++i) {
+        x[i] = 5.0; // Initialize x to 5.0
+        y[i] = 0.0; // Initialize y to 0.0
+        for (int j = 0; j < n; ++j) {
+            A[i][j] = 3.0; // Initialize A to 3.0
+        }
+    }
+
+    // Call the gemv_parallel function
 
 """
+
+gemv_code_template_after_call = """(n, (const float *)A, x, y);
+
+    // Print the results
+    for (int i = 0; i < n; ++i) {
+        std::cout << "y(" << i + 1 << ") = " << y[i] << std::endl;
+    }
+
+    return 0;
+}
+
+"""
+
+
 
 expected_output = "expected_output.txt"
 test_file_prefix = "Test"
@@ -67,6 +97,8 @@ def parse_functions(file_path):
     
     return functions
 
+error_per_test = []
+
 # Function to compile, execute, and verify test file
 def compile_execute_verify(file_path):
     compile_command = 'g++ -fopenmp ' + file_path + ' -o ' + file_path[:-2]
@@ -74,18 +106,21 @@ def compile_execute_verify(file_path):
     process = subprocess.Popen(compile_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = process.communicate()
     if process.returncode != 0:
-        return False, 'Compilation Failed'
+        error_message = stderr.decode('utf-8')  # Decode stderr to a string
+        error_per_test.append(error_message)  # Append error message to error_per_test
+        return False, 'Compilation Failed: ' + error_message
+    error_per_test.append(stdout.decode('utf-8'))  # Decode and append stdout to error_per_test
+    # print('error_per_test: ' + str(error_per_test))
     
     # Execute the compiled program
     run_command = './' + file_path[:-2]
     process = subprocess.Popen(run_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
     stdout, stderr = process.communicate()
-    output = stdout 
-       
+    output = stdout
+    
     # Compare output
     with open(expected_output, 'r') as expected_file:
         expected = expected_file.read().strip()
-        # print('output: ' + output.strip() + ' expected: ' + expected) 
     if output.strip() == expected:
         return True, 'Output Correct'
     else:
@@ -97,38 +132,48 @@ def print_test_file(file_path):
         # Read the contents of the file
         content = file.read()
     
-# Initialize lists to keep track of function test results
-functions_passed = []
-functions_failed = []
-
-# Main process
-functions = parse_functions(source_file_path)
-print(source_file_path)
-totalCorrect = 0
-test_file_counter = 0  # Ensure test_file_counter is initialized
-for function in functions:
-    test_file_name = test_file_prefix + '{:03}'.format(test_file_counter) + '.cpp'
+def write_test_file(test_file_name, function, test_file_counter):
+    content = libraries_needed + '\n' + function + '\n' + gemv_code_template_before_call + function_names[test_file_counter] + gemv_code_template_after_call
     with open(test_file_name, 'w') as test_file:
-        test_file.write(libraries_needed + '\n' + function + '\n' + axpy_code_template_before_call + function_names[test_file_counter] + axpy_code_template_after_call)
-    compiled, result = compile_execute_verify(test_file_name)
-    print('{test_file_name}: Compiled={compiled}, Result={result}'.format(test_file_name=test_file_name, compiled=compiled, result=result))
-    if compiled:
-        totalCorrect += 1
-        # Append both the function and its corresponding test file number
-        functions_passed.append((function, test_file_counter))
-    else:
-        functions_failed.append((function, test_file_counter))
-    test_file_counter += 1
+        test_file.write(content)
 
-# Write the test results to a file
-with open('test_results.cpp', 'w') as results_file:
-    results_file.write("Functions that passed:\n")
-    for function, file_number in functions_passed:
-        results_file.write(f"(Test File: {file_number})\n {function}\n")
-    results_file.write("\nFunctions that failed:\n")
-    for function, file_number in functions_failed:
-        results_file.write(f"(Test File: {file_number})\n {function} \n")
-    results_file.write(f"\nTotal Correct: {len(functions_passed)}/{len(functions_passed) + len(functions_failed)}\n")
+def write_results_file(functions_passed, functions_failed, error_per_test):
+    with open('test_results.cpp', 'w') as results_file:
+        results_file.write("Functions that passed:\n")
+        for function, file_number in functions_passed:
+            results_file.write(f"(Test File: {file_number})\n {function}\n")
+        results_file.write("\nFunctions that failed:\n")
+        for function, file_number in functions_failed:
+            results_file.write(f"(Test File: {file_number})\n {function} \nError: \n")
+    
 
-print("Test results written to test_results.cpp")
 
+
+def main_process(source_file_path):
+    functions_passed = []
+    functions_failed = []
+    error_per_test = []  # Assuming this is populated within compile_execute_verify
+
+    functions = parse_functions(source_file_path)
+    print(source_file_path)
+    totalCorrect = 0
+    test_file_counter = 0
+    for function in functions:
+        test_file_name = test_file_prefix + '{:03}'.format(test_file_counter) + '.cpp'
+        write_test_file(test_file_name, function, test_file_counter)
+        compiled, result = compile_execute_verify(test_file_name)
+        print(f'{test_file_name}: Compiled={compiled}, Result={result}')
+        if compiled:
+            totalCorrect += 1
+            functions_passed.append((function, test_file_counter))
+        else:
+            functions_failed.append((function, test_file_counter))
+        test_file_counter += 1
+
+    write_results_file(functions_passed, functions_failed, error_per_test)
+
+# Assuming the rest of the necessary variables and functions (like parse_functions, compile_execute_verify, etc.) are defined elsewhere
+if __name__ == "__main__":
+    source_file_path = "functions.cpp"
+    main_process(source_file_path)
+    print('Results printed to test_results.cpp')
