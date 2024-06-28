@@ -1,0 +1,913 @@
+Output 1:
+Sure! Below you'll find the C with OpenMP and CUDA implementations of the `saxpy_parallel` subroutine for performing the AXPY operation \( y = a \cdot x + y \):
+
+### C with OpenMP
+
+```c
+#include <omp.h>
+
+void saxpy_parallel(int n, float a, float *x, float *y) {
+    int i;
+
+    #pragma omp parallel for
+    for (i = 0; i < n; i++) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+```
+
+### CUDA
+
+```cuda
+#include <cuda_runtime.h>
+
+__global__ void saxpy_kernel(int n, float a, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+void saxpy_parallel(int n, float a, float *x, float *y) {
+    float *d_x, *d_y;
+    size_t size = n * sizeof(float);
+
+    // Allocate device memory
+    cudaMalloc(&d_x, size);
+    cudaMalloc(&d_y, size);
+
+    // Copy data to device
+    cudaMemcpy(d_x, x, size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_y, y, size, cudaMemcpyHostToDevice);
+
+    // Launch the kernel with enough blocks and threads
+    int blockSize = 256; // Number of threads per block
+    int numBlocks = (n + blockSize - 1) / blockSize; // Number of blocks
+    saxpy_kernel<<<numBlocks, blockSize>>>(n, a, d_x, d_y);
+
+    // Copy result back to host
+    cudaMemcpy(y, d_y, size, cudaMemcpyDeviceToHost);
+
+    // Free device memory
+    cudaFree(d_x);
+    cudaFree(d_y);
+}
+```
+
+### Explanation
+
+- **C with OpenMP**:
+    - `#pragma omp parallel for` is used to parallelize the `for` loop which performs the AXPY operation.
+    - Each thread will handle a portion of the iterations, thereby speeding up the computation.
+
+- **CUDA**:
+    - The `saxpy_kernel` function is defined as a `__global__` kernel function, which will be executed on the GPU.
+    - The kernel function calculates the global thread index `i` and performs the AXPY operation for that index.
+    - In the `saxpy_parallel` function, CUDA's `cudaMalloc` and `cudaMemcpy` functions are used for memory allocation and data transfer between the host and device.
+    - The kernel is launched with an appropriate number of blocks and threads.
+    - After computation, the result is copied back to the host using `cudaMemcpy` and the device memory is freed using `cudaFree`.
+
+This way of parallel computation is essential for leveraging modern CPU and GPU architectures for efficient computation.
+
+Output 2:
+To reimplement the `saxpy_parallel` subroutine in C with CUDA, we need to understand the AXPY operation and how CUDA can help parallelize it. The AXPY operation is defined as `Y = a*X + Y`, where `a` is a scalar, and `X` and `Y` are vectors.
+
+### C Implementation
+
+Here is a C implementation using CUDA to parallelize the operation:
+
+#### C and CUDA code
+
+```c
+#include <stdio.h>
+#include <cuda_runtime.h>
+
+// CUDA kernel for SAXPY
+__global__ void saxpy(int n, float a, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+void saxpy_parallel(int n, float a, float *x, float *y) {
+    // Allocate device memory for x and y
+    float *d_x, *d_y;
+    cudaMalloc(&d_x, n * sizeof(float));
+    cudaMalloc(&d_y, n * sizeof(float));
+
+    // Copy vectors x and y to device
+    cudaMemcpy(d_x, x, n * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_y, y, n * sizeof(float), cudaMemcpyHostToDevice);
+
+    // Configure launch parameters
+    int blockSize = 256;
+    int numBlocks = (n + blockSize - 1) / blockSize;
+
+    // Launch kernel on the device
+    saxpy<<<numBlocks, blockSize>>>(n, a, d_x, d_y);
+
+    // Copy result back to host
+    cudaMemcpy(y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
+
+    // Free device memory
+    cudaFree(d_x);
+    cudaFree(d_y);
+}
+
+int main() {
+    int n = 1000;
+    float a = 2.0f;
+    float x[n], y[n];
+
+    // Initialize vectors x and y
+    for (int i = 0; i < n; i++) {
+        x[i] = static_cast<float>(i);
+        y[i] = static_cast<float>(i * 2);
+    }
+
+    // Call the saxpy_parallel function
+    saxpy_parallel(n, a, x, y);
+
+    // Output some results to verify
+    printf("Result y[0] = %f\n", y[0]);
+    printf("Result y[n-1] = %f\n", y[n-1]);
+
+    return 0;
+}
+```
+
+### Explanation
+
+1. **Kernel Definition**: The `__global__` function `saxpy` performs the AXPY operation. It calculates the corresponding index `i` of each thread and checks if it is within bounds of the array.
+   
+2. **Kernel Launch**: The `saxpy_parallel` function configures the kernel launch parameters, allocates device memory, and copies data to and from the device.
+
+3. **Memory Allocation and Copying**: We use CUDA runtime functions `cudaMalloc`, `cudaMemcpy`, and `cudaFree` to manage device memory.
+
+4. **Parallel Execution**: The CUDA execution configuration `<<<numBlocks, blockSize>>>` specifies the number of blocks and threads per block. This allows the AXPY operation to be performed in parallel across the GPU.
+
+5. **Main Function**: The `main` function initializes vectors `x` and `y`, calls the `saxpy_parallel` function, and prints some of the results to verify correctness.
+
+Output 3:
+Below is an equivalent implementation of the `saxpy_parallel` subroutine in C with OpenMP, and in CUDA. 
+
+### C with OpenMP:
+```c
+#include <omp.h>
+
+void saxpy_parallel(int n, float a, float *x, float *y) {
+    int i;
+
+    #pragma omp parallel for
+    for (i = 0; i < n; i++) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+```
+
+### CUDA:
+```cuda
+#include <cuda_runtime.h>
+
+__global__ void saxpy_kernel(int n, float a, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+void saxpy_parallel(int n, float a, float *x, float *y) {
+    float *d_x, *d_y;
+
+    // Allocate device memory
+    cudaMalloc((void **)&d_x, n * sizeof(float));
+    cudaMalloc((void **)&d_y, n * sizeof(float));
+
+    // Copy data from host to device
+    cudaMemcpy(d_x, x, n * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_y, y, n * sizeof(float), cudaMemcpyHostToDevice);
+
+    // Kernel configuration: 256 threads per block is typically a good number
+    int blockSize = 256;
+    int numBlocks = (n + blockSize - 1) / blockSize;
+
+    // Launch kernel
+    saxpy_kernel<<<numBlocks, blockSize>>>(n, a, d_x, d_y);
+
+    // Copy result back to host
+    cudaMemcpy(y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
+
+    // Free device memory
+    cudaFree(d_x);
+    cudaFree(d_y);
+}
+```
+
+### Explanation:
+#### C with OpenMP
+- The OpenMP directive `#pragma omp parallel for` will parallelize the for-loop. Each iteration of the loop will be performed by a separate thread, permitting concurrent computation of the AXPY operation.
+
+#### CUDA
+- The CUDA implementation involves defining a kernel, `saxpy_kernel`, which performs the AXPY operation in parallel on the GPU.
+  - The `__global__` keyword indicates that `saxpy_kernel` is a kernel function that will be executed on the device.
+  - The `saxpy_parallel` function sets up the device memory and copies the data from the host (CPU) to the device (GPU).
+  - The kernel is launched with a certain number of blocks and threads per block, tailored to ensure that all elements are processed.
+  - After the kernel execution, data is copied back from the device to the host.
+
+### Notes:
+1. Both implementations assume that the arrays `x` and `y` are properly allocated and initialized in host code before calling `saxpy_parallel`.
+2. Error handling (e.g., checking `cudaMalloc` and `cudaMemcpy` return values) is omitted for brevity but should be included in production code.
+
+Output 4:
+Below are the equivalent implementations of the `saxpy_parallel` subroutine using C with OpenMP and CUDA.
+
+### C with OpenMP
+
+```c
+#include <omp.h>
+
+void saxpy_parallel(int n, float a, float* x, float* y) {
+    int i;
+
+    #pragma omp parallel for
+    for (i = 0; i < n; ++i) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+```
+
+### CUDA
+
+CUDA requires defining a kernel function to perform the AXPY operation on the GPU. The host code will then launch this kernel with an appropriate number of threads and blocks.
+
+```c
+#include <cuda_runtime.h>
+
+__global__ void saxpy_kernel(int n, float a, float* x, float* y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+void saxpy_parallel(int n, float a, float* x, float* y) {
+    float *d_x, *d_y;
+
+    // Allocate device memory
+    cudaMalloc((void**)&d_x, n * sizeof(float));
+    cudaMalloc((void**)&d_y, n * sizeof(float));
+
+    // Copy data from host to device
+    cudaMemcpy(d_x, x, n * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_y, y, n * sizeof(float), cudaMemcpyHostToDevice);
+
+    // Define the number of threads per block and the number of blocks
+    int blockSize = 256;
+    int numBlocks = (n + blockSize - 1) / blockSize;
+
+    // Launch the kernel
+    saxpy_kernel<<<numBlocks, blockSize>>>(n, a, d_x, d_y);
+
+    // Copy result back to host
+    cudaMemcpy(y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
+
+    // Free device memory
+    cudaFree(d_x);
+    cudaFree(d_y);
+}
+```
+
+### Explanation of CUDA Implementation
+
+1. **Kernel Definition**: A `__global__` function `saxpy_kernel` performs the AXPY operation on each element indexed by the CUDA thread index `i`.
+
+2. **Host Function**: The `saxpy_parallel` function allocates device memory, copies data from the host to the device, invokes the kernel, and then copies the results back to the host memory.
+
+3. **Block and Thread Management**: 
+   - `blockSize` is set to 256, a common value for CUDA threads per block.
+   - `numBlocks` is calculated to ensure there are enough blocks to handle all elements, with each block containing 256 threads.
+   
+   This ensures the CUDA kernel runs with enough threads to cover the entire range of elements specified by `n`.
+
+4. **Memory Management**: Device memory is allocated with `cudaMalloc`, data transfer between host and device occurs with `cudaMemcpy`, and after computation, device memory is freed with `cudaFree`.
+
+Output 5:
+Implementing an AXPY operation (`y = a * x + y`) in both C with OpenMP and CUDA involves different paradigms for parallelization. Here's how you'd do it in each case.
+
+### C with OpenMP
+
+Below is the equivalent implementation of your Fortran subroutine in C using OpenMP:
+
+```c
+#include <omp.h>
+
+void saxpy_parallel(int n, float a, float *x, float *y) {
+    #pragma omp parallel for
+    for (int i = 0; i < n; i++) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+```
+
+### CUDA
+
+Below is the equivalent implementation in CUDA:
+
+```cuda
+#include <cuda_runtime.h>
+
+__global__ void saxpy_kernel(int n, float a, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+void saxpy_parallel(int n, float a, float *x, float *y) {
+    // Define the number of threads per block and the number of blocks
+    int blockSize = 256;
+    int numBlocks = (n + blockSize - 1) / blockSize;
+
+    // Allocate device memory
+    float *d_x, *d_y;
+    cudaMalloc((void**)&d_x, n * sizeof(float));
+    cudaMalloc((void**)&d_y, n * sizeof(float));
+
+    // Copy data from host to device
+    cudaMemcpy(d_x, x, n * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_y, y, n * sizeof(float), cudaMemcpyHostToDevice);
+
+    // Launch the SAXPY kernel
+    saxpy_kernel<<<numBlocks, blockSize>>>(n, a, d_x, d_y);
+
+    // Copy result from device to host
+    cudaMemcpy(y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
+
+    // Free device memory
+    cudaFree(d_x);
+    cudaFree(d_y);
+}
+```
+
+### Explanation of CUDA Implementation
+
+1. **Kernel Definition**: `__global__ void saxpy_kernel(int n, float a, float *x, float *y)`
+   - This function runs on the GPU.
+   - Each thread computes a single element of the SAXPY operation.
+
+2. **Thread Index Calculation**: `int i = blockIdx.x * blockDim.x + threadIdx.x`
+   - This determines the global index (`i`) for a thread in the grid.
+
+3. **Boundary Check**: `if (i < n)`
+   - Ensures that threads beyond the array bounds do not perform computations.
+
+4. **Memory Allocation**:
+   - Allocate memory on the device using `cudaMalloc`.
+
+5. **Data Transfer**:
+   - Copy data from host to device using `cudaMemcpy`.
+
+6. **Kernel Launch**: 
+   - Execute the kernel with an appropriate number of blocks and threads.
+
+7. **Result Transfer**:
+   - Copy results from the device back to the host.
+
+8. **Memory Deallocation**:
+   - Free the allocated memory on the device.
+
+This way, we can parallelize the SAXPY operation both on CPU using OpenMP and on GPU using CUDA effectively.
+
+Output 6:
+Certainly! Here is the `saxpy_parallel` subroutine translated into C with OpenMP and CUDA. The C version uses OpenMP for parallelization, and the CUDA version uses GPU kernels for parallel execution.
+
+### C with OpenMP
+
+```c
+#include <omp.h>
+
+void saxpy_parallel(int n, float a, const float *x, float *y) {
+    #pragma omp parallel for
+    for (int i = 0; i < n; i++) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+```
+
+### CUDA
+
+Here's the CUDA version of the same functionality. The CUDA version requires a kernel definition for the `saxpy` operation and a host function to invoke the kernel.
+
+```cuda
+#include <cuda_runtime.h>
+#include <stdio.h>
+
+__global__ void saxpy_kernel(int n, float a, const float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+void saxpy_parallel(int n, float a, const float *x, float *y) {
+    // Device pointers
+    float *d_x, *d_y;
+
+    // Allocate memory on the GPU
+    cudaMalloc(&d_x, n * sizeof(float));
+    cudaMalloc(&d_y, n * sizeof(float));
+
+    // Copy data from host to device
+    cudaMemcpy(d_x, x, n * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_y, y, n * sizeof(float), cudaMemcpyHostToDevice);
+
+    // Determine block and grid sizes
+    int blockSize = 256; // You can tune this value
+    int gridSize = (n + blockSize - 1) / blockSize;
+
+    // Launch the kernel
+    saxpy_kernel<<<gridSize, blockSize>>>(n, a, d_x, d_y);
+
+    // Copy results from device to host
+    cudaMemcpy(y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
+
+    // Free GPU memory
+    cudaFree(d_x);
+    cudaFree(d_y);
+}
+
+int main() {
+    const int n = 1000000;
+    float a = 2.0f;
+
+    float *x = (float *) malloc(n * sizeof(float));
+    float *y = (float *) malloc(n * sizeof(float));
+
+    // Initialize x and y arrays (example)
+    for (int i = 0; i < n; i++) {
+        x[i] = i * 1.0f;
+        y[i] = i * 2.0f;
+    }
+
+    // Perform SAXPY
+    saxpy_parallel(n, a, x, y);
+
+    // Optionally print results for verification
+    // for (int i = 0; i < n; i++) {
+    //     printf("%f\n", y[i]);
+    // }
+
+    // Free host memory
+    free(x);
+    free(y);
+
+    return 0;
+}
+```
+
+### Explanation
+
+#### C with OpenMP
+- The `saxpy_parallel` function computes the SAXPY (Single-Precision A * X Plus Y) operation in parallel with OpenMP.
+- The `#pragma omp parallel for` directive is used to parallelize the loop.
+- Each iteration of the loop computes `y[i] = a * x[i] + y[i]`.
+
+#### CUDA
+- The CUDA implementation includes a kernel function `saxpy_kernel` that performs the SAXPY operation.
+- In the host function `saxpy_parallel`, memory is allocated on the GPU, data is copied from the host to the GPU, the kernel is launched, and the results are copied back from the GPU to the host.
+- The kernel uses `blockIdx.x` and `threadIdx.x` to compute the global index `i` corresponding to the thread responsible for processing each element.
+- Ensure that you have a CUDA-capable GPU and the CUDA toolkit installed to compile and run the CUDA version. Compilation can be done using `nvcc` (e.g., `nvcc -o saxpy saxpy.cu`).
+
+Output 7:
+Certainly! Here's how you can implement the AXPY (a * x + y) operation in both C with OpenMP and CUDA.
+
+### C with OpenMP
+First, let's implement the AXPY operation in C utilizing OpenMP for parallelism.
+
+#### C Code
+```c
+#include <omp.h>
+
+void saxpy_parallel(int n, float a, float* x, float* y) {
+    int i;
+    
+    #pragma omp parallel for
+    for (i = 0; i < n; i++) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+```
+
+### CUDA
+Next, let's implement the same AXPY operation using CUDA.
+
+#### CUDA Code
+```cuda
+#include <cuda_runtime.h>
+#include <stdio.h>
+
+__global__ void saxpy_kernel(int n, float a, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+void saxpy_parallel(int n, float a, float *x, float *y) {
+    float *d_x, *d_y;
+    size_t size = n * sizeof(float);
+
+    // Allocate device memory
+    cudaMalloc((void**)&d_x, size);
+    cudaMalloc((void**)&d_y, size);
+
+    // Copy data from host to device
+    cudaMemcpy(d_x, x, size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_y, y, size, cudaMemcpyHostToDevice);
+
+    // Set up the execution configuration
+    int blockSize = 256;
+    int numBlocks = (n + blockSize - 1) / blockSize;
+
+    // Launch the SAXPY kernel
+    saxpy_kernel<<<numBlocks, blockSize>>>(n, a, d_x, d_y);
+
+    // Copy result from device to host
+    cudaMemcpy(y, d_y, size, cudaMemcpyDeviceToHost);
+
+    // Free device memory
+    cudaFree(d_x);
+    cudaFree(d_y);
+}
+```
+
+### Usage Example
+Below is an example of how you might call these functions in a host main function to perform the AXPY operation.
+
+#### C Usage Example
+```c
+#include <stdio.h>
+#include <stdlib.h>
+
+int main() {
+    int n = 1 << 20; // Example: 1 million elements
+    float a = 2.0f;
+    float *x = (float *)malloc(n * sizeof(float));
+    float *y = (float *)malloc(n * sizeof(float));
+
+    // Initialize x and y arrays
+    for (int i = 0; i < n; i++) {
+        x[i] = 1.0f;
+        y[i] = 2.0f;
+    }
+
+    // Perform SAXPY operation
+    saxpy_parallel(n, a, x, y);
+
+    // Optionally, check the results
+    for (int i = 0; i < n; i++) {
+        if (y[i] != a * x[i] + 2.0f) {
+            printf("Error at index %d\n", i);
+            break;
+        }
+    }
+
+    // Clean up
+    free(x);
+    free(y);
+
+    return 0;
+}
+```
+
+#### CUDA Usage Example
+```cpp
+#include <cuda_runtime.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+int main() {
+    int n = 1 << 20; // Example: 1 million elements
+    float a = 2.0f;
+    float *x = (float *)malloc(n * sizeof(float));
+    float *y = (float *)malloc(n * sizeof(float));
+
+    // Initialize x and y arrays
+    for (int i = 0; i < n; i++) {
+        x[i] = 1.0f;
+        y[i] = 2.0f;
+    }
+
+    // Call the CUDA SAXPY function
+    saxpy_parallel(n, a, x, y);
+
+    // Optionally, check the results
+    for (int i = 0; i < n; i++) {
+        if (y[i] != a * x[i] + 2.0f) {
+            printf("Error at index %d\n", i);
+            break;
+        }
+    }
+
+    // Clean up
+    free(x);
+    free(y);
+
+    return 0;
+}
+```
+
+**Note:** Ensure you have a CUDA-enabled GPU and the NVIDIA software stack installed to run the CUDA example. The C example should work on any system with an OpenMP-capable compiler.
+
+Output 8:
+Implementing the `AXPY` operation in C with CUDA, equivalent to the provided Fortran and OpenMP subroutine, involves defining a CUDA kernel for parallel computation on the GPU. Below is the implementation:
+
+### C/CUDA Implementation
+
+First, let's define the CUDA kernel function and a host function to set up and launch the kernel:
+
+```c
+#include <stdio.h>
+#include <cuda_runtime.h>
+
+// CUDA Kernel for SAXPY operation
+__global__ void saxpy_kernel(int n, float a, const float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+// Host function to setup and launch the kernel
+void saxpy_parallel(int n, float a, const float *x, float *y) {
+    // Device pointers
+    float *d_x, *d_y;
+
+    // Allocate device memory
+    cudaMalloc(&d_x, n * sizeof(float));
+    cudaMalloc(&d_y, n * sizeof(float));
+
+    // Copy input vectors from host memory to device memory
+    cudaMemcpy(d_x, x, n * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_y, y, n * sizeof(float), cudaMemcpyHostToDevice);
+
+    // Define block size and number of blocks
+    int blockSize = 256;
+    int numBlocks = (n + blockSize - 1) / blockSize;
+
+    // Launch the kernel
+    saxpy_kernel<<<numBlocks, blockSize>>>(n, a, d_x, d_y);
+
+    // Wait for GPU to finish before accessing on host
+    cudaDeviceSynchronize();
+
+    // Copy output vector from device memory to host memory
+    cudaMemcpy(y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
+
+    // Free device memory
+    cudaFree(d_x);
+    cudaFree(d_y);
+}
+
+// Helper function to initialize vectors
+void initialize_vectors(int n, float *x, float *y) {
+    for (int i = 0; i < n; ++i) {
+        x[i] = static_cast<float>(i + 1);
+        y[i] = static_cast<float>(i + 1);
+    }
+}
+
+int main() {
+    // Number of elements in vectors
+    int n = 1000000;
+    float a = 2.0f;
+
+    // Allocate host memory
+    float *x = (float *)malloc(n * sizeof(float));
+    float *y = (float *)malloc(n * sizeof(float));
+
+    // Initialize vectors
+    initialize_vectors(n, x, y);
+
+    // Run SAXPY operation
+    saxpy_parallel(n, a, x, y);
+
+    // Print the first 10 results for verification
+    for (int i = 0; i < 10; ++i) {
+        printf("y[%d] = %f\n", i, y[i]);
+    }
+
+    // Free host memory
+    free(x);
+    free(y);
+
+    return 0;
+}
+```
+
+### Explanation:
+
+1. **CUDA Kernel (`saxpy_kernel`)**:
+   - This kernel performs the `AXPY (y = a * x + y)` operation in parallel. Each thread computes one element of the result.
+   - The index `i` is computed based on the block and thread indices.
+
+2. **Host Function (`saxpy_parallel`)**:
+   - This function prepares for and launches the CUDA kernel.
+   - Memory for vectors `x` and `y` is allocated on the GPU.
+   - Vectors are copied from host to device memory.
+   - The kernel is launched with enough blocks and threads to cover all elements.
+   - Results are copied back to host memory after the kernel execution.
+
+3. **Main Function**:
+   - Defines vector sizes and initializes vectors for testing.
+   - Calls the `saxpy_parallel` function to perform the operation.
+   - Prints out some results for verification.
+
+When compiled and executed, this program will perform the `AXPY` operation in parallel using the GPU, similar to the Fortran subroutine with OpenMP parallelization. Make sure you have an appropriate CUDA development environment set up to compile and run the code.
+
+Output 9:
+Certainly! The AXPY operation (which stands for "A times X plus Y") is a common linear algebra operation. Below is a C implementation using OpenMP and a CUDA implementation. 
+
+### C with OpenMP
+```c
+#include <omp.h>
+
+void saxpy_parallel(int n, float a, float *x, float *y) {
+    #pragma omp parallel for
+    for (int i = 0; i < n; ++i) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+```
+
+### CUDA
+```cuda
+#include <cuda_runtime.h>
+
+__global__ void saxpy_kernel(int n, float a, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+void saxpy_parallel(int n, float a, float *x, float *y) {
+    float *d_x, *d_y;
+    size_t size = n * sizeof(float);
+
+    // Allocate device memory
+    cudaMalloc((void **)&d_x, size);
+    cudaMalloc((void **)&d_y, size);
+
+    // Copy inputs to device
+    cudaMemcpy(d_x, x, size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_y, y, size, cudaMemcpyHostToDevice);
+
+    // Define block size and number of blocks
+    int blockSize = 256;
+    int numBlocks = (n + blockSize - 1) / blockSize;
+
+    // Launch the kernel on the GPU
+    saxpy_kernel<<<numBlocks, blockSize>>>(n, a, d_x, d_y);
+
+    // Copy result back to host
+    cudaMemcpy(y, d_y, size, cudaMemcpyDeviceToHost);
+
+    // Free device memory
+    cudaFree(d_x);
+    cudaFree(d_y);
+}
+```
+
+### Usage Example:
+```c
+#include <stdio.h>
+
+// Prototype the functions
+void saxpy_parallel(int n, float a, float *x, float *y);
+
+int main() {
+    int n = 1000;
+    float a = 2.0f;
+    float x[n], y[n];
+
+    // Initialize x and y arrays
+    for (int i = 0; i < n; ++i) {
+        x[i] = i * 1.0f;
+        y[i] = i * 0.5f;
+    }
+
+    // Call the OpenMP-version of saxpy_parallel
+    saxpy_parallel(n, a, x, y);
+
+    // Print the results for OpenMP version
+    printf("OpenMP version result:\n");
+    for (int i = 0; i < 10; ++i) {
+        printf("y[%d] = %f\n", i, y[i]);
+    }
+
+    // Reinitialize y array for CUDA version
+    for (int i = 0; i < n; ++i) {
+        y[i] = i * 0.5f;
+    }
+
+    // Call the CUDA-version of saxpy_parallel
+    saxpy_parallel(n, a, x, y);
+
+    // Print the results for CUDA version
+    printf("CUDA version result:\n");
+    for (int i = 0; i < 10; ++i) {
+        printf("y[%d] = %f\n", i, y[i]);
+    }
+
+    return 0;
+}
+```
+
+### Notes
+1. **C with OpenMP**:
+    - The `#pragma omp parallel for` directive parallelizes the for loop across multiple threads.
+
+2. **CUDA**:
+    - Memory management (`cudaMalloc`, `cudaMemcpy`, `cudaFree`) is required for transferring data between the host (CPU) and the device (GPU).
+    - The kernel `saxpy_kernel` does the actual computation on the GPU. The indices are calculated based on the block and thread IDs.
+    - `blockSize` and `numBlocks` are set to launch enough threads to cover all `n` elements.
+
+3. **Error Checking**:
+    - These example codes do not include error checking for simplicity. In production code, make sure to handle errors especially for CUDA function calls.
+
+Compile the C code with `gcc` including OpenMP flag `-fopenmp` and the CUDA code with `nvcc`.
+
+```sh
+gcc -fopenmp -o saxpy_openmp saxpy_openmp.c
+nvcc -o saxpy_cuda saxpy_cuda.cu
+```
+
+Adapt as needed for your specific requirements!
+
+Output 10:
+Sure, here is the equivalent function implemented in C with OpenMP and in CUDA.
+
+### C with OpenMP Implementation:
+
+```c
+#include <omp.h>
+
+void saxpy_parallel(int n, float a, const float *x, float *y) {
+    int i;
+    #pragma omp parallel for
+    for (i = 0; i < n; ++i) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+```
+
+### CUDA Implementation:
+
+```cuda
+#include <cuda_runtime.h>
+
+__global__ void saxpy_parallel_kernel(int n, float a, const float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+void saxpy_parallel(int n, float a, const float *x, float *y) {
+    // Assuming you're copying data to GPU memories somehow; here is a basic structure
+    float *d_x, *d_y;
+    cudaMalloc((void **) &d_x, n * sizeof(float));
+    cudaMalloc((void **) &d_y, n * sizeof(float));
+
+    cudaMemcpy(d_x, x, n * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_y, y, n * sizeof(float), cudaMemcpyHostToDevice);
+
+    int blockSize = 256;
+    int numBlocks = (n + blockSize - 1) / blockSize;
+    saxpy_parallel_kernel<<<numBlocks, blockSize>>>(n, a, d_x, d_y);
+
+    cudaMemcpy(y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
+
+    cudaFree(d_x);
+    cudaFree(d_y);
+}
+```
+
+### Explanation:
+
+Both functions perform the same operation: `y = a * x + y`.
+
+1. **C with OpenMP**:
+    - We use `#pragma omp parallel for` to parallelize the loop across multiple CPU cores.
+
+2. **CUDA**:
+    - We define a CUDA kernel `saxpy_parallel_kernel` that executes the AXPY operation for a specific index `i`.
+    - The kernel is launched with a grid of thread blocks. Each thread in the grid computes a part of the operation.
+    - Memory for the input and output vectors (`x` and `y`) is allocated and copied to the device (GPU).
+    - After the kernel execution, the results are copied back from the device to the host.
+
+In practice, you would need to handle errors and possibly optimize memory transfers depending on the size of `n` and the specifics of your environment.
+

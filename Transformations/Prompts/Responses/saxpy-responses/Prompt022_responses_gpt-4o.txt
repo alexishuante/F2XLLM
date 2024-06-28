@@ -1,0 +1,983 @@
+Output 1:
+Certainly! Below is the implementation of the AXPY operation (where `y = a * x + y`) in both C with HIP (Heterogeneous-Compute Interface for Portability) and Fortran with OpenACC.
+
+### Fortran with OpenACC
+
+This is the provided Fortran implementation of the `saxpy` subroutine with OpenACC.
+
+```fortran
+subroutine saxpy(n, a, x, y)
+    implicit none
+    integer, intent(in) :: n
+    real, intent(in) :: a
+    real, intent(in) :: x(n)
+    real, intent(inout) :: y(n)
+    integer :: i
+    !$acc kernels
+    do i = 1, n
+        y(i) = a * x(i) + y(i)
+    end do
+    !$acc end kernels
+end subroutine saxpy
+```
+
+### C with HIP
+
+The following is the equivalent `saxpy` function implemented in C using HIP for GPU acceleration.
+
+```c
+#include <stdio.h>
+#include <hip/hip_runtime.h>
+
+// HIP kernel for SAXPY
+__global__ void saxpy_kernel(int n, float a, const float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+// SAXPY function using HIP
+void saxpy(int n, float a, const float *x, float *y) {
+    float *d_x, *d_y;
+    size_t size = n * sizeof(float);
+
+    // Allocate device memory
+    hipMalloc((void**)&d_x, size);
+    hipMalloc((void**)&d_y, size);
+
+    // Copy data to device
+    hipMemcpy(d_x, x, size, hipMemcpyHostToDevice);
+    hipMemcpy(d_y, y, size, hipMemcpyHostToDevice);
+
+    // Define grid and block sizes
+    int blockSize = 256;
+    int numBlocks = (n + blockSize - 1) / blockSize;
+
+    // Launch the SAXPY kernel
+    hipLaunchKernelGGL(saxpy_kernel, dim3(numBlocks), dim3(blockSize), 0, 0, n, a, d_x, d_y);
+
+    // Copy result back to host
+    hipMemcpy(y, d_y, size, hipMemcpyDeviceToHost);
+
+    // Free device memory
+    hipFree(d_x);
+    hipFree(d_y);
+}
+
+int main() {
+    // Sample data
+    int n = 1000000;
+    float a = 2.0f;
+    float x[n], y[n];
+    
+    // Initialize arrays
+    for(int i = 0; i < n; i++) {
+        x[i] = i * 1.0f;
+        y[i] = i * 2.0f;
+    }
+    
+    // Perform SAXPY operation
+    saxpy(n, a, x, y);
+
+    // Print some results (for verification)
+    printf("y[0] = %f\n", y[0]);
+    printf("y[n-1] = %f\n", y[n-1]);
+
+    return 0;
+}
+```
+
+This HIP code declares a `saxpy_kernel` to perform the AXPY operation on each element of the arrays. In the `saxpy` function, memory is allocated on the GPU, data is copied to the GPU, the kernel is launched, and then the results are copied back to the host memory. Finally, the device memory is freed.
+
+This example also includes a `main` function that initializes some test data, performs the SAXPY operation, and prints out the results for verification.
+
+Output 2:
+Sure, I can help you with that. Below is the equivalent AXPY operation implemented in C with HIP (Heterogeneous-Computing Interface for Portability).
+
+### C with HIP Implementation for AXPY Operation
+
+```c
+#include <hip/hip_runtime.h>
+#include <stdio.h>
+
+__global__ void saxpy_kernel(int n, float a, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+void saxpy(int n, float a, float *x, float *y) {
+    float *d_x, *d_y;
+
+    // Allocate device memory
+    hipMalloc(&d_x, n * sizeof(float));
+    hipMalloc(&d_y, n * sizeof(float));
+
+    // Copy data to device
+    hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
+    hipMemcpy(d_y, y, n * sizeof(float), hipMemcpyHostToDevice);
+
+    // Define block and grid sizes
+    int blockSize = 256;
+    int numBlocks = (n + blockSize - 1) / blockSize;
+
+    // Launch the kernel
+    hipLaunchKernelGGL(saxpy_kernel, dim3(numBlocks), dim3(blockSize), 0, 0, n, a, d_x, d_y);
+
+    // Copy result back to host
+    hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
+
+    // Free device memory
+    hipFree(d_x);
+    hipFree(d_y);
+}
+
+int main() {
+    int n = 100000;
+    float a = 2.0f;
+    float x[n], y[n];
+
+    // Initialize x and y arrays
+    for (int i = 0; i < n; i++) {
+        x[i] = 1.0f;
+        y[i] = 2.0f;
+    }
+
+    // Perform SAXPY operation
+    saxpy(n, a, x, y);
+
+    // Print the result for validation
+    printf("y[0] = %f\n", y[0]);
+    printf("y[n-1] = %f\n", y[n-1]);
+
+    return 0;
+}
+```
+
+### Explanation
+- **`__global__ void saxpy_kernel`**: This is the GPU kernel that performs the SAXPY operation at a single point in the array. It's the equivalent of the Fortran loop within the OpenACC region.
+- **`saxpy` function**: 
+  - Allocates memory on the device.
+  - Copies data from host (CPU) to device (GPU).
+  - Defines block and grid sizes. 
+  - Launches the kernel with the specified parameters.
+  - Copies the result back from device to host.
+  - Frees device memory.
+- The **`main` function** initializes the x and y arrays, calls the saxpy function, and prints out part of the result for validation.
+
+This implementation is the HIP equivalent of the provided Fortran subroutine using OpenACC. The structure and the data flow are kept similar to ensure that it carries out the same operations leveraging GPU acceleration.
+
+Output 3:
+Sure! Below you will find the implementations of the AXPY operation in C using HIP and Fortran using OpenACC. The AXPY operation is defined as \( y = a \times x + y \), where \( x \) and \( y \) are vectors and \( a \) is a scalar.
+
+### C with HIP Implementation
+
+```c
+#include <stdio.h>
+#include <hip/hip_runtime.h>
+
+// HIP kernel for AXPY operation
+__global__ void saxpy_hip(int n, float a, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+void saxpy(int n, float a, float *x, float *y) {
+    float *d_x, *d_y;
+    size_t size = n * sizeof(float);
+
+    // Allocate device memory
+    hipMalloc((void **) &d_x, size);
+    hipMalloc((void **) &d_y, size);
+
+    // Copy vectors from host memory to device memory
+    hipMemcpy(d_x, x, size, hipMemcpyHostToDevice);
+    hipMemcpy(d_y, y, size, hipMemcpyHostToDevice);
+
+    // Define block size and grid size
+    int blockSize = 256;
+    int gridSize = (n + blockSize - 1) / blockSize;
+
+    // Launch kernel on the device
+    hipLaunchKernelGGL(saxpy_hip, dim3(gridSize), dim3(blockSize), 0, 0, n, a, d_x, d_y);
+
+    // Copy result back to host memory
+    hipMemcpy(y, d_y, size, hipMemcpyDeviceToHost);
+
+    // Free device memory
+    hipFree(d_x);
+    hipFree(d_y);
+}
+
+int main() {
+    int n = 1000;
+    float a = 2.0f;
+    float x[1000], y[1000];
+
+    for (int i = 0; i < n; ++i) {
+        x[i] = 1.0f;
+        y[i] = 2.0f;
+    }
+
+    saxpy(n, a, x, y);
+
+    // Display results (optional)
+    for (int i = 0; i < n; ++i) {
+        printf("%f ", y[i]);
+        if (i % 10 == 9) printf("\n");
+    }
+
+    return 0;
+}
+```
+
+### Fortran with OpenACC Implementation
+
+Here is the Fortran version of the AXPY subroutine with OpenACC directives:
+
+```fortran
+subroutine saxpy(n, a, x, y)
+    implicit none
+    integer, intent(in) :: n
+    real, intent(in) :: a
+    real, intent(in) :: x(n)
+    real, intent(inout) :: y(n)
+    integer :: i
+
+    !$acc kernels
+    do i = 1, n
+        y(i) = a * x(i) + y(i)
+    end do
+    !$acc end kernels
+
+end subroutine saxpy
+```
+
+### Usage example for Fortran routine:
+
+Here is an example of how you might call this Fortran subroutine from a main program.
+
+```fortran
+program main
+    implicit none
+    integer :: n
+    real :: a
+    real, allocatable :: x(:), y(:)
+    integer :: i
+
+    n = 1000
+    a = 2.0
+    allocate(x(n), y(n))
+
+    ! Initialize vectors
+    do i = 1, n
+        x(i) = 1.0
+        y(i) = 2.0
+    end do
+
+    ! Call the AXPY subroutine
+    call saxpy(n, a, x, y)
+
+    ! Display results (optional)
+    do i = 1, n
+        print *, y(i)
+        if (mod(i, 10) == 0) print *
+    end do
+
+    deallocate(x, y)
+end program main
+```
+
+These examples demonstrate an AXPY operation using GPU acceleration with HIP for C and OpenACC for Fortran.
+
+Output 4:
+Certainly! The AXPY operation computes the element-wise `Y = a*X + Y`, where `a` is a scalar, and `X` and `Y` are vectors. Below are the implementations in C using HIP and the provided Fortran subroutine with OpenACC.
+
+### HIP (C) Implementation:
+```c
+#include <hip/hip_runtime.h>
+#include <stdio.h>
+
+// Kernel function for AXPY
+__global__ void saxpy_hip(int n, float a, float* x, float* y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+void saxpy(int n, float a, float* x, float* y) {
+    float *d_x, *d_y;
+    size_t size = n * sizeof(float);
+
+    // Allocate device memory
+    hipMalloc(&d_x, size);
+    hipMalloc(&d_y, size);
+
+    // Copy data from host to device
+    hipMemcpy(d_x, x, size, hipMemcpyHostToDevice);
+    hipMemcpy(d_y, y, size, hipMemcpyHostToDevice);
+
+    // Launch kernel with 256 threads per block
+    int blockSize = 256;
+    int numBlocks = (n + blockSize - 1) / blockSize;
+    hipLaunchKernelGGL(saxpy_hip, dim3(numBlocks), dim3(blockSize), 0, 0, n, a, d_x, d_y);
+
+    // Copy result back to host
+    hipMemcpy(y, d_y, size, hipMemcpyDeviceToHost);
+
+    // Free device memory
+    hipFree(d_x);
+    hipFree(d_y);
+}
+
+int main() {
+    int n = 100000;
+    float a = 2.0f;
+    float *x, *y;
+
+    // Allocate host memory
+    x = (float*)malloc(n * sizeof(float));
+    y = (float*)malloc(n * sizeof(float));
+
+    // Initialize vectors x and y
+    for (int i = 0; i < n; i++) {
+        x[i] = 1.0f;
+        y[i] = 2.0f;
+    }
+
+    // Perform saxpy operation
+    saxpy(n, a, x, y);
+
+    // Print some results
+    for (int i = 0; i < 10; i++) {
+        printf("y[%d] = %f\n", i, y[i]);
+    }
+
+    // Free host memory
+    free(x);
+    free(y);
+
+    return 0;
+}
+```
+
+### Fortran with OpenACC Implementation:
+The Fortran implementation you provided is already using OpenACC for parallelization. Here's the code again for completeness:
+
+```fortran
+subroutine saxpy(n, a, x, y)
+    implicit none
+    integer, intent(in) :: n
+    real, intent(in) :: a
+    real, intent(in) :: x(n)
+    real, intent(inout) :: y(n)
+    integer :: i
+    !$acc kernels
+    do i = 1, n
+        y(i) = a * x(i) + y(i)
+    end do
+    !$acc end kernels
+end subroutine saxpy
+```
+
+### Explanation:
+- The `saxpy_hip` kernel is defined to be run on the GPU using HIP. Each thread computes one element of the resulting vector `y` by performing `y[i] = a * x[i] + y[i]`.
+- The `saxpy` function in C:
+  1. Allocates device memory for `x` and `y`.
+  2. Copies data from the host to the device.
+  3. Launches the `saxpy_hip` kernel with an appropriate number of blocks and threads.
+  4. Copies the results back to the host.
+  5. Frees the device memory.
+- The Fortran subroutine incorporates OpenACC directives:
+  - `!$acc kernels` tells the compiler to parallelize the enclosed loop.
+  - `!$acc end kernels` ends the parallel region.
+
+Both implementations perform the AXPY operation in parallel on their respective GPUs using HIP for C and OpenACC for Fortran.
+
+Output 5:
+Sure, I'll provide a C function using HIP and a modified Fortran subroutine using OpenACC for the AXPY operation.
+
+### Fortran Subroutine with OpenACC
+
+The provided subroutine already utilizes OpenACC to perform the AXPY operation efficiently on parallel hardware like GPUs. Here it is for completeness:
+
+```fortran
+subroutine saxpy(n, a, x, y)
+    implicit none
+    integer, intent(in) :: n
+    real, intent(in) :: a
+    real, intent(in) :: x(n)
+    real, intent(inout) :: y(n)
+    integer :: i
+    !$acc kernels
+    do i = 1, n
+        y(i) = a * x(i) + y(i)
+    end do
+    !$acc end kernels
+end subroutine saxpy
+```
+
+### C Function with HIP
+
+Now, let's write the equivalent function in C using HIP for the AXPY operation:
+
+```c
+#include <hip/hip_runtime.h>
+#include <stdio.h>
+
+__global__ void saxpy_kernel(int n, float a, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+void saxpy(int n, float a, float *x, float *y) {
+    float *d_x, *d_y;
+
+    // Allocate device memory
+    hipMalloc(&d_x, n * sizeof(float));
+    hipMalloc(&d_y, n * sizeof(float));
+
+    // Copy vectors from host to device
+    hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
+    hipMemcpy(d_y, y, n * sizeof(float), hipMemcpyHostToDevice);
+
+    // Number of threads per block
+    int blockSize = 256;
+    // Number of blocks per grid
+    int numBlocks = (n + blockSize - 1) / blockSize;
+
+    // Launch the SAXPY kernel on GPU
+    hipLaunchKernelGGL(saxpy_kernel, dim3(numBlocks), dim3(blockSize), 0, 0, n, a, d_x, d_y);
+
+    // Copy result from device to host
+    hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
+
+    // Free device memory
+    hipFree(d_x);
+    hipFree(d_y);
+}
+
+int main() {
+    int n = 1000000; // Size of vectors
+    float a = 2.0f;
+    float *x, *y;
+
+    // Allocate host memory
+    x = (float*)malloc(n * sizeof(float));
+    y = (float*)malloc(n * sizeof(float));
+
+    // Initialize vectors
+    for (int i = 0; i < n; i++) {
+        x[i] = 1.0f;
+        y[i] = 2.0f;
+    }
+
+    // Perform SAXPY operation
+    saxpy(n, a, x, y);
+
+    // Print some results for verification
+    for (int i = 0; i < 5; i++) {
+        printf("y[%d] = %f\n", i, y[i]);
+    }
+
+    // Free host memory
+    free(x);
+    free(y);
+
+    return 0;
+}
+```
+
+### Explanation:
+
+1. **Kernel (`saxpy_kernel`)**: This is the core of the computation. It computes the SAXPY operation in parallel on the GPU. Each thread operates on a different element of the arrays.
+
+2. **Host Code (`saxpy` function)**:
+    - **Memory Allocation**: Allocates memory on the GPU for the `x` and `y` arrays.
+    - **Data Transfer**: Copies data from the host to the GPU.
+    - **Kernel Launch**: Launches the kernel with a number of blocks and threads suitable for the size of the input data.
+    - **Data Transfer Back**: Copies the result back from the GPU to the host.
+    - **Memory Deallocation**: Frees the GPU memory.
+
+3. **Main Function**:
+    - Allocates and initializes the arrays `x` and `y`.
+    - Calls the `saxpy` function to perform the SAXPY operation.
+    - Prints some elements of the result `y` for verification.
+    - Frees the host memory.
+
+This C function assumes that you have a HIP environment properly set up and that you compile the code with a HIP compiler.
+
+Output 6:
+Sure! Let's start by converting the given Fortran code for the AXPY operation to C and HIP.
+
+### C Implementation
+Here's the equivalent code implemented in C:
+
+```c
+#include <stdio.h>
+
+void saxpy(int n, float a, float* x, float* y) {
+    int i;
+#pragma acc kernels
+    for (i = 0; i < n; i++) {
+        y[i] = a * x[i] + y[i];
+    }
+#pragma acc end kernels
+}
+
+int main() {
+    const int n = 5;
+    float a = 2.0f;
+    float x[5] = {1, 2, 3, 4, 5};
+    float y[5] = {10, 20, 30, 40, 50};
+
+    saxpy(n, a, x, y);
+
+    for (int i = 0; i < n; i++) {
+        printf("y[%d] = %f\n", i, y[i]);
+    }
+
+    return 0;
+}
+```
+
+Note the usage of `#pragma acc kernels` and `#pragma acc end kernels` for OpenACC, just like the Fortran version.
+
+### HIP Implementation
+Here's the equivalent code implemented using HIP:
+
+```c
+#include <hip/hip_runtime.h>
+#include <stdio.h>
+
+__global__ void saxpy_kernel(int n, float a, float* x, float* y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+void saxpy(int n, float a, float* x, float* y) {
+    float *d_x, *d_y;
+    hipMalloc((void**)&d_x, n * sizeof(float));
+    hipMalloc((void**)&d_y, n * sizeof(float));
+
+    hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
+    hipMemcpy(d_y, y, n * sizeof(float), hipMemcpyHostToDevice);
+
+    int blockSize = 256;
+    int numBlocks = (n + blockSize - 1) / blockSize;
+
+    hipLaunchKernelGGL(saxpy_kernel, numBlocks, blockSize, 0, 0, n, a, d_x, d_y);
+
+    hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
+
+    hipFree(d_x);
+    hipFree(d_y);
+}
+
+int main() {
+    const int n = 5;
+    float a = 2.0f;
+    float x[5] = {1, 2, 3, 4, 5};
+    float y[5] = {10, 20, 30, 40, 50};
+
+    saxpy(n, a, x, y);
+
+    for (int i = 0; i < n; i++) {
+        printf("y[%d] = %f\n", i, y[i]);
+    }
+
+    return 0;
+}
+```
+
+### Explanation:
+* `__global__ void saxpy_kernel(int n, float a, float* x, float* y)` defines a HIP kernel function. The kernel performs the AXPY operation in parallel.
+* `hipMalloc` and `hipFree` are used for memory allocation and de-allocation on the GPU.
+* `hipMemcpy` is used to transfer data between the host and the device (GPU).
+* `hipLaunchKernelGGL` is used to launch the kernel function on the GPU with appropriate grid and block dimensions.
+
+By using HIP, you can leverage the computing power of modern GPUs, which can significantly speed up the AXPY operation for large input sizes.
+
+Output 7:
+Sure! Below is the C and HIP implementation of the AXPY operation that corresponds to your Fortran and OpenACC subroutine.
+
+### C and HIP Implementation
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <hip/hip_runtime.h>
+
+// HIP Kernel 
+__global__ void saxpy_hip(int n, float a, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if(i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+void saxpy(int n, float a, float *x, float *y) {
+    float *d_x, *d_y;
+    const int size = n * sizeof(float);
+    
+    // Allocate device memory
+    hipMalloc((void**)&d_x, size);
+    hipMalloc((void**)&d_y, size);
+    
+    // Copy data from host to device
+    hipMemcpy(d_x, x, size, hipMemcpyHostToDevice);
+    hipMemcpy(d_y, y, size, hipMemcpyHostToDevice);
+    
+    // Define block and grid sizes
+    int blockSize = 256;
+    int numBlocks = (n + blockSize - 1) / blockSize;
+    
+    // Launch HIP kernel
+    hipLaunchKernelGGL(saxpy_hip, dim3(numBlocks), dim3(blockSize), 0, 0, n, a, d_x, d_y);
+    
+    // Copy result back to host
+    hipMemcpy(y, d_y, size, hipMemcpyDeviceToHost);
+    
+    // Free device memory
+    hipFree(d_x);
+    hipFree(d_y);
+}
+
+int main() {
+    int n = 1000000;  // Vector size
+    float a = 2.0f;   // Scaling factor
+    
+    // Allocate host memory
+    float *x = (float*)malloc(n * sizeof(float));
+    float *y = (float*)malloc(n * sizeof(float));
+    
+    // Initialize vectors
+    for (int i = 0; i < n; i++) {
+        x[i] = (float)i;
+        y[i] = (float)i * 2.0f;
+    }
+    
+    // Perform SAXPY operation
+    saxpy(n, a, x, y);
+    
+    // Print first 10 elements of the result
+    for (int i = 0; i < 10; i++) {
+        printf("y[%d] = %f\n", i, y[i]);
+    }
+    
+    // Free host memory
+    free(x);
+    free(y);
+    
+    return 0;
+}
+```
+
+### Explanation
+
+1. **HIP Kernel**:
+    - `__global__ void saxpy_hip(int n, float a, float *x, float *y)`: This is the kernel definition that runs on the GPU.
+    - `int i = blockIdx.x * blockDim.x + threadIdx.x;`: Each thread computes its unique index.
+    - `if(i < n) { y[i] = a * x[i] + y[i]; }`: Each thread performs the AXPY operation for its assigned index.
+
+2. **Host Function**:
+    - The function `saxpy`:
+        - Allocates device memory for vectors `x` and `y`.
+        - Copies vectors `x` and `y` from host to device.
+        - Calculates the number of blocks needed.
+        - Launches the HIP Kernel.
+        - Copies the result back from the device to the host.
+        - Frees the device memory.
+
+3. **Main Function**:
+    - Initializes vectors `x` and `y`.
+    - Calls the `saxpy` function to perform the operation.
+    - Prints the results.
+
+This setup leverages HIP's capabilities to parallelize the AXPY operation on the GPU, akin to how OpenACC parallelizes it in your Fortran subroutine.
+
+Output 8:
+To implement the AXPY operation in C with HIP (Heterogeneous-Compute Interface for Portability), we need to consider the parallel nature of GPU computation. Here's how you can translate the above Fortran routine into a C function using HIP:
+
+```c
+#include <hip/hip_runtime.h>
+
+__global__ void saxpy_hip(int n, float a, float* x, float* y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+void saxpy(int n, float a, float *x, float *y) {
+    float *d_x, *d_y;
+
+    // Allocate device memory
+    hipMalloc((void**)&d_x, n * sizeof(float));
+    hipMalloc((void**)&d_y, n * sizeof(float));
+
+    // Copy data from host to device
+    hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
+    hipMemcpy(d_y, y, n * sizeof(float), hipMemcpyHostToDevice);
+
+    // Configure and launch the kernel
+    int blockSize = 256;
+    int numBlocks = (n + blockSize - 1) / blockSize;
+    hipLaunchKernelGGL(saxpy_hip, numBlocks, blockSize, 0, 0, n, a, d_x, d_y);
+
+    // Copy result back from device to host
+    hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
+
+    // Free device memory
+    hipFree(d_x);
+    hipFree(d_y);
+}
+```
+
+This implementation consists of:
+
+1. **HIP Kernel (`saxpy_hip`)**: This kernel function performs the AXPY operation parallelly over the elements of arrays `x` and `y`.
+
+2. **Host Function (`saxpy`)**:
+    - Allocates memory on the GPU for `x` and `y`.
+    - Copies input arrays `x` and `y` from host memory to device memory.
+    - Launches the `saxpy_hip` kernel on the GPU.
+    - Copies the output array `y` back from device memory to host memory.
+    - Frees the allocated GPU memory.
+
+Ensure you have the necessary HIP runtime and development environment set up to compile and run this code. The typical compilation command for HIP code would involve `hipcc`, which is the HIP compiler driver. Here is an example compilation command:
+
+```sh
+hipcc -o saxpy saxpy.c
+```
+
+By running the compiled executable, you can perform the AXPY operation on the GPU.
+
+Output 9:
+Certainly! Below are the equivalent implementations of the AXPY operation (Y = aX + Y) in C with HIP and in Fortran with OpenACC.
+
+### Fortran with OpenACC
+
+```fortran
+subroutine saxpy(n, a, x, y)
+    implicit none
+    integer, intent(in) :: n
+    real, intent(in) :: a
+    real, intent(in) :: x(n)
+    real, intent(inout) :: y(n)
+    integer :: i
+    !$acc kernels
+    do i = 1, n
+        y(i) = a * x(i) + y(i)
+    end do
+    !$acc end kernels
+end subroutine saxpy
+```
+
+### C with HIP
+
+```c
+#include <hip/hip_runtime.h>
+
+__global__ void saxpy(int n, float a, float* x, float* y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+void saxpy_hip(int n, float a, float* x, float* y) {
+    float *d_x, *d_y;
+    hipMalloc((void**)&d_x, n * sizeof(float));
+    hipMalloc((void**)&d_y, n * sizeof(float));
+
+    hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
+    hipMemcpy(d_y, y, n * sizeof(float), hipMemcpyHostToDevice);
+
+    int blockSize = 256; // Number of threads per block
+    int numBlocks = (n + blockSize - 1) / blockSize;
+
+    hipLaunchKernelGGL(saxpy, dim3(numBlocks), dim3(blockSize), 0, 0, n, a, d_x, d_y);
+
+    hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
+
+    hipFree(d_x);
+    hipFree(d_y);
+}
+```
+
+### How to Compile
+
+1. **Fortran code** with OpenACC:
+    ```bash
+    pgfortran -acc -o saxpy_openacc saxpy_openacc.f90
+    ```
+
+2. **C code** with HIP:
+    ```bash
+    hipcc saxpy_hip.c -o saxpy_hip
+    ```
+
+### Usage Example
+
+#### Fortran:
+```fortran
+program test
+    implicit none
+    integer :: n, i
+    real :: a
+    real, allocatable :: x(:), y(:)
+
+    n = 1000000
+    a = 2.0
+    allocate(x(n), y(n))
+
+    ! Initialize x and y arrays
+    do i = 1, n
+        x(i) = i * 0.001
+        y(i) = i * 0.002
+    end do
+
+    ! Call the saxpy subroutine
+    call saxpy(n, a, x, y)
+
+    ! Print y[1], y[500000] and y[n] for testing
+    print *, y(1), y(500000), y(n)
+
+    deallocate(x, y)
+end program test
+```
+
+#### C:
+```c
+#include <stdio.h>
+#include <stdlib.h>
+
+void saxpy_hip(int n, float a, float* x, float* y);
+
+int main() {
+    int n = 1000000;
+    float a = 2.0f;
+    float *x, *y;
+
+    x = (float*)malloc(n * sizeof(float));
+    y = (float*)malloc(n * sizeof(float));
+
+    // Initialize x and y arrays
+    for (int i = 0; i < n; ++i) {
+        x[i] = i * 0.001f;
+        y[i] = i * 0.002f;
+    }
+
+    // Call the saxpy function
+    saxpy_hip(n, a, x, y);
+
+    // Print y[0], y[499999] and y[n-1] for testing
+    printf("%f %f %f\n", y[0], y[499999], y[n-1]);
+
+    free(x);
+    free(y);
+
+    return 0;
+}
+```
+
+These implementations should give you the same functional results for the saxpy operation using OpenACC in Fortran and HIP in C.
+
+Output 10:
+Sure! Below is an equivalent function in C using HIP for the AXPY operation (`y = a * x + y`), which corresponds to the Fortran subroutine you provided.
+
+**HIP implementation in C:**
+
+```c
+#include <hip/hip_runtime.h>
+#include <stdio.h>
+
+// HIP kernel for the AXPY operation
+__global__ void saxpy_kernel(int n, float a, float *x, float *y) {
+    int i = blockDim.x * blockIdx.x + threadIdx.x;
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+// Host function to call the HIP kernel
+void saxpy(int n, float a, float *x, float *y) {
+    float *d_x, *d_y;
+    size_t size = n * sizeof(float);
+
+    // Allocate device memory
+    hipMalloc((void**)&d_x, size);
+    hipMalloc((void**)&d_y, size);
+
+    // Copy data from host to device
+    hipMemcpy(d_x, x, size, hipMemcpyHostToDevice);
+    hipMemcpy(d_y, y, size, hipMemcpyHostToDevice);
+
+    // Launch the saxpy kernel with enough blocks and threads
+    int blockSize = 256;
+    int numBlocks = (n + blockSize - 1) / blockSize;
+    hipLaunchKernelGGL(saxpy_kernel, dim3(numBlocks), dim3(blockSize), 0, 0, n, a, d_x, d_y);
+
+    // Copy result back to host
+    hipMemcpy(y, d_y, size, hipMemcpyDeviceToHost);
+
+    // Free device memory
+    hipFree(d_x);
+    hipFree(d_y);
+}
+
+// Example main function to demonstrate usage
+int main() {
+    int n = 1024;
+    float a = 2.0f;
+    float x[n], y[n];
+
+    // Initialize the arrays
+    for(int i = 0; i < n; i++) {
+        x[i] = i * 1.0f;
+        y[i] = i * 2.0f;
+    }
+
+    // Compute SAXPY
+    saxpy(n, a, x, y);
+
+    // Print the result for verification
+    for(int i = 0; i < n; i++) {
+        printf("y[%d] = %f\n", i, y[i]);
+    }
+
+    return 0;
+}
+```
+
+### Explanation:
+1. **HIP Kernel Definition (`saxpy_kernel`):**
+   - Uses the `__global__` keyword to define a kernel that runs on the GPU.
+   - Each thread computes one element of the result array `y`.
+  
+2. **Host Function (`saxpy`)**:
+   - Manages memory allocation and data transfer between host (CPU) and device (GPU).
+   - Launches the `saxpy_kernel` with an appropriate configuration based on the input size.
+   - Copies the result back from the device to the host.
+
+3. **Main Function (`main`)**:
+   - Initializes input arrays `x` and `y`.
+   - Calls the `saxpy` function to perform the computation.
+   - Prints the results for verification.
+
+**Usage Notes:**
+- Ensure you have HIP installed and properly configured for this code to run.
+- Compile the code with a HIP-compatible compiler, such as `hipcc`.
+
+The provided implementation mirrors the functionality of the Fortran subroutine using OpenACC.
+
