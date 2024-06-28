@@ -1,0 +1,361 @@
+Code Block 1:
+void hip_gemv(int n, const float *h_A, const float *h_x, float *h_y) {
+    float *d_A, *d_x, *d_y;
+
+    // Allocate device memory
+    hipMalloc((void**)&d_A, n * n * sizeof(float));
+    hipMalloc((void**)&d_x, n * sizeof(float));
+    hipMalloc((void**)&d_y, n * sizeof(float));
+
+    // Copy data from host to device
+    hipMemcpy(d_A, h_A, n * n * sizeof(float), hipMemcpyHostToDevice);
+    hipMemcpy(d_x, h_x, n * sizeof(float), hipMemcpyHostToDevice);
+
+    // Set up execution configuration
+    dim3 blockDim(256);
+    dim3 gridDim((n + blockDim.x - 1) / blockDim.x);
+
+    // Launch the kernel
+    hipLaunchKernelGGL(gemv_kernel, gridDim, blockDim, 0, 0, n, d_A, d_x, d_y);
+
+    // Copy result back to host
+    hipMemcpy(h_y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
+
+    // Free device memory
+    hipFree(d_A);
+    hipFree(d_x);
+    hipFree(d_y);
+}
+
+__global__ void gemv_kernel(int n, const float *A, const float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        float sum = 0.0;
+        for (int j = 0; j < n; ++j) {
+            sum += A[i * n + j] * x[j];
+        }
+        y[i] = sum;
+    }
+}
+
+Code Block 2:
+void gemv_hip(int n, const float* A, const float* x, float* y) {
+    float *d_A, *d_x, *d_y;
+
+    hipMalloc((void**)&d_A, n * n * sizeof(float));
+    hipMalloc((void**)&d_x, n * sizeof(float));
+    hipMalloc((void**)&d_y, n * sizeof(float));
+    
+    hipMemcpy(d_A, A, n * n * sizeof(float), hipMemcpyHostToDevice);
+    hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
+
+    int grid_size = (n + BLOCK_SIZE - 1) / BLOCK_SIZE;
+    hipLaunchKernelGGL(gemv_kernel, dim3(grid_size), dim3(BLOCK_SIZE), 0, 0, n, d_A, d_x, d_y);
+
+    hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
+
+    hipFree(d_A);
+    hipFree(d_x);
+    hipFree(d_y);
+}
+
+__global__ void gemv_kernel(int n, const float* A, const float* x, float* y) {
+    int row = blockIdx.x * blockDim.x + threadIdx.x;
+    if (row < n) {
+        float sum = 0.0;
+        for (int j = 0; j < n; j++) {
+            sum += A[row * n + j] * x[j];
+        }
+        y[row] = sum;
+    }
+}
+
+Code Block 3:
+void gemv_parallel(int n, float* A, float* x, float* y) {
+    float *d_A, *d_x, *d_y;
+
+    // Allocate device memory
+    hipMalloc(&d_A, n * n * sizeof(float));
+    hipMalloc(&d_x, n * sizeof(float));
+    hipMalloc(&d_y, n * sizeof(float));
+
+    // Copy data from host to device
+    hipMemcpy(d_A, A, n * n * sizeof(float), hipMemcpyHostToDevice);
+    hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
+
+    // Define grid and block dimensions
+    int blockSize = 256;
+    int gridSize = (n + blockSize - 1) / blockSize;
+
+    // Launch kernel
+    hipLaunchKernelGGL(gemvKernel, dim3(gridSize), dim3(blockSize), 0, 0, n, d_A, d_x, d_y);
+
+    // Copy result from device to host
+    hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
+
+    // Free device memory
+    hipFree(d_A);
+    hipFree(d_x);
+    hipFree(d_y);
+}
+
+__global__ void gemvKernel(int n, float* A, float* x, float* y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        float sum = 0.0f;
+        for (int j = 0; j < n; j++) {
+            sum += A[i * n + j] * x[j];
+        }
+        y[i] = sum;
+    }
+}
+
+Code Block 4:
+void gemv_parallel(int n, float *A, float *x, float *y) {
+    float *d_A, *d_x, *d_y;
+    size_t sizeA = n * n * sizeof(float);
+    size_t sizeX = n * sizeof(float);
+    size_t sizeY = n * sizeof(float);
+
+    // Allocate device memory
+    hipMalloc((void**)&d_A, sizeA);
+    hipMalloc((void**)&d_x, sizeX);
+    hipMalloc((void**)&d_y, sizeY);
+
+    // Copy data from host to device
+    hipMemcpy(d_A, A, sizeA, hipMemcpyHostToDevice);
+    hipMemcpy(d_x, x, sizeX, hipMemcpyHostToDevice);
+
+    // Launch the kernel
+    int blockSize = 256;  // Adjust to your GPU capabilities
+    int numBlocks = (n + blockSize - 1) / blockSize;
+    hipLaunchKernelGGL(gemv_kernel, dim3(numBlocks), dim3(blockSize), 0, 0, n, d_A, d_x, d_y);
+
+    // Copy result from device to host
+    hipMemcpy(y, d_y, sizeY, hipMemcpyDeviceToHost);
+
+    // Free device memory
+    hipFree(d_A);
+    hipFree(d_x);
+    hipFree(d_y);
+}
+
+__global__ void gemv_kernel(int n, float *A, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        float sum = 0.0f;
+        for (int j = 0; j < n; ++j) {
+            sum += A[i * n + j] * x[j];
+        }
+        y[i] = sum;
+    }
+}
+
+Code Block 5:
+void gemv_parallel(int n, const float *A, const float *x, float *y) {
+    float *d_A, *d_x, *d_y;
+
+    // Allocate memory on the device
+    hipMalloc(&d_A, n * n * sizeof(float));
+    hipMalloc(&d_x, n * sizeof(float));
+    hipMalloc(&d_y, n * sizeof(float));
+
+    // Copy data to the device
+    hipMemcpy(d_A, A, n * n * sizeof(float), hipMemcpyHostToDevice);
+    hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
+
+    // Define block and grid sizes
+    int blockSize = 256;
+    int gridSize = (n + blockSize - 1) / blockSize;
+
+    // Launch the kernel
+    hipLaunchKernelGGL(gemv_kernel, dim3(gridSize), dim3(blockSize), 0, 0, n, d_A, d_x, d_y);
+
+    // Copy the result back to host
+    hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
+
+    // Free device memory
+    hipFree(d_A);
+    hipFree(d_x);
+    hipFree(d_y);
+}
+
+__global__ void gemv_kernel(int n, const float *A, const float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        float sum = 0.0f;
+        for (int j = 0; j < n; ++j) {
+            sum += A[i * n + j] * x[j];
+        }
+        y[i] = sum;
+    }
+}
+
+Code Block 6:
+j
+        for (int j = 0; j < n; j++) {
+            sum += A[i * n + j] * x[j];
+        }
+
+__global__ void gemv_kernel(int n, const float* A, const float* x, float* y) {
+    int i = blockDim.x * blockIdx.x + threadIdx.x;
+
+    if (i < n) {
+        float sum = 0.0f;
+
+        // Sum A(i, j) * x(j) for all j
+        for (int j = 0; j < n; j++) {
+            sum += A[i * n + j] * x[j];
+        }
+
+        y[i] = sum;
+    }
+}
+
+Code Block 7:
+void gemv(int n, float *A, float *x, float *y) {
+    float *d_A, *d_x, *d_y;
+    size_t size_matrix = n * n * sizeof(float);
+    size_t size_vector = n * sizeof(float);
+
+    // Allocate device memory
+    hipMalloc(&d_A, size_matrix);
+    hipMalloc(&d_x, size_vector);
+    hipMalloc(&d_y, size_vector);
+
+    // Copy data from host to device
+    hipMemcpy(d_A, A, size_matrix, hipMemcpyHostToDevice);
+    hipMemcpy(d_x, x, size_vector, hipMemcpyHostToDevice);
+
+    // Define block size and grid size
+    int blockSize = 256;
+    int gridSize = (n + blockSize - 1) / blockSize;
+
+    // Launch kernel
+    hipLaunchKernelGGL(gemv_parallel_hip, gridSize, blockSize, 0, 0, n, d_A, d_x, d_y);
+
+    // Copy result back to host
+    hipMemcpy(y, d_y, size_vector, hipMemcpyDeviceToHost);
+
+    // Free device memory
+    hipFree(d_A);
+    hipFree(d_x);
+    hipFree(d_y);
+}
+
+__global__ void gemv_parallel_hip(int n, float *A, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (i < n) {
+        float sum = 0.0f;
+        for (int j = 0; j < n; j++) {
+            sum += A[i * n + j] * x[j];
+        }
+        y[i] = sum;
+    }
+}
+
+Code Block 8:
+void gemv_parallel(int n, float *A, float *x, float *y)
+{
+    float *d_A, *d_x, *d_y;
+
+    // Allocate memory on the device
+    hipMalloc((void**)&d_A, n * n * sizeof(float));
+    hipMalloc((void**)&d_x, n * sizeof(float));
+    hipMalloc((void**)&d_y, n * sizeof(float));
+
+    // Copy data to the device
+    hipMemcpy(d_A, A, n * n * sizeof(float), hipMemcpyHostToDevice);
+    hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
+
+    // Launch the kernel
+    int blockSize = 256;
+    int numBlocks = (n + blockSize - 1) / blockSize;
+    hipLaunchKernelGGL(gemv_hip, dim3(numBlocks), dim3(blockSize), 0, 0, n, d_A, d_x, d_y);
+    
+    // Copy the result back to the host
+    hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
+
+    // Free device memory
+    hipFree(d_A);
+    hipFree(d_x);
+    hipFree(d_y);
+}
+
+__global__ void gemv_hip(int n, float *A, float *x, float *y)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n)
+    {
+        float sum = 0.0f;
+        for (int j = 0; j < n; j++)
+        {
+            sum += A[i * n + j] * x[j];
+        }
+        y[i] = sum;
+    }
+}
+
+Code Block 9:
+void gemv_parallel(int n, float *A, float *x, float *y) {
+    #pragma omp parallel for
+    for (int i = 0; i < n; i++) {
+        float sum = 0.0f;
+        for (int j = 0; j < n; j++) {
+            sum += A[i * n + j] * x[j];
+        }
+        y[i] = sum;
+    }
+}
+
+__global__ void gemv_kernel(int n, float *A, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        float sum = 0.0f;
+        for (int j = 0; j < n; j++) {
+            sum += A[i * n + j] * x[j];
+        }
+        y[i] = sum;
+    }
+}
+
+Code Block 10:
+void gemv_parallel(int n, const float *A, const float *x, float *y) {
+    // Device pointers
+    float *d_A, *d_x, *d_y;
+
+    // Allocate memory on the device
+    hipMalloc((void**)&d_A, n * n * sizeof(float));
+    hipMalloc((void**)&d_x, n * sizeof(float));
+    hipMalloc((void**)&d_y, n * sizeof(float));
+
+    // Copy data from host to device
+    hipMemcpy(d_A, A, n * n * sizeof(float), hipMemcpyHostToDevice);
+    hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
+
+    // Launch the kernel with one thread per row
+    int blockSize = 256; // you can adjust the block size as needed
+    int gridSize = (n + blockSize - 1) / blockSize;
+    hipLaunchKernelGGL(gemv_parallel_hip, dim3(gridSize), dim3(blockSize), 0, 0, n, d_A, d_x, d_y);
+
+    // Copy the result back to host
+    hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
+
+    // Free device memory
+    hipFree(d_A);
+    hipFree(d_x);
+    hipFree(d_y);
+}
+
+__global__ void gemv_parallel_hip(int n, const float *A, const float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        float sum = 0.0f;
+        for (int j = 0; j < n; ++j) {
+            sum += A[i * n + j] * x[j];
+        }
+        y[i] = sum;
+    }
+}
+

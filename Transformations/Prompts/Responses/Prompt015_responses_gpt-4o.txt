@@ -1,0 +1,556 @@
+Output 1:
+Sure, here is a C function implementation of the above Fortran subroutine using OpenACC:
+
+```c
+#include <stdio.h>
+#include <openacc.h>
+
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int i, j, l;
+  
+  #pragma acc parallel loop collapse(2) private(i, j, l)
+  for (j = 0; j < n; j++) {
+    for (i = 0; i < m; i++) {
+      double temp = 0.0;
+      for (l = 0; l < k; l++) {
+        temp += a[i * lda + l] * b[l * ldb + j];
+      }
+      c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+    }
+  }
+}
+
+int main() {
+  int m = 2, n = 2, k = 2;
+  double alpha = 1.0, beta = 1.0;
+  double a[4] = {1.0, 2.0, 3.0, 4.0}; // 2x2 matrix
+  double b[4] = {5.0, 6.0, 7.0, 8.0}; // 2x2 matrix
+  double c[4] = {0.0, 0.0, 0.0, 0.0}; // 2x2 matrix
+  
+  gemm_parallel(m, n, k, alpha, a, 2, b, 2, beta, c, 2);
+
+  printf("Result matrix:\n");
+  for (int i = 0; i < m; i++) {
+    for (int j = 0; j < n; j++) {
+      printf("%f ", c[i * 2 + j]);
+    }
+    printf("\n");
+  }
+
+  return 0;
+}
+```
+
+This C code initializes an example setup and performs the general matrix-matrix multiplication operation using OpenACC for parallelism. The results are printed to observe the behavior of the function.
+
+Explanation of key parts of the code:
+
+1. **pragma acc parallel loop collapse(2) private(i, j, l)**:
+    - `pragma acc parallel loop` indicates the following loop should be parallelized by OpenACC.
+    - `collapse(2)` tells OpenACC that the next two loops should be treated as a single entity to provide more parallelism.
+    - `private(i, j, l)` ensures that each thread has its own copy of the variables `i`, `j`, and `l`.
+
+2. **Indexing**:
+    - The matrices `a`, `b`, and `c` are stored in 1D arrays, so appropriate indexing is done to access respective elements.
+
+3. **Initialization**:
+    - Here, the matrices `a`, `b`, and `c` have been initialized with some values. In practice, you would provide your actual matrices and values.
+
+For running the above code, you need a compiler that supports OpenACC (e.g., PGI, GCC with OpenACC), and you must compile it with OpenACC flags enabled.
+
+Output 2:
+Sure! Here is the `gemm_parallel` function implemented in C with OpenACC. This function will calculate the Generalized Matrix Multiplication (GEMM) operation:
+
+```c
+#include <openacc.h>
+
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+    int i, j, l;
+    double temp;
+
+    #pragma acc parallel loop collapse(2) private(i, j, l, temp)
+    for (j = 0; j < n; j++) {
+        for (i = 0; i < m; i++) {
+            temp = 0.0;
+            for (l = 0; l < k; l++) {
+                temp += a[i * lda + l] * b[l * ldb + j];
+            }
+            c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+        }
+    }
+}
+
+int main() {
+    // Example usage
+    int m = 3, n = 3, k = 3;
+    double alpha = 1.0, beta = 1.0;
+    double a[9] = {1, 2, 3, 4, 5, 6, 7, 8, 9};
+    double b[9] = {9, 8, 7, 6, 5, 4, 3, 2, 1};
+    double c[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+    gemm_parallel(m, n, k, alpha, a, m, b, k, beta, c, m);
+
+    for (int i = 0; i < m; i++) {
+        for (int j = 0; j < n; j++) {
+            printf("%f ", c[i * m + j]);
+        }
+        printf("\n");
+    }
+
+    return 0;
+}
+```
+### Explanation
+1. **Parameters**:
+    - `m, n, k`: Dimensions of the matrices.
+    - `alpha, beta`: Scalars for the GEMM operation.
+    - `a, b`: Input matrices.
+    - `lda, ldb, ldc`: Leading dimensions of the matrices `a, b, c` respectively.
+    - `c`: Output matrix, stores the result.
+
+2. **OpenACC Parallel Loop**:
+    - `#pragma acc parallel loop collapse(2) private(i, j, l, temp)`: Indicates that the code block inside the loop is parallel and the loop iterations are independent. The `collapse(2)` clause merges the two loops into a single large loop to improve parallel performance.
+
+3. **Matrix Computation**:
+    - The inner-most loop computes the dot product of a row of `a` and a column of `b`. This is the core computation for GEMM.
+    - After computing `temp`, it is scaled by `alpha` and added to `beta` times the existing value in `c`.
+
+4. **Example Usage**:
+    - The `main` function initializes example matrices `a` and `b` and calls `gemm_parallel` to compute the matrix product. The resulting matrix `c` is printed.
+
+### Dependencies
+To compile with OpenACC support, you need a compatible compiler such as the PGI (NVIDIA) compiler:
+
+```sh
+pgcc -acc -o gemm_parallel gemm_parallel.c
+```
+
+This will compile the `gemm_parallel.c` file with OpenACC support. Adjust the command accordingly based on the compiler being used.
+
+Output 3:
+Sure! Below is the equivalent function implemented in C and OpenACC that performs the Generalized Matrix Multiplication (GEMM) operation matching the provided Fortran and OpenMP subroutine.
+
+First, here's the complete function `gemm_parallel` in C that uses OpenACC for parallelization.
+
+```c
+#include <stdio.h>
+
+// Function to perform General Matrix Multiplication (GEMM)
+void gemm_parallel(int m, int n, int k, double alpha, double* a, int lda, double* b, int ldb, double beta, double* c, int ldc) {
+    int i, j, l;
+    double temp;
+
+    // Parallelize the outer loops using OpenACC
+    #pragma acc parallel loop collapse(2) private(i, j, l, temp) present(a[0:lda*k], b[0:ldb*n], c[0:ldc*n])
+    for (j = 0; j < n; j++) {
+        for (i = 0; i < m; i++) {
+            temp = 0.0;
+            for (l = 0; l < k; l++) {
+                temp += a[i * lda + l] * b[l * ldb + j];
+            }
+            c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+        }
+    }
+}
+
+int main() {
+    // Example usage
+    int m = 2, n = 3, k = 4;
+    double alpha = 1.0, beta = 0.0;
+
+    double a[2][4] = {{1, 2, 3, 4}, {5, 6, 7, 8}};
+    double b[4][3] = {{1, 2, 3}, {4, 5, 6}, {7, 8, 9}, {10, 11, 12}};
+    double c[2][3] = {{0, 0, 0}, {0, 0, 0}};
+
+    gemm_parallel(m, n, k, alpha, (double*)a, 4, (double*)b, 3, beta, (double*)c, 3);
+
+    for (int i = 0; i < m; i++) {
+        for (int j = 0; j < n; j++) {
+            printf("%f ", c[i][j]);
+        }
+        printf("\n");
+    }
+
+    return 0;
+}
+```
+
+### Notes:
+1. **Use of OpenACC**: The `#pragma acc parallel loop collapse(2)` directive instructs the compiler to parallelize the nested loops on an accelerator (e.g., a GPU). The `collapse(2)` clause indicates that both outermost loops should be collapsed into a single parallel loop.
+
+2. **Memory Present Clauses**: The `present` clause specifies that the arrays `a`, `b`, and `c` are already present on the accelerator device memory, avoiding unnecessary data movements between the host and device.
+
+3. **Array Indexing**: Unlike Fortran, C arrays are 0-based, so the loop indices and array accesses are adjusted accordingly.
+
+4. **Array Layout**: In C, when passing a 2D array to the function, they are handled as 1D arrays with careful indexing by row and column to match Fortran's row-major order.
+
+Remember, for the OpenACC directives to work, you need to compile the code with an OpenACC-compatible compiler, such as the PGI (now NVIDIA HPC) compiler. The syntax for compilation depends on the compiler being used. For example:
+```sh
+pgcc -acc -o gemm_parallel gemm_parallel.c
+```
+
+Output 4:
+Certainly! Below is the equivalent of the provided Fortran subroutine, implemented in C and using OpenACC for parallelism.
+
+Here, you'll see the function `gemm_parallel` that performs the Generalized Matrix multiplication (GEMM) operation. The OpenACC directives are used to parallelize this matrix multiplication.
+
+```c
+#include <stdio.h>
+#include <openacc.h>
+
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, 
+                   double *b, int ldb, double beta, double *c, int ldc) {
+    int i, j, l;
+    double temp;
+
+    #pragma acc parallel loop collapse(2) private(i, j, l, temp) present(a[0:lda*k], b[0:ldb*n], c[0:ldc*n])
+    for (j = 0; j < n; j++) {
+        for (i = 0; i < m; i++) {
+            temp = 0.0;
+            for (l = 0; l < k; l++) {
+                temp += a[i + l * lda] * b[l + j * ldb];
+            }
+            c[i + j * ldc] = alpha * temp + beta * c[i + j * ldc];
+        }
+    }
+}
+
+int main() {
+    // Example usage
+    int m = 2, n = 3, k = 2;
+    int lda = 2, ldb = 2, ldc = 2;
+    
+    double alpha = 1.0, beta = 0.0;
+    double a[4] = {1.0, 2.0, 3.0, 4.0}; // 2x2 matrix
+    double b[6] = {5.0, 6.0, 7.0, 8.0, 9.0, 10.0}; // 2x3 matrix
+    double c[6] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0}; // 2x3 matrix
+
+    #pragma acc data copyin(a[0:lda*k], b[0:ldb*n]) copy(c[0:ldc*n])
+    {
+        gemm_parallel(m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+    }
+
+    printf("Result matrix C:\n");
+    for (int i = 0; i < m; i++) {
+        for (int j = 0; j < n; j++) {
+            printf("%f ", c[i + j * ldc]);
+        }
+        printf("\n");
+    }
+
+    return 0;
+}
+```
+
+### Notes on the implementation:
+
+1. **Array Storage**: In C, matrices are stored in row-major order by default, unlike Fortran which stores them in column-major order. Here, the C matrices `a`, `b`, and `c` respect the Fortran layout by manually indexing.
+  
+2. **OpenACC Directives**: The `#pragma acc parallel loop` directive is used to parallelize the outer loops. The `collapse(2)` clause allows the two outermost loops (j and i) to be collapsed into a single loop for parallelism. The `private` clause ensures that each thread gets its own private copy of the variables `i`, `j`, `l`, and `temp`.
+
+3. **Memory Management**: The `#pragma acc data` directive is used for transferring data to and from the device (GPU). The `copyin` and `copy` clauses specify that arrays `a` and `b` are copied to the device, and array `c` is both copied to the device and back to the host.
+
+### Compilation:
+To compile this code, you need an OpenACC-compatible compiler, such as PGI or NVHPC. Below is an example compilation command using the NVHPC compiler:
+
+```bash
+nvc -acc -o gemm_parallel gemm_parallel.c
+```
+
+You can replace the `nvc` with the appropriate compiler command if using a different OpenACC-enabled compiler.
+
+Output 5:
+To convert the Fortran subroutine `gemm_parallel` that uses OpenMP to a C function using OpenACC, we can closely follow the same logic while adapting it to C syntax and using OpenACC directives for parallelization. Below is the implementation:
+
+```c
+#include <openacc.h>
+
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+    int i, j, l;
+    #pragma acc parallel loop collapse(2) private(i, j, l) present(a[0:lda*k], b[0:ldb*n], c[0:ldc*n])
+    for (j = 0; j < n; j++) {
+        for (i = 0; i < m; i++) {
+            double temp = 0.0;
+            #pragma acc loop reduction(+:temp)
+            for (l = 0; l < k; l++) {
+                temp += a[i * lda + l] * b[l * ldb + j];
+            }
+            c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+        }
+    }
+}
+```
+
+**Explanation:**
+- **Data Layout in C vs Fortran:** C uses 0-based indexing and row-major order for arrays, while Fortran uses 1-based indexing and column-major order. Therefore, we need to access elements properly to match the equivalent behavior.
+- **Private Variables:** The OpenACC directive `private(i, j, l)` specifies which variables are private to each thread.
+- **Data Mapping:** `present` clause in OpenACC ensures that the data is already present on the device. If the data is not already on the device, you may need to use `copyin` and `copyout` or `create` clauses accordingly.
+- **Reduction:** The `reduction(+:temp)` clause in OpenACC is used to accumulate the value of `temp` for each iteration of the `l` loop.
+
+Ensure that arrays `a`, `b`, and `c` are either already allocated on the device or appropriately managed with data directives if not initially present. Adjustments may be necessary based on the surrounding code that manages these arrays.
+
+Output 6:
+To translate the provided Fortran subroutine (which uses OpenMP) for Generalized Matrix Multiplication (GEMM) into a C function using OpenACC, we need to follow these steps:
+
+1. Declare the function parameters following C conventions.
+2. Implement the nested loops that perform the matrix multiplication.
+3. Use OpenACC directives to parallelize the loops.
+
+Given the provided Fortran subroutine, here is its equivalent implementation in C using OpenACC:
+
+```c
+#include <stdio.h>
+
+// Function prototype
+void gemm_parallel(int m, int n, int k, double alpha, double* a, int lda, double* b, int ldb, double beta, double* c, int ldc);
+
+void gemm_parallel(int m, int n, int k, double alpha, double* a, int lda, double* b, int ldb, double beta, double* c, int ldc) {
+    int i, j, l;
+    double temp;
+
+    // Parallelization with OpenACC
+    #pragma acc parallel loop private(i, j, l, temp) collapse(2)
+    for (j = 0; j < n; ++j) {
+        for (i = 0; i < m; ++i) {
+            temp = 0.0;
+            for (l = 0; l < k; ++l) {
+                temp += a[i * lda + l] * b[l * ldb + j];
+            }
+            c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+        }
+    }
+
+}
+
+int main() {
+    // Sample data for testing
+    // In practice, these should be dynamically allocated if sizes are large
+    int m = 2, n = 2, k = 2;
+    double alpha = 1.0, beta = 1.0;
+    double a[2][2] = {{1.0, 2.0}, {3.0, 4.0}};
+    double b[2][2] = {{5.0, 6.0}, {7.0, 8.0}};
+    double c[2][2] = {{9.0, 10.0}, {11.0, 12.0}};
+
+    gemm_parallel(m, n, k, alpha, (double *)a, 2, (double *)b, 2, beta, (double *)c, 2);
+
+    // Print result
+    for (int i = 0; i < m; ++i) {
+        for (int j = 0; j < n; ++j) {
+            printf("%f ", c[i][j]);
+        }
+        printf("\n");
+    }
+
+    return 0;
+}
+```
+
+### Explanation
+- **Function Parameters**: 
+  - `m`, `n`, `k` are the dimensions of the matrices.
+  - `alpha`, `beta` are the scalar multipliers.
+  - `a`, `b`, `c` are pointers to the matrices.
+  - `lda`, `ldb`, `ldc` are the leading dimensions of the matrices.
+
+- **Indexing**:
+  - The matrices in C are accessed using row-major order. The index formula used is `matrix[row * leading_dimension + column]`.
+
+- **OpenACC Directives**:
+  - `#pragma acc parallel loop` allows for the parallel execution of the nested loops.
+  - `private(i, j, l, temp)` ensures that each thread has its local copies of the variables.
+  - `collapse(2)` merges the two nested loops into a single loop to increase parallelism.
+
+- **Main Function**:
+  - The main function demonstrates a sample call to the `gemm_parallel` function with a 2x2 matrix and prints the result.
+
+This implementation assumes that the matrices fit into the memory available and does not handle dynamic memory allocation for larger matrices. For real-world applications, appropriate dynamic allocation should be implemented based on the sizes of the matrices.
+
+Output 7:
+Sure! Below is the equivalent C function with OpenACC directives to perform a Generalized Matrix Multiplication (GEMM) operation. 
+
+Here's the C version:
+
+```c
+#include <openacc.h>
+
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+    #pragma acc parallel loop collapse(2) present(a[0:lda*k], b[0:ldb*n], c[0:ldc*n])
+    for (int j = 0; j < n; j++) {
+        for (int i = 0; i < m; i++) {
+            double temp = 0.0;
+            #pragma acc loop reduction(+:temp)
+            for (int l = 0; l < k; l++) {
+                temp += a[i * lda + l] * b[l * ldb + j];
+            }
+            c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+        }
+    }
+}
+```
+
+### Explanation:
+1. **Matrix Indexing**:
+   - In C, matrices are typically stored in row-major order, so we adjust the indexing accordingly.
+   
+2. **OpenACC Directives**:
+   - `#pragma acc parallel loop collapse(2)`: This directive indicates that the outermost two loops should be parallelized.
+   - `present(a[0:lda*k], b[0:ldb*n], c[0:ldc*n])`: Ensures that the arrays `a`, `b`, and `c` are already present on the device.
+   - `#pragma acc loop reduction(+:temp)`: The `reduction` clause ensures that `temp` is correctly reduced across the loop iterations.
+
+By converting this subroutine for use with OpenACC, it allows for leveraging GPU acceleration in a C environment. Ensure proper compilation with an OpenACC-compatible compiler such as PGI or GCC (with OpenACC support).
+
+Output 8:
+Here is the equivalent function in C using OpenACC for the given Fortran subroutine using OpenMP. This function performs a Generalized Matrix Multiplication (GEMM) operation.
+
+```c
+#include <stdio.h>
+#include <openacc.h>
+
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, 
+                   double *b, int ldb, double beta, double *c, int ldc) {
+    int i, j, l;
+    double temp;
+
+    #pragma acc parallel loop private(i, j, l, temp) present(a[0:lda*k], b[0:ldb*n], c[0:ldc*n])
+    for (j = 0; j < n; ++j) {
+        for (i = 0; i < m; ++i) {
+            temp = 0.0;
+            for (l = 0; l < k; ++l) {
+                temp += a[i + l*lda] * b[l + j*ldb];
+            }
+            c[i + j*ldc] = alpha * temp + beta * c[i + j*ldc];
+        }
+    }
+}
+
+int main() {
+    // Example usage:
+
+    int m = 3, n = 3, k = 3;
+    double alpha = 1.0, beta = 1.0;
+    double a[3][3] = {{1.0, 2.0, 3.0}, 
+                      {4.0, 5.0, 6.0}, 
+                      {7.0, 8.0, 9.0}};
+    double b[3][3] = {{9.0, 8.0, 7.0}, 
+                      {6.0, 5.0, 4.0}, 
+                      {3.0, 2.0, 1.0}};
+    double c[3][3] = {{0.0, 0.0, 0.0}, 
+                      {0.0, 0.0, 0.0}, 
+                      {0.0, 0.0, 0.0}};
+
+    gemm_parallel(m, n, k, alpha, (double *)a, 3, (double *)b, 3, beta, (double *)c, 3);
+
+    printf("Result matrix C:\n");
+    for (int i = 0; i < m; ++i) {
+        for (int j = 0; j < n; ++j) {
+            printf("%f ", c[i][j]);
+        }
+        printf("\n");
+    }
+    
+    return 0;
+}
+```
+
+### Explanation:
+1. **Function Parameters**:
+    - `m`, `n`, `k`: Dimensions of the matrices involved.
+    - `alpha`, `beta`: Scalar multipliers.
+    - `a`, `b`: Input matrices with dimensions `m x k` and `k x n` respectively.
+    - `lda`, `ldb`, `ldc`: Leading dimensions (strides) of the matrices `a`, `b`, and `c`.
+    - `c`: Output matrix with dimensions `m x n`.
+
+2. **OpenACC Directives**:
+    - `#pragma acc parallel loop`: This directive is used to parallelize the outer loop over `j`, and additionally private copies of `i`, `j`, `l`, and `temp` are created for each thread. 
+    - `present(a[0:lda*k], b[0:ldb*n], c[0:ldc*n])`: Indicates that these arrays are already present on the device.
+
+3. **Matrix Multiplication**:
+    - The loops iterate over the dimensions of the matrices `c`, computing the product `a[i, l] * b[l, j]` and updating the values of matrix `c` as `alpha * temp + beta * c[i, j]`.
+
+4. **Main function**:
+    - Provides an example of how to call the GEMM function and demonstrates its usage.
+
+To compile this program, you need to link with the OpenACC compiler. For example, if you are using PGI (NVIDIA HPC SDK), you can compile it using:
+```sh
+pgcc -acc -Minfo=accel -o gemm gemm.c
+```
+
+Make sure to adapt the compilation command if you are using a different compiler with OpenACC support.
+
+Output 9:
+Sure, here is the C version of the Fortran subroutine that uses OpenACC for parallelization:
+
+```c
+#include <openacc.h>
+
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda,
+                   double *b, int ldb, double beta, double *c, int ldc) {
+  int i, j, l;
+  double temp;
+
+  #pragma acc parallel loop collapse(2) private(i,j,l,temp) present(a[0:m*k], b[0:k*n], c[0:m*n])
+  for (j = 0; j < n; j++) {
+    for (i = 0; i < m; i++) {
+      temp = 0.0;
+      for (l = 0; l < k; l++) {
+        temp += a[i + l * lda] * b[l + j * ldb];
+      }
+      c[i + j * ldc] = alpha * temp + beta * c[i + j * ldc];
+    }
+  }
+}
+```
+
+Explanation:
+1. The function signature corresponds to the Fortran subroutine, with array indexing starting from 0 in C.
+2. The OpenACC directive `#pragma acc parallel loop` is used to parallelize the outer two loops (iterating over j and i), equivalent to OpenMP's parallel for loop.
+3. `collapse(2)` ensures that the parallel region covers both the outer loops.
+4. `private(i,j,l,temp)` specifies that these variables should be private to each parallel thread.
+5. `present(a[0:m*k], b[0:k*n], c[0:m*n])` indicates that the arrays `a`, `b`, and `c` are already present in the GPU memory, and avoids unnecessary copying between the host and device memory.
+
+This C function uses OpenACC to achieve parallelization similar to the OpenMP directives in the original Fortran subroutine. It should be compiled with an OpenACC-compatible compiler like PGI or GCC with OpenACC support.
+
+Output 10:
+Certainly! Below is the equivalent C function that achieves the same Generalized Matrix Multiplication (GEMM) using OpenACC for parallelization.
+
+```c
+#include <openacc.h>
+
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+    #pragma acc parallel loop collapse(2) independent
+    for (int j = 0; j < n; j++) {
+        for (int i = 0; i < m; i++) {
+            double temp = 0.0;
+            #pragma acc loop reduction(+:temp)
+            for (int l = 0; l < k; l++) {
+                temp += a[i * lda + l] * b[l * ldb + j];
+            }
+            c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+        }
+    }
+}
+```
+
+### Explanation:
+1. **Function Signature:**
+   - The function `gemm_parallel` takes parameters similar to the Fortran subroutine.
+   - `m`, `n`, `k`: dimensions of the matrices.
+   - `alpha`, `beta`: scaling factors.
+   - `a`, `b`: input matrices.
+   - `lda`, `ldb`, `ldc`: leading dimensions of matrices `a`, `b`, and `c` respectively.
+   - `c`: output matrix.
+
+2. **Matrix Indices:**
+   - Matrix `a` is stored in a row-major order, and similarly for matrices `b` and `c`.
+
+3. **OpenACC Directives:**
+   - `#pragma acc parallel loop collapse(2) independent`: Initiates parallel execution of the nested loops with collapsing the loops for better performance.
+   - `#pragma acc loop reduction(+:temp)`: The inner product loop uses a reduction clause to safely sum the values of `temp` across parallel threads.
+
+### Important Notes:
+- OpenACC directives are similar to OpenMP but are designed to offload computations to accelerators such as GPUs.
+- Ensure that all matrix dimensions and leading dimensions are correctly passed to the function, as these values are crucial for correct indexing and data layout.
+- OpenACC compiler and runtime must be correctly set up in your development environment to utilize these parallel directives.
+
+This C function should provide similar performance benefits on supported hardware as the original Fortran subroutine using OpenMP.
+

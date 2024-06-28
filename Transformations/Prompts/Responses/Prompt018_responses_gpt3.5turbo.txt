@@ -1,0 +1,306 @@
+Output 1:
+Here is the equivalent function implemented in C and OpenACC:
+
+```C
+void jacobi_parallel(double *u, double *unew, int n, int niter) {
+    #pragma acc data copy(u[0:n*n*n], unew[0:n*n*n])
+    {
+        for (int iter = 0; iter < niter; iter++) {
+            #pragma acc parallel loop collapse(3) private(i, j, k)
+            for (int k = 1; k < n - 1; k++) {
+                for (int j = 1; j < n - 1; j++) {
+                    for (int i = 1; i < n - 1; i++) {
+                        unew[i + j*n + k*n*n] = 0.125 * (u[(i-1) + j*n + k*n*n] + u[(i+1) + j*n + k*n*n] +
+                                                         u[i + (j-1)*n + k*n*n] + u[i + (j+1)*n + k*n*n] +
+                                                         u[i + j*n + (k-1)*n*n] + u[i + j*n + (k+1)*n*n] +
+                                                         u[i + j*n + k*n*n]);
+                    }
+                }
+            }
+            #pragma acc update self(u[0:n*n*n])
+        }
+    }
+}
+```
+
+Output 2:
+Here is the corresponding function implemented in C with OpenACC:
+
+```c
+void jacobi_parallel(double *u, double *unew, int n, int niter) {
+    int i, j, k, iter;
+    #pragma acc data copy(u[:n*n*n], unew[:n*n*n])
+    {
+        for (iter = 0; iter < niter; iter++) {
+            #pragma acc parallel loop collapse(3) private(i, j, k)
+            for (k = 1; k < n - 1; k++) {
+                for (j = 1; j < n - 1; j++) {
+                    for (i = 1; i < n - 1; i++) {
+                        int idx = i + j * n + k * n * n;
+                        unew[idx] = 0.125 * (u[idx-n] + u[idx+n] + u[idx-n*n] + u[idx+n*n] +
+                                            u[idx-n*n*n] + u[idx+n*n*n] + u[idx]);
+                    }
+                }
+            }
+            #pragma acc parallel loop collapse(3)
+            for (k = 1; k < n - 1; k++) {
+                for (j = 1; j < n - 1; j++) {
+                    for (i = 1; i < n - 1; i++) {
+                        int idx = i + j * n + k * n * n;
+                        u[idx] = unew[idx];
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+In this C function, the `jacobi_parallel` function performs the Jacobi operation with the specified number of iterations using OpenACC directives to parallelize the computation over the three dimensions. The data is also explicitly copied to and from the device using the `acc data copy` directive to manage data movement between the host and device.
+
+Output 3:
+Here is the C function implemented with OpenACC that computes the Jacobi operation:
+
+```c
+void jacobi_parallel(double *u, double *unew, int n, int niter) {
+    #pragma acc data copy(u[:n*n*n], unew[:n*n*n])
+    for (int iter = 0; iter < niter; iter++) {
+        #pragma acc parallel loop collapse(3) present(u[:n*n*n], unew[:n*n*n])
+        for (int k = 1; k < n-1; k++) {
+            for (int j = 1; j < n-1; j++) {
+                for (int i = 1; i < n-1; i++) {
+                    unew[i+n*j+n*n*k] = 0.125 * (u[i-1+n*j+n*n*k] + u[i+1+n*j+n*n*k] + u[i+n*(j-1)+n*n*k] +
+                                                  u[i+n*(j+1)+n*n*k] + u[i+n*j+n*n*(k-1)] + u[i+n*j+n*n*(k+1)] +
+                                                  u[i+n*j+n*n*k]);
+                }
+            }
+        }
+        #pragma acc update self(u[:n*n*n]) async(iter%2+1)
+        #pragma acc update device(unew[:n*n*n]) async(iter%2+1)
+        #pragma acc wait(iter%2+1)
+    }
+}
+```
+
+Please note that the code above assumes that the `u` and `unew` arrays are flattened to 1D. Also, the `update` directives are used to synchronize the `u` and `unew` arrays between the host and device at the end of each iteration asynchronously.
+
+Make sure to include the necessary headers and compile the code with the OpenACC flags and libraries.
+
+Output 4:
+```c
+
+void jacobi_parallel(double *u, double *unew, int n, int niter) {
+    int i, j, k, iter;
+    #pragma acc data copy(u[0:n*n*n], unew[0:n*n*n])
+    {
+        for(iter = 0; iter < niter; iter++) {
+            #pragma acc parallel loop collapse(3) private(i, j, k)
+            for(k = 1; k < n-1; k++) {
+                for(j = 1; j < n-1; j++) {
+                    for(i = 1; i < n-1; i++) {
+                        int idx = i + j*n + k*n*n;
+                        unew[idx] = 0.125 * (u[idx-1] + u[idx+1] + u[idx-n] +
+                            u[idx+n] + u[idx-n*n] + u[idx+n*n] + u[idx]);
+                    }
+                }
+            }
+            #pragma acc parallel loop collapse(3)
+            for(k = 1; k < n-1; k++) {
+                for(j = 1; j < n-1; j++) {
+                    for(i = 1; i < n-1; i++) {
+                        int idx = i + j*n + k*n*n;
+                        u[idx] = unew[idx];
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+Output 5:
+```c
+void jacobi_parallel(double *u, double *unew, int n, int niter){
+    int i, j, k, iter;
+    for(iter = 0; iter < niter; iter++){
+        #pragma acc parallel loop collapse(3) private(i, j, k)
+        for(k = 1; k < n-1; k++){
+            for(j = 1; j < n-1; j++){
+                for(i = 1; i < n-1; i++){
+                    unew[i + j*n + k*n*n] = 0.125 * (u[(i-1) + j*n + k*n*n] + u[(i+1) + j*n + k*n*n] + u[i + (j-1)*n + k*n*n] +
+                                                      u[i + (j+1)*n + k*n*n] + u[i + j*n + (k-1)*n*n] + u[i + j*n + (k+1)*n*n] + u[i + j*n + k*n*n]);
+                }
+            }
+        }
+        // Copy unew values back to u
+        #pragma acc parallel loop collapse(3) private(i, j, k)
+        for(k = 1; k < n-1; k++){
+            for(j = 1; j < n-1; j++){
+                for(i = 1; i < n-1; i++){
+                    u[i + j*n + k*n*n] = unew[i + j*n + k*n*n];
+                }
+            }
+        }
+    }
+}
+```
+
+Output 6:
+Here is the C implementation of the jacobi_parallel subroutine using OpenACC:
+
+```c
+void jacobi_parallel(double *u, double *unew, int n, int niter) {
+    int i, j, k, iter;
+    #pragma acc data copyin(u[0:n*n*n]) copy(unew[0:n*n*n])
+    {
+        for (iter = 0; iter < niter; iter++) {
+            #pragma acc parallel loop collapse(3) private(i, j, k)
+            for (k = 1; k < n - 1; k++) {
+                for (j = 1; j < n - 1; j++) {
+                    for (i = 1; i < n - 1; i++) {
+                        unew[i + n * (j + n * k)] = 0.125 * (u[(i-1) + n * (j + n * k)] + u[(i+1) + n * (j + n * k)] +
+                            u[i + n * ((j-1) + n * k)] + u[i + n * ((j+1) + n * k)] + u[i + n * (j + n * (k-1)] +
+                            u[i + n * (j + n * (k+1)] + u[i + n * (j + n * k)]);
+                    }
+                }
+            }
+            #pragma acc update self(u[0:n*n*n])
+        }
+    }
+}
+```
+
+Please note that the indexing in C is different from Fortran, so the index calculations have been adjusted accordingly. Additionally, the `copyin` and `copy` directives were used to manage the data movement between the CPU and GPU memory for better performance.
+
+Output 7:
+Here is the equivalent function implemented in C and OpenACC:
+
+```c
+void jacobi_parallel(double u[n][n][n], double unew[n][n][n], int n, int niter) {
+    int i, j, k, iter;
+    for (iter = 0; iter < niter; iter++) {
+        #pragma acc parallel loop collapse(3) private(i, j, k)
+        for (k = 1; k < n - 1; k++) {
+            for (j = 1; j < n - 1; j++) {
+                for (i = 1; i < n - 1; i++) {
+                    unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] + u[i][j-1][k] + u[i][j+1][k] + u[i][j][k-1] + u[i][j][k+1] + u[i][j][k]);
+                }
+            }
+        }
+        #pragma acc update self(u)
+        #pragma acc update device(unew)
+        #pragma acc update self(u)
+        for (k = 0; k < n; k++) {
+            for (j = 0; j < n; j++) {
+                for (i = 0; i < n; i++) {
+                    u[i][j][k] = unew[i][j][k];
+                }
+            }
+        }
+    }
+}
+```
+
+This function performs the Jacobi operation parallelized using OpenACC directives in C. Make sure to adjust the array sizes and data types as needed for your specific use case.
+
+Output 8:
+Here is the equivalent function implemented in C and OpenACC:
+
+```c
+void jacobi_parallel(double *u, double *unew, int n, int niter)
+{
+    int i, j, k, iter;
+    #pragma acc data copyin(u[:n*n*n]) copyout(unew[:n*n*n])
+    {
+        for(iter = 0; iter < niter; iter++)
+        {
+            #pragma acc parallel loop collapse(3) private(i, j, k)
+            for(k = 1; k < n - 1; k++)
+            {
+                for(j = 1; j < n - 1; j++)
+                {
+                    for(i = 1; i < n - 1; i++)
+                    {
+                        int idx = i + n*(j + n*k);
+                        unew[idx] = 0.125 * (u[idx - n] + u[idx + n] + u[idx - 1] +
+                                            u[idx + 1] + u[idx - n*n] + u[idx + n*n] + u[idx]);
+                    }
+                }
+            }
+            
+            #pragma acc parallel loop collapse(3)
+            for(k = 1; k < n - 1; k++)
+            {
+                for(j = 1; j < n - 1; j++)
+                {
+                    for(i = 1; i < n - 1; i++)
+                    {
+                        int idx = i + n*(j + n*k);
+                        u[idx] = unew[idx];
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+Please note that the indexing in C is different from Fortran, so the indexing has been adjusted accordingly. Also, the array indexing needs to be adjusted to match the column-major order of data storage in Fortran.
+
+Output 9:
+```c
+void jacobi_parallel(double *u, double *unew, int n, int niter) {
+    int i, j, k, iter;
+    #pragma acc data copyin(u[0:n*n*n]) copyout(unew[0:n*n*n])
+    for (iter = 0; iter < niter; iter++) {
+        #pragma acc parallel loop collapse(3) private(i, j, k)
+        for (k = 1; k < n - 1; k++) {
+            for (j = 1; j < n - 1; j++) {
+                for (i = 1; i < n - 1; i++) {
+                    unew[i + j*n + k*n*n] = 0.125 * (u[(i-1) + j*n + k*n*n] + u[(i+1) + j*n + k*n*n] +
+                        u[i + (j-1)*n + k*n*n] + u[i + (j+1)*n + k*n*n] + u[i + j*n + (k-1)*n*n] +
+                        u[i + j*n + (k+1)*n*n] + u[i + j*n + k*n*n]);
+                }
+            }
+        }
+        #pragma acc parallel loop collapse(3)
+        for (k = 1; k < n - 1; k++) {
+            for (j = 1; j < n - 1; j++) {
+                for (i = 1; i < n - 1; i++) {
+                    u[i + j*n + k*n*n] = unew[i + j*n + k*n*n];
+                }
+            }
+        }
+    }
+}
+```
+
+Output 10:
+Here is the C implementation of the Jacobi operation using OpenACC:
+
+```c
+void jacobi_parallel(double *u, double *unew, int n, int niter) {
+    #pragma acc data copyin(u[0:n*n*n]) copy(unew[0:n*n*n])
+    {
+        for (int iter = 0; iter < niter; iter++) {
+            #pragma acc parallel loop collapse(3) present(u, unew)
+            for (int k = 1; k < n - 1; k++) {
+                for (int j = 1; j < n - 1; j++) {
+                    for (int i = 1; i < n - 1; i++) {
+                        unew[i + j * n + k * n * n] = 0.125 * (u[(i-1) + j * n + k * n * n] + u[(i+1) + j * n + k * n * n] +
+                                                             u[i + (j-1) * n + k * n * n] + u[i + (j+1) * n + k * n * n] +
+                                                             u[i + j * n + (k-1) * n * n] + u[i + j * n + (k+1) * n * n] + u[i + j * n + k * n * n]);
+                    }
+                }
+            }
+            #pragma acc parallel loop present(u, unew)
+            for (int i = 0; i < n*n*n; i++) {
+                u[i] = unew[i];
+            }
+        }
+    }
+}
+```
+
+In this implementation, the `jacobi_parallel` function calculates the Jacobi operation using the provided `u` and `unew` arrays with size `n x n x n` for `niter` iterations. The `#pragma acc` directives are used to parallelize the loops and manage data movement between the host and device.
+
