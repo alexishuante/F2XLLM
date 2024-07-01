@@ -13,7 +13,8 @@ gfortran -fopenacc -fopt-info-optimized file_name -o outputFileName
 ```
 
 Command to measure the GPU usage on milan0 and cousteau (Make sure to copy the entire thing and paste it on a second terminal) 
-'''shell
+
+```shell
 #!/bin/bash
 
 # Log GPU usage every second for 60 seconds
@@ -25,4 +26,4 @@ done
 
 # Calculate average GPU usage
 awk '{ total += $1; count++ } END { print "Average GPU usage:", total/count "%" }' gpu_usage.log
-'''
+```
