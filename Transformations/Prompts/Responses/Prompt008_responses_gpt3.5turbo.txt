@@ -1,138 +1,33 @@
 Output 1:
-Here is a version of the above Fortran OpenACC code implemented in C/C++ using OpenMP:
-
-```cpp
-#include <omp.h>
-
-void jacobi_parallel(double (*u)[n][n], double (*unew)[n][n], int n, int niter) {
+```c
+void jacobi_parallel(double *u, double *unew, int n, int niter) {
     int i, j, k, iter;
     #pragma omp parallel for private(i, j, k)
-    for (iter = 0; iter < niter; iter++) {
-        #pragma omp parallel for collapse(3) private(i, j, k)
-        for (k = 1; k < n - 1; k++) {
-            for (j = 1; j < n - 1; j++) {
-                for (i = 1; i < n - 1; i++) {
-                    (*unew)[i][j][k] = 0.125 * ((*u)[i-1][j][k] + (*u)[i+1][j][k] + (*u)[i][j-1][k] +
-                                                 (*u)[i][j+1][k] + (*u)[i][j][k-1] + (*u)[i][j][k+1] + (*u)[i][j][k]);
+    for(iter = 0; iter < niter; iter++) {
+        for(k = 1; k < n - 1; k++) {
+            for(j = 1; j < n - 1; j++) {
+                for(i = 1; i < n - 1; i++) {
+                    unew[i + n*(j + n*k)] = 0.125 * (u[(i-1) + n*(j + n*k)] + u[(i+1) + n*(j + n*k)] + 
+                                                      u[i + n*((j-1) + n*k)] + u[i + n*((j+1) + n*k)] + 
+                                                      u[i + n*(j + n*(k-1))] + u[i + n*(j + n*(k+1))] + 
+                                                      u[i + n*(j + n*k)]);
                 }
             }
         }
-        
-        #pragma omp parallel for collapse(2) private(i, j)
-        for (k = 1; k < n - 1; k++) {
-            for (j = 1; j < n - 1; j++) {
-                for (i = 1; i < n - 1; i++) {
-                    (*u)[i][j][k] = (*unew)[i][j][k];
-                }
-            }
-        }
+        memcpy(u, unew, n*n*n*sizeof(double));
     }
 }
 ```
 
-In this version, we use OpenMP directives to parallelize the nested loop structure of the Jacobi operation. The collapse(3) clause is used to flatten the 3D loop structure into a 1D loop, which can potentially improve performance. The private(i, j, k) clause ensures that each thread has its own copy of loop variables.
-
 Output 2:
-Here is the C/C++ OpenMP version of the Fortran OpenACC code for the Jacobi operation:
+Here is the equivalent function in C with OpenMP:
 
 ```c
 #include <omp.h>
 
-void jacobi_parallel(double *u, double *unew, int n, int niter) {
-    int i, j, k, iter;
-    #pragma omp parallel shared(u, unew) private(i, j, k, iter)
-    {
-        for (iter = 0; iter < niter; iter++) {
-            #pragma omp for collapse(3)
-            for (k = 1; k < n - 1; k++) {
-                for (j = 1; j < n - 1; j++) {
-                    for (i = 1; i < n - 1; i++) {
-                        unew[i + j*n + k*n*n] = 0.125 * (u[(i-1) + j*n + k*n*n] + u[(i+1) + j*n + k*n*n] +
-                                                         u[i + (j-1)*n + k*n*n] + u[i + (j+1)*n + k*n*n] +
-                                                         u[i + j*n + (k-1)*n*n] + u[i + j*n + (k+1)*n*n] + u[i + j*n + k*n*n]);
-                    }
-                }
-            }
-            #pragma omp barrier
-            #pragma omp for
-            for (int i = 0; i < n * n * n; i++) {
-                u[i] = unew[i];
-            }
-        }
-    }
-}
-```
-
-In this C/C++ OpenMP version of the code, the Jacobi operation is parallelized using OpenMP directives. The `#pragma omp parallel` directive creates a parallel region, and the `#pragma omp for collapse(3)` directive parallelizes the nested loops over `i`, `j`, and `k`.
-
-The variables `u`, `unew`, `n`, and `niter` are passed as arguments to the function. The Jacobi operation is performed for the specified number of iterations `niter`, updating the `unew` array based on the values in the `u` array. Finally, the updated values are copied back to the `u` array.
-
-Please note that the array indexing is done according to the row-major order used in C/C++ arrays.
-
-Output 3:
-#include <omp.h>
-
-void jacobi_parallel(double *u, double *unew, int n, int niter) {
-    #pragma omp parallel
-    {
-        int i, j, k, iter;
-        for (iter = 0; iter < niter; iter++) {
-            #pragma omp for collapse(3) private(i, j, k)
-            for (k = 1; k < n - 1; k++) {
-                for (j = 1; j < n - 1; j++) {
-                    for (i = 1; i < n - 1; i++) {
-                        unew[i + j*n + k*n*n] = 0.125 * (u[(i-1) + j*n + k*n*n] + u[(i+1) + j*n + k*n*n] + u[i + (j-1)*n + k*n*n] +
-                                                          u[i + (j+1)*n + k*n*n] + u[i + j*n + (k-1)*n*n] + u[i + j*n + (k+1)*n*n] + u[i + j*n + k*n*n]);
-                    }
-                }
-            }
-
-            #pragma omp barrier
-            
-            #pragma omp for
-            for (int i = 0; i < n*n*n; i++) {
-                u[i] = unew[i];
-            }
-        }
-    }
-}
-
-Output 4:
-#include <omp.h>
-
 void jacobi_parallel(double u[n][n][n], double unew[n][n][n], int n, int niter) {
     int i, j, k, iter;
-    #pragma omp parallel shared(u, unew) private(i, j, k, iter)
-    {
-        for (iter = 0; iter < niter; iter++) {
-            #pragma omp for collapse(3)
-            for (k = 1; k < n - 1; k++) {
-                for (j = 1; j < n - 1; j++) {
-                    for (i = 1; i < n - 1; i++) {
-                        unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] + u[i][j-1][k] +
-                                                u[i][j+1][k] + u[i][j][k-1] + u[i][j][k+1] + u[i][j][k]);
-                    }
-                }
-            }
-            #pragma omp barrier
-            #pragma omp for collapse(3)
-            for (k = 1; k < n - 1; k++) {
-                for (j = 1; j < n - 1; j++) {
-                    for (i = 1; i < n - 1; i++) {
-                        u[i][j][k] = unew[i][j][k];
-                    }
-                }
-            }
-        }
-    }
-}
-
-Output 5:
-#include <omp.h>
-
-void jacobi_parallel(double u[n][n][n], double unew[n][n][n], int n, int niter) {
-    int i, j, k, iter;
-    #pragma omp parallel for collapse(3) private(i, j, k)
+    #pragma omp parallel for private(i, j, k)
     for (iter = 0; iter < niter; iter++) {
         for (k = 1; k < n - 1; k++) {
             for (j = 1; j < n - 1; j++) {
@@ -142,44 +37,83 @@ void jacobi_parallel(double u[n][n][n], double unew[n][n][n], int n, int niter) 
                 }
             }
         }
-        #pragma omp barrier
+
+        #pragma omp parallel for collapse(3)
+        for (k = 1; k < n - 1; k++) {
+            for (j = 1; j < n - 1; j++) {
+                for (i = 1; i < n - 1; i++) {
+                    u[i][j][k] = unew[i][j][k];
+                }
+            }
+        }
+    }
+}
+```
+
+This function uses OpenMP directives to parallelize the computation of the Jacobi operation in C.
+
+Output 3:
+Here is the equivalent function implemented in C and OpenMP:
+
+```c
+#include <omp.h>
+
+void jacobi_parallel(double *u, double *unew, int n, int niter) {
+    int i, j, k, iter;
+
+    #pragma omp parallel private(i, j, k)
+    {
+        for (iter = 0; iter < niter; iter++) {
+            #pragma omp for collapse(3)
+            for (k = 1; k < n - 1; k++) {
+                for (j = 1; j < n - 1; j++) {
+                    for (i = 1; i < n - 1; i++) {
+                        unew[i + j*n + k*n*n] = 0.125 * (u[(i-1) + j*n + k*n*n] + u[(i+1) + j*n + k*n*n] + u[i + (j-1)*n + k*n*n] + 
+                                                          u[i + (j+1)*n + k*n*n] + u[i + j*n + (k-1)*n*n] + u[i + j*n + (k+1)*n*n] + u[i + j*n + k*n*n]);
+                    }
+                }
+            }
+
+            #pragma omp for collapse(3)
+            for (k = 1; k < n - 1; k++) {
+                for (j = 1; j < n - 1; j++) {
+                    for (i = 1; i < n - 1; i++) {
+                        u[i + j*n + k*n*n] = unew[i + j*n + k*n*n];
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+This code is equivalent to the Fortran subroutine `jacobi_parallel` using OpenACC, but instead uses C and OpenMP. The function `jacobi_parallel` takes two 3D arrays `u` and `unew`, the size of the arrays `n`, and the number of iterations `niter` to perform the Jacobi operation. The Jacobi operation is performed using nested loops over the grid points at each iteration, updating the values in `unew` based on the neighboring points in `u` and then copying the values back to `u`. The code is parallelized using OpenMP directives to distribute the work among multiple threads.
+
+Output 4:
+Here is the equivalent function implemented in C and OpenMP:
+
+```c
+#include <omp.h>
+
+void jacobi_parallel(double *u, double *unew, int n, int niter) {
+    int i, j, k, iter;
+
+    for (iter = 0; iter < niter; iter++) {
+        #pragma omp parallel for private(i, j, k)
+        for (k = 1; k < n - 1; k++) {
+            for (j = 1; j < n - 1; j++) {
+                for (i = 1; i < n - 1; i++) {
+                    unew[i + j*n + k*n*n] = 0.125 * (u[(i-1) + j*n + k*n*n] + u[(i+1) + j*n + k*n*n] + u[i + (j-1)*n + k*n*n]
+                                                    + u[i + (j+1)*n + k*n*n] + u[i + j*n + (k-1)*n*n] + u[i + j*n + (k+1)*n*n] + u[i + j*n + k*n*n]);
+                }
+            }
+        }
+
         #pragma omp for
         for (k = 1; k < n - 1; k++) {
             for (j = 1; j < n - 1; j++) {
                 for (i = 1; i < n - 1; i++) {
-                    u[i][j][k] = unew[i][j][k];
-                }
-            }
-        }
-    }
-}
-
-Output 6:
-Here is a version of the given Fortran OpenACC code implemented in C with OpenMP:
-
-```c
-#include <omp.h>
-
-void jacobi_parallel(double u[n][n][n], double unew[n][n][n], int n, int niter) {
-    int i, j, k, iter;
-    
-    #pragma omp parallel for collapse(3) private(i, j, k)
-    for(iter = 0; iter < niter; iter++) {
-        for(k = 1; k < n - 1; k++) {
-            for(j = 1; j < n - 1; j++) {
-                for(i = 1; i < n - 1; i++) {
-                    unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] + u[i][j-1][k] +
-                                            u[i][j+1][k] + u[i][j][k-1] + u[i][j][k+1] + u[i][j][k]);
-                }
-            }
-        }
-        
-        // Copy unew back to u
-        #pragma omp parallel for collapse(3) private(i, j, k)
-        for(k = 1; k < n - 1; k++) {
-            for(j = 1; j < n - 1; j++) {
-                for(i = 1; i < n - 1; i++) {
-                    u[i][j][k] = unew[i][j][k];
+                    u[i + j*n + k*n*n] = unew[i + j*n + k*n*n];
                 }
             }
         }
@@ -187,138 +121,189 @@ void jacobi_parallel(double u[n][n][n], double unew[n][n][n], int n, int niter) 
 }
 ```
 
-This C code implements the Jacobi operation using OpenMP parallelization and is similar in structure to the Fortran OpenACC code provided. The `#pragma omp parallel for collapse(3)` directive is used to parallelize the nested loops and the private clause is used to declare private loop variables `i`, `j`, and `k`.
+This function performs the same Jacobi operation as the Fortran subroutine but is implemented in C and utilizes OpenMP for parallelization.
 
-Output 7:
-Here is the equivalent Jacobi operation implemented using OpenMP in C/C++:
+Output 5:
+Here is an equivalent function implemented in C with OpenMP that computes the Jacobi operation:
 
-```cpp
+```c
 #include <omp.h>
 
 void jacobi_parallel(double *u, double *unew, int n, int niter) {
-    #pragma omp parallel for collapse(3)
+    int i, j, k, iter;
+    #pragma omp parallel for private(i, j, k)
+    for (iter = 0; iter < niter; iter++) {
+        for (k = 1; k < n - 1; k++) {
+            for (j = 1; j < n - 1; j++) {
+                for (i = 1; i < n - 1; i++) {
+                    unew[i + j*n + k*n*n] = 0.125 * (u[(i-1) + j*n + k*n*n] + u[(i+1) + j*n + k*n*n] + u[i + (j-1)*n + k*n*n] + 
+                                                      u[i + (j+1)*n + k*n*n] + u[i + j*n + (k-1)*n*n] + u[i + j*n + (k+1)*n*n] + u[i + j*n + k*n*n]);
+                }
+            }
+        }
+        #pragma omp parallel for
+        for (i = 0; i < n*n*n; i++) {
+            u[i] = unew[i];
+        }
+    }
+}
+```
+
+Note that in the C implementation, we converted the 3D array indices to a 1D array index for easier memory access. The OpenMP directive `#pragma omp parallel for` is used to parallelize the outer loop over iterations.
+
+Hope this helps! Let me know if you need further assistance.
+
+Output 6:
+Here is a C function implemented with OpenMP that performs the same Jacobi operation as the Fortran subroutine implemented with OpenACC:
+
+```c
+#include <omp.h>
+
+void jacobi_parallel(double *u, double *unew, int n, int niter) {
+    int i, j, k, iter;
+
+    #pragma omp parallel for private(i, j, k)
+    for (iter = 0; iter < niter; iter++) {
+        for (k = 1; k < n - 1; k++) {
+            for (j = 1; j < n - 1; j++) {
+                for (i = 1; i < n - 1; i++) {
+                    unew[i + j*n + k*n*n] = 0.125 * (u[(i-1) + j*n + k*n*n] + u[(i+1) + j*n + k*n*n] + u[i + (j-1)*n + k*n*n] +
+                                                      u[i + (j+1)*n + k*n*n] + u[i + j*n + (k-1)*n*n] + u[i + j*n + (k+1)*n*n] + u[i + j*n + k*n*n]);
+                }
+            }
+        }
+
+        // Copy unew to u
+        #pragma omp parallel for
+        for (int idx = 0; idx < n*n*n; idx++) {
+            u[idx] = unew[idx];
+        }
+    }
+}
+```
+
+In this code snippet, we utilize OpenMP to parallelize the Jacobi operation over the iterations of the `niter` loop and also parallelize the copying of the `unew` array back to the `u` array. The Jacobi operation loop is collapsed to one loop and the private variables `i`, `j`, and `k` are specified to ensure correct parallel execution.
+
+Output 7:
+Here is the equivalent function in C with OpenMP:
+
+```c
+void jacobi_parallel(double *u, double *unew, int n, int niter) {
+    #pragma omp parallel for collapse(3) shared(u, unew, n, niter) private(i, j, k)
     for (int iter = 0; iter < niter; iter++) {
         for (int k = 1; k < n - 1; k++) {
             for (int j = 1; j < n - 1; j++) {
                 for (int i = 1; i < n - 1; i++) {
-                    int index = i + j*n + k*n*n;
-                    unew[index] = 0.125 * (u[index-1] + u[index+1] + u[index-n] +
-                                          u[index+n] + u[index-n*n] + u[index+n*n] + u[index]);
-                }
-            }
-        }
-
-        #pragma omp parallel for collapse(3)
-        for (int k = 1; k < n - 1; k++) {
-            for (int j = 1; j < n - 1; j++) {
-                for (int i = 1; i < n - 1; i++) {
-                    int index = i + j*n + k*n*n;
-                    u[index] = unew[index];
+                    int index = k*n*n + j*n + i;
+                    unew[index] = 0.125 * (u[(k-1)*n*n + j*n + i] + u[(k+1)*n*n + j*n + i] + u[k*n*n + (j-1)*n + i] +
+                                          u[k*n*n + (j+1)*n + i] + u[k*n*n + j*n + (i-1)] + u[k*n*n + j*n + (i+1)] + u[index]);
                 }
             }
         }
     }
+    #pragma omp parallel for
+    for (int i = 0; i < n*n*n; i++) {
+        u[i] = unew[i];
+    }
 }
 ```
 
-In this code:
-- `#pragma omp parallel for collapse(3)` is used to parallelize the triple-nested loop.
-- The collapse(3) clause specifies that the loop iterations of all three loops will be collapsed into a single loop to be distributed across threads.
-- The indices are calculated based on the 3D array layout.
-- The first loop calculates the values of `unew` based on neighboring elements.
-- The second loop updates the `u` array with the newly calculated values from `unew` after all elements have been processed in the first loop.
+In this C function, `u` and `unew` are 1D arrays of size `n*n*n` representing the 3D grid. The collapse(3) clause is used to parallelize the three nested loops. The relationships between indices are adjusted accordingly to match the Fortran implementation.
 
 Output 8:
+Here is the C function implemented with OpenMP that performs the Jacobi operation:
+
+```c
 #include <omp.h>
 
-void jacobi_parallel(double u[n][n][n], double unew[n][n][n], int n, int niter) {
+void jacobi_parallel(double *u, double *unew, int n, int niter) {
     int i, j, k, iter;
-    #pragma omp parallel
-    {
-        #pragma omp for collapse(3) private(i, j, k)
-        for (iter = 0; iter < niter; iter++) {
-            for (k = 1; k < n - 1; k++) {
-                for (j = 1; j < n - 1; j++) {
-                    for (i = 1; i < n - 1; i++) {
-                        unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] + u[i][j-1][k] +
-                            u[i][j+1][k] + u[i][j][k-1] + u[i][j][k+1] + u[i][j][k]);
-                    }
-                }
-            }
-            for (k = 1; k < n - 1; k++) {
-                for (j = 1; j < n - 1; j++) {
-                    for (i = 1; i < n - 1; i++) {
-                        u[i][j][k] = unew[i][j][k];
-                    }
+
+    #pragma omp parallel for private(i, j, k)
+    for (iter = 0; iter < niter; iter++) {
+        for (k = 1; k < n - 1; k++) {
+            for (j = 1; j < n - 1; j++) {
+                for (i = 1; i < n - 1; i++) {
+                    unew[i + j*n + k*n*n] = 0.125 * (u[(i-1) + j*n + k*n*n] + u[(i+1) + j*n + k*n*n] +
+                                                      u[i + (j-1)*n + k*n*n] + u[i + (j+1)*n + k*n*n] +
+                                                      u[i + j*n + (k-1)*n*n] + u[i + j*n + (k+1)*n*n] +
+                                                      u[i + j*n + k*n*n]);
                 }
             }
         }
+
+        #pragma omp parallel for
+        for (int idx = 0; idx < n*n*n; idx++) {
+            u[idx] = unew[idx];
+        }
     }
 }
+```
+
+In this implementation, we use the `#pragma omp parallel for` directive to parallelize the outer loop over `iter`. We also use nested loops to iterate over the 3D array `u` and `unew`. Additionally, we copy the contents of `unew` back to `u` after each iteration.
+
+Note: Ensure that the `n` and `niter` parameters are the same as in the Fortran code, and adjust the array indexing if needed based on the storage layout used in the Fortran code.
 
 Output 9:
-Here is the equivalent version of the Fortran OpenACC code in C/C++ OpenMP:
-
 ```c
-#include <omp.h>
-
-void jacobi_parallel(double u[n][n][n], double unew[n][n][n], int n, int niter) {
+void jacobi_parallel(double *u, double *unew, int n, int niter) {
     int i, j, k, iter;
-
     #pragma omp parallel for collapse(3) private(i, j, k)
-    for(iter = 0; iter < niter; iter++) {
-        for(k = 1; k < n - 1; k++) {
-            for(j = 1; j < n - 1; j++) {
-                for(i = 1; i < n - 1; i++) {
-                    unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] + u[i][j-1][k] +
-                                             u[i][j+1][k] + u[i][j][k-1] + u[i][j][k+1] + u[i][j][k]);
+    for (iter = 0; iter < niter; iter++) {
+        for (k = 1; k < n-1; k++) {
+            for (j = 1; j < n-1; j++) {
+                for (i = 1; i < n-1; i++) {
+                    unew[i + j*n + k*n*n] = 0.125 * (u[(i-1) + j*n + k*n*n] + u[(i+1) + j*n + k*n*n] + u[i + (j-1)*n + k*n*n] +
+                                                      u[i + (j+1)*n + k*n*n] + u[i + j*n + (k-1)*n*n] + u[i + j*n + (k+1)*n*n] + u[i + j*n + k*n*n]);
                 }
             }
         }
-
-        #pragma omp parallel for collapse(3) private(i, j, k)
-        for(k = 1; k < n - 1; k++) {
-            for(j = 1; j < n - 1; j++) {
-                for(i = 1; i < n - 1; i++) {
-                    u[i][j][k] = unew[i][j][k];
-                }
+        #pragma omp barrier
+        #pragma omp single
+        {
+            for (int i = 0; i < n*n*n; i++) {
+                u[i] = unew[i];
             }
         }
     }
 }
 ```
-
-In this code, the Jacobi operation is parallelized using OpenMP directives in C/C++. The `collapse(3)` clause is used to collapse three loops together to parallelize the nested loops efficiently. The private variables are specified within the pragma to ensure that each thread has its own private copy of the loop variables.
 
 Output 10:
+Here is the corresponding function in C with OpenMP:
+
 ```c
 #include <omp.h>
 
-void jacobi_parallel(double u[n][n][n], double unew[n][n][n], int n, int niter) {
+void jacobi_parallel(double *u, double *unew, int n, int niter) {
     int i, j, k, iter;
-    
-    for (iter = 0; iter < niter; iter++) {
-        #pragma omp parallel for collapse(3) private(i, j, k)
-        for (k = 1; k < n - 1; k++) {
-            for (j = 1; j < n - 1; j++) {
-                for (i = 1; i < n - 1; i++) {
-                    unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] + u[i][j-1][k] +
-                                             u[i][j+1][k] + u[i][j][k-1] + u[i][j][k+1] + u[i][j][k]);
+
+    #pragma omp parallel shared(u, unew) private(i, j, k, iter)
+    {
+        for (iter = 0; iter < niter; iter++) {
+            #pragma omp for collapse(3)
+            for (k = 1; k < n - 1; k++) {
+                for (j = 1; j < n - 1; j++) {
+                    for (i = 1; i < n - 1; i++) {
+                        unew[k*n*n + j*n + i] = 0.125 * (u[(k-1)*n*n + j*n + i] + u[(k+1)*n*n + j*n + i] +
+                                                          u[k*n*n + (j-1)*n + i] + u[k*n*n + (j+1)*n + i] +
+                                                          u[k*n*n + j*n + (i-1)] + u[k*n*n + j*n + (i+1)] +
+                                                          u[k*n*n + j*n + i]);
+                    }
                 }
             }
         }
-        
-        #pragma omp barrier
-        
-        #pragma omp parallel for collapse(3) private(i, j, k)
-        for (k = 1; k < n - 1; k++) {
-            for (j = 1; j < n - 1; j++) {
-                for (i = 1; i < n - 1; i++) {
-                    u[i][j][k] = unew[i][j][k];
-                }
-            }
+
+        // Copy unew back to u
+        #pragma omp for
+        for (i = 0; i < n*n*n; i++) {
+            u[i] = unew[i];
         }
     }
 }
 ```
+
+In this C function, OpenMP directives are used to parallelize the Jacobi operation in a similar way as the Fortran subroutine with OpenACC.
+
+Note: Make sure to adjust the data type (double) and memory access patterns according to the specific requirements of your application.
 

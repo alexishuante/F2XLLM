@@ -1,61 +1,154 @@
 Output 1:
-__global__ void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y)
-{
+Here is a C and CUDA implementation of the SpMV subroutine:
+
+```c
+#include <stdio.h>
+
+__global__ void spmv(int n, int nnz, float* val, int* row, int* col, float* x, float* y) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     
-    if (i < n)
-    {
+    if (i < n) {
         y[i] = 0.0;
-        for (int j = row[i]; j < row[i + 1]; j++)
-        {
+        
+        for (int j = row[i]; j < row[i+1]; j++) {
             y[i] += val[j] * x[col[j]];
         }
     }
 }
 
-void spmv_cuda(int n, int nnz, float *val, int *row, int *col, float *x, float *y)
-{
+void spmv_parallel(int n, int nnz, float* val, int* row, int* col, float* x, float* y) {
     float *d_val, *d_x, *d_y;
     int *d_row, *d_col;
-    
+
     cudaMalloc(&d_val, nnz * sizeof(float));
-    cudaMalloc(&d_x, n * sizeof(float));
-    cudaMalloc(&d_y, n * sizeof(float));
     cudaMalloc(&d_row, (n + 1) * sizeof(int));
     cudaMalloc(&d_col, nnz * sizeof(int));
-    
+    cudaMalloc(&d_x, n * sizeof(float));
+    cudaMalloc(&d_y, n * sizeof(float));
+
     cudaMemcpy(d_val, val, nnz * sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_x, x, n * sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_y, y, n * sizeof(float), cudaMemcpyHostToDevice);
     cudaMemcpy(d_row, row, (n + 1) * sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpy(d_col, col, nnz * sizeof(int), cudaMemcpyHostToDevice);
-    
+    cudaMemcpy(d_x, x, n * sizeof(float), cudaMemcpyHostToDevice);
+
     int blockSize = 256;
     int numBlocks = (n + blockSize - 1) / blockSize;
-    
-    spmv_parallel<<<numBlocks, blockSize>>>(n, nnz, d_val, d_row, d_col, d_x, d_y);
-    
+
+    spmv<<<numBlocks, blockSize>>>(n, nnz, d_val, d_row, d_col, d_x, d_y);
+
     cudaMemcpy(y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
-    
+
     cudaFree(d_val);
-    cudaFree(d_x);
-    cudaFree(d_y);
     cudaFree(d_row);
     cudaFree(d_col);
+    cudaFree(d_x);
+    cudaFree(d_y);
 }
 
-Output 2:
-Here is a CUDA version of the provided Fortran OpenMP code implementing a Sparse matrix–vector multiplication (SpMV) operation:
+int main() {
+    int n = 5;
+    int nnz = 5;
 
-```cuda
+    float val[5] = {0.1, 0.2, 0.3, 0.4, 0.5};
+    int row[6] = {0, 1, 2, 3, 4, 5};
+    int col[5] = {0, 1, 2, 3, 4};
+    float x[5] = {1.0, 1.0, 1.0, 1.0, 1.0};
+    float y[5];
+
+    spmv_parallel(n, nnz, val, row, col, x, y);
+
+    for (int i = 0; i < n; i++) {
+        printf("%f\n", y[i]);
+    }
+
+    return 0;
+}
+```
+
+This code defines a CUDA kernel `spmv` which performs the sparse matrix-vector multiplication. The `spmv_parallel` function allocates memory on the GPU, copies data to the GPU, launches the kernel, and copies the result back to the CPU. Finally, the main function calls `spmv_parallel` and prints the resulting vector `y`.
+
+Output 2:
+Below is the C and CUDA implementation of the given subroutine `spmv_parallel`:
+
+```c
+#include <cuda_runtime.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+__global__ void spmv_kernel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = 0.0f;
+        for (int j = row[i]; j < row[i+1]; j++) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+
+void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    float *d_val, *d_x, *d_y;
+    int *d_row, *d_col;
+
+    cudaMalloc(&d_val, nnz * sizeof(float));
+    cudaMalloc(&d_row, (n+1) * sizeof(int));
+    cudaMalloc(&d_col, nnz * sizeof(int));
+    cudaMalloc(&d_x, n * sizeof(float));
+    cudaMalloc(&d_y, n * sizeof(float));
+
+    cudaMemcpy(d_val, val, nnz * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_row, row, (n+1) * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_col, col, nnz * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_x, x, n * sizeof(float), cudaMemcpyHostToDevice);
+
+    int block_size = 256;
+    int grid_size = (n + block_size - 1) / block_size;
+    spmv_kernel<<<grid_size, block_size>>>(n, nnz, d_val, d_row, d_col, d_x, d_y);
+
+    cudaMemcpy(y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
+
+    cudaFree(d_val);
+    cudaFree(d_row);
+    cudaFree(d_col);
+    cudaFree(d_x);
+    cudaFree(d_y);
+}
+
+int main() {
+    // Define input matrix and vectors
+    int n = 5;
+    int nnz = 9;
+    float val[9] = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0};
+    int row[6] = {0, 3, 5, 7, 8, 9};
+    int col[9] = {0, 1, 3, 1, 2, 3, 0, 2, 4};
+    float x[5] = {1, 2, 3, 4, 5};
+    float y[5];
+
+    // Perform SpMV operation
+    spmv_parallel(n, nnz, val, row, col, x, y);
+
+    // Print result
+    for (int i = 0; i < n; i++) {
+        printf("y[%d] = %.1f\n", i, y[i]);
+    }
+
+    return 0;
+}
+```
+
+In this implementation, we define a CUDA kernel function `spmv_kernel` that performs the sparse matrix-vector multiplication operation. The `spmv_parallel` function allocates memory on the GPU, copies data to the GPU, launches the kernel on the GPU, and then copies the result back to the CPU. The `main` function demonstrates how to call `spmv_parallel` with sample input matrices and vectors.
+
+Output 3:
+C and CUDA function:
+
+```c
 #include <stdio.h>
 
 __global__ void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
-  
-    if (i < n) {
-        y[i] = 0.0;
-        for (int j = row[i]; j < row[i + 1]; j++) {
+
+    if(i < n) {
+        y[i] = 0.0f;
+        for(int j = row[i]; j < row[i+1]; j++) {
             y[i] += val[j] * x[col[j]];
         }
     }
@@ -63,24 +156,25 @@ __global__ void spmv_parallel(int n, int nnz, float *val, int *row, int *col, fl
 
 int main() {
     int n = 5;
-    int nnz = 10;
-  
-    float val[10] = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0};
-    int row[6] = {0, 2, 4, 6, 8, 10};
-    int col[10] = {0, 1, 1, 2, 2, 3, 3, 4, 4, 0};
+    int nnz = 7;
+    
+    float val[7] = {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7};
+    int row[6] = {0, 2, 3, 5, 6, 7};
+    int col[7] = {0, 2, 3, 1, 3, 4, 2};
     float x[5] = {1.0, 2.0, 3.0, 4.0, 5.0};
     float y[5] = {0.0};
+
     float *d_val, *d_x, *d_y;
     int *d_row, *d_col;
 
     cudaMalloc(&d_val, nnz * sizeof(float));
-    cudaMalloc(&d_row, (n + 1) * sizeof(int));
+    cudaMalloc(&d_row, (n+1) * sizeof(int));
     cudaMalloc(&d_col, nnz * sizeof(int));
     cudaMalloc(&d_x, n * sizeof(float));
     cudaMalloc(&d_y, n * sizeof(float));
 
     cudaMemcpy(d_val, val, nnz * sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_row, row, (n + 1) * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_row, row, (n+1) * sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpy(d_col, col, nnz * sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpy(d_x, x, n * sizeof(float), cudaMemcpyHostToDevice);
     cudaMemcpy(d_y, y, n * sizeof(float), cudaMemcpyHostToDevice);
@@ -92,7 +186,7 @@ int main() {
 
     cudaMemcpy(y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
 
-    for (int i = 0; i < n; i++) {
+    for(int i = 0; i < n; i++) {
         printf("y[%d] = %f\n", i, y[i]);
     }
 
@@ -106,128 +200,19 @@ int main() {
 }
 ```
 
-In this CUDA code, we are using the `__global__` keyword to indicate that the `spmv_parallel` function will be executed on the GPU. We are also using CUDA memory allocation functions and cudaMemcpy to transfer data between the host and device. Finally, we launch the kernel function with the appropriate number of blocks and threads and copy the result back to the host for printing.
+This C and CUDA function implements the Sparse matrix-vector multiplication (SpMV) operation using a parallel kernel in CUDA. The main function allocates memory on the device, copies data from host to device, launches the CUDA kernel, copies the result back to the host, and then prints the result.
 
-Output 3:
-Here is a C/C++ with CUDA version of the Fortran OpenMP code:
+Note: Make sure to include the necessary headers and linker flags when compiling this code.
 
-```cpp
-#include <stdio.h>
-
-__global__ void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-
-    if (i < n) {
-        y[i] = 0.0f;
-        for (int j = row[i]; j < row[i+1]; j++) {
-            y[i] += val[j] * x[col[j]];
-        }
-    }
-}
-
-int main() {
-    int n = 5;
-    int nnz = 7;
-    float val[] = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0};
-    int row[] = {0, 2, 4, 5, 6, 7};
-    int col[] = {0, 2, 1, 3, 4, 1, 3};
-    float x[] = {1.0, 2.0, 3.0, 4.0, 5.0};
-    float y[n];
-
-    float *d_val, *d_x, *d_y;
-    int *d_row, *d_col;
-
-    cudaMalloc(&d_val, nnz * sizeof(float));
-    cudaMalloc(&d_row, (n+1) * sizeof(int));
-    cudaMalloc(&d_col, nnz * sizeof(int));
-    cudaMalloc(&d_x, n * sizeof(float));
-    cudaMalloc(&d_y, n * sizeof(float));
-
-    cudaMemcpy(d_val, val, nnz * sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_row, row, (n+1) * sizeof(int), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_col, col, nnz * sizeof(int), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_x, x, n * sizeof(float), cudaMemcpyHostToDevice);
-
-    spmv_parallel<<<(n + 255) / 256, 256>>>(n, nnz, d_val, d_row, d_col, d_x, d_y);
-
-    cudaMemcpy(y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
-
-    for (int i = 0; i < n; i++) {
-        printf("%.2f\n", y[i]);
-    }
-
-    cudaFree(d_val);
-    cudaFree(d_row);
-    cudaFree(d_col);
-    cudaFree(d_x);
-    cudaFree(d_y);
-
-    return 0;
-}
-```
-
-This code defines a CUDA kernel `spmv_parallel` that performs the sparse matrix-vector multiplication operation. The main function initializes the input arrays and allocates memory on the GPU before launching the kernel. The result is copied back to the host and printed out.
+I hope this helps! Let me know if you have further questions!
 
 Output 4:
-Here is the CUDA version of the Fortran OpenMP code for SpMV:
-
-```cpp
-#include <cuda_runtime.h>
-#include <device_launch_parameters.h>
-
-__global__ void spmv_kernel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    
-    if (i < n) {
-        y[i] = 0.0f;
-        for (int j = row[i]; j < row[i+1]; j++) {
-            y[i] += val[j] * x[col[j]];
-        }
-    }
-}
-
-void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
-    float *d_val, *d_x, *d_y;
-    int *d_row, *d_col;
-
-    cudaMalloc((void**)&d_val, nnz * sizeof(float));
-    cudaMalloc((void**)&d_x, n * sizeof(float));
-    cudaMalloc((void**)&d_y, n * sizeof(float));
-    cudaMalloc((void**)&d_row, (n+1) * sizeof(int));
-    cudaMalloc((void**)&d_col, nnz * sizeof(int));
-
-    cudaMemcpy(d_val, val, nnz * sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_x, x, n * sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_y, y, n * sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_row, row, (n+1) * sizeof(int), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_col, col, nnz * sizeof(int), cudaMemcpyHostToDevice);
-
-    int blockSize = 256;
-    int numBlocks = (n + blockSize - 1) / blockSize;
-
-    spmv_kernel<<<numBlocks, blockSize>>>(n, nnz, d_val, d_row, d_col, d_x, d_y);
-
-    cudaMemcpy(y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
-
-    cudaFree(d_val);
-    cudaFree(d_x);
-    cudaFree(d_y);
-    cudaFree(d_row);
-    cudaFree(d_col);
-}
-```
-
-In this CUDA version, we define a kernel function `spmv_kernel` that performs the SpMV operation. We then allocate memory on the device, copy data from host to device, launch the kernel with appropriate block size and grid size, and finally copy the result back to the host. Make sure to call `spmv_parallel` with the appropriate parameters to perform the SpMV operation using CUDA.
-
-Output 5:
-Here is a version of the Fortran OpenMP code converted to a CUDA C/C++ code for Sparse matrix-vector multiplication (SpMV) operation:
-
-```cpp
+```c
 #include <stdio.h>
 
 __global__ void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
-    
+
     if (i < n) {
         y[i] = 0.0;
         for (int j = row[i]; j < row[i+1]; j++) {
@@ -237,170 +222,61 @@ __global__ void spmv_parallel(int n, int nnz, float *val, int *row, int *col, fl
 }
 
 int main() {
-    int n = 10;
-    int nnz = 20;
-    
-    float val[nnz];
-    int row[n+1], col[nnz];
-    float x[n], y[n];
-    
-    // Initialize arrays val, row, col, x
-    
+    int n = 5;
+    int nnz = 6;
+    float val[] = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0};
+    int row[] = {0, 2, 3, 4, 5, 6};
+    int col[] = {0, 1, 1, 2, 3, 4};
+    float x[] = {1.0, 2.0, 3.0, 4.0, 5.0};
+    float y[n];
+
+    // Device memory allocation
     float *d_val, *d_x, *d_y;
     int *d_row, *d_col;
-    
+
     cudaMalloc(&d_val, nnz * sizeof(float));
-    cudaMalloc(&d_row, (n+1) * sizeof(int));
-    cudaMalloc(&d_col, nnz * sizeof(int));
     cudaMalloc(&d_x, n * sizeof(float));
     cudaMalloc(&d_y, n * sizeof(float));
-    
+    cudaMalloc(&d_row, (n + 1) * sizeof(int));
+    cudaMalloc(&d_col, nnz * sizeof(int));
+
+    // Copy data to device
     cudaMemcpy(d_val, val, nnz * sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_row, row, (n+1) * sizeof(int), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_col, col, nnz * sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpy(d_x, x, n * sizeof(float), cudaMemcpyHostToDevice);
-    
-    int blockSize = 256;
-    int grid = (n + blockSize - 1) / blockSize;
-    
-    spmv_parallel <<<grid, blockSize>>> (n, nnz, d_val, d_row, d_col, d_x, d_y);
-    
+    cudaMemcpy(d_row, row, (n + 1) * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_col, col, nnz * sizeof(int), cudaMemcpyHostToDevice);
+
+    // Kernel launch
+    int block_size = 256;
+    int num_blocks = (n + block_size - 1) / block_size;
+    spmv_parallel<<<num_blocks, block_size>>>(n, nnz, d_val, d_row, d_col, d_x, d_y);
+
+    // Copy result back to host
     cudaMemcpy(y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
-    
+
+    // Free device memory
     cudaFree(d_val);
-    cudaFree(d_row);
-    cudaFree(d_col);
     cudaFree(d_x);
     cudaFree(d_y);
-    
+    cudaFree(d_row);
+    cudaFree(d_col);
+
+    // Print result
+    for (int i = 0; i < n; i++) {
+        printf("y[%d] = %f\n", i, y[i]);
+    }
+
     return 0;
 }
 ```
+In this implementation, the spmv_parallel function is defined as a CUDA kernel that performs the sparse matrix-vector multiplication operation in parallel on the GPU. The main function shows how to allocate memory on the GPU, copy data from the host to the device, launch the kernel, copy the result back to the host, and free the device memory. Finally, it prints the result of the spmv operation.
 
-This CUDA C/C++ code performs Sparse matrix-vector multiplication using parallelization with GPU using CUDA.
-
-Output 6:
+Output 5:
 ```c
 #include <stdio.h>
 #include <stdlib.h>
 
-__global__ void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    
-    if (i < n) {
-        y[i] = 0.0;
-        for (int j = row[i]; j < row[i + 1]; j++) {
-            y[i] += val[j] * x[col[j]];
-        }
-    }
-}
-
-void spmv(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
-    float *d_val, *d_x, *d_y;
-    int *d_row, *d_col;
-    
-    cudaMalloc((void **)&d_val, nnz * sizeof(float));
-    cudaMalloc((void **)&d_row, (n + 1) * sizeof(int));
-    cudaMalloc((void **)&d_col, nnz * sizeof(int));
-    cudaMalloc((void **)&d_x, n * sizeof(float));
-    cudaMalloc((void **)&d_y, n * sizeof(float));
-    
-    cudaMemcpy(d_val, val, nnz * sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_row, row, (n + 1) * sizeof(int), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_col, col, nnz * sizeof(int), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_x, x, n * sizeof(float), cudaMemcpyHostToDevice);
-    
-    int block_size = 256;
-    int grid_size = (n + block_size - 1) / block_size;
-    
-    spmv_parallel<<<grid_size, block_size>>>(n, nnz, d_val, d_row, d_col, d_x, d_y);
-    
-    cudaMemcpy(y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
-    
-    cudaFree(d_val);
-    cudaFree(d_row);
-    cudaFree(d_col);
-    cudaFree(d_x);
-    cudaFree(d_y);
-}
-
-int main() {
-    int n = 5;
-    int nnz = 7;
-    float val[] = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0};
-    int row[] = {0, 2, 4, 4, 5, 7};
-    int col[] = {0, 2, 1, 3, 1, 4, 3};
-    float x[] = {1.0, 2.0, 3.0, 4.0, 5.0};
-    float y[5];
-    
-    spmv(n, nnz, val, row, col, x, y);
-    
-    for (int i = 0; i < n; i++) {
-        printf("%f ", y[i]);
-    }
-    
-    return 0;
-}
-``` 
-
-This code defines a CUDA kernel function `spmv_parallel` which performs sparse matrix-vector multiplication in parallel using CUDA. The `spmv` function allocates memory on the GPU, copies data from the host to the GPU, launches the kernel, and then copies the result back to the host. Finally, the main function provides sample input values for the sparse matrix and vectors, calls the `spmv` function, and prints the result.
-
-Output 7:
-Here is the equivalent CUDA code for the Fortran OpenMP code for Sparse matrix–vector multiplication (SpMV) operation:
-
-```cuda
-__global__ void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
-    int i = blockDim.x * blockIdx.x + threadIdx.x;
-    
-    if (i < n) {
-        y[i] = 0.0f;
-        for (int j = row[i]; j < row[i + 1]; j++) {
-            y[i] += val[j] * x[col[j]];
-        }
-    }
-}
-
-int main() {
-    int n, nnz;
-    // Initialize n, nnz, val, row, col, x
-    // Allocate memory for val, row, col, x, y
-    float *d_val, *d_x, *d_y;
-    int *d_row, *d_col;
-    
-    // Copy data from host to device
-    cudaMemcpy(d_val, val, nnz * sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_row, row, (n+1) * sizeof(int), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_col, col, nnz * sizeof(int), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_x, x, n * sizeof(float), cudaMemcpyHostToDevice);
-    
-    // Define block size and grid size
-    int blockSize = 256;
-    int numBlocks = (n + blockSize - 1) / blockSize;
-    
-    // Launch kernel
-    spmv_parallel<<<numBlocks, blockSize>>>(n, nnz, d_val, d_row, d_col, d_x, d_y);
-    
-    // Copy result from device to host
-    cudaMemcpy(y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
-    
-    // Free device memory
-    cudaFree(d_val);
-    cudaFree(d_row);
-    cudaFree(d_col);
-    cudaFree(d_x);
-    cudaFree(d_y);
-    
-    return 0;
-}
-```
-
-Please note that this is a basic example and may need to be modified based on the specific requirements of your application. Also, error checking and memory management have been omitted for brevity.
-
-Output 8:
-#include <stdio.h>
-#include <stdlib.h>
-
-__global__ void spmv_kernel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+__global__ void spmv(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < n) {
         y[i] = 0.0;
@@ -427,7 +303,212 @@ void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, flo
 
     int block_size = 256;
     int grid_size = (n + block_size - 1) / block_size;
-    spmv_kernel<<<grid_size, block_size>>>(n, nnz, d_val, d_row, d_col, d_x, d_y);
+
+    spmv<<<grid_size, block_size>>>(n, nnz, d_val, d_row, d_col, d_x, d_y);
+
+    cudaMemcpy(y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
+
+    cudaFree(d_val);
+    cudaFree(d_row);
+    cudaFree(d_col);
+    cudaFree(d_x);
+    cudaFree(d_y);
+}
+```
+In this CUDA implementation, the SpMV operation is performed by a kernel function `spmv` which is executed on the GPU. The `spmv_parallel` function allocates device memory, copies data from host to device, launches the kernel, copies the result back to the host, and deallocates device memory.
+
+Output 6:
+```c
+__global__ void spmv_kernel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    if (i < n) {
+        y[i] = 0.0;
+        for (int j = row[i]; j < row[i+1]; j++) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+
+void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    float *d_val, *d_x, *d_y;
+    int *d_row, *d_col;
+    
+    cudaMalloc(&d_val, nnz * sizeof(float));
+    cudaMalloc(&d_row, (n+1) * sizeof(int));
+    cudaMalloc(&d_col, nnz * sizeof(int));
+    cudaMalloc(&d_x, n * sizeof(float));
+    cudaMalloc(&d_y, n * sizeof(float));
+    
+    cudaMemcpy(d_val, val, nnz * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_row, row, (n+1) * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_col, col, nnz * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_x, x, n * sizeof(float), cudaMemcpyHostToDevice);
+    
+    int block_size = 256;
+    int num_blocks = (n + block_size - 1) / block_size;
+    
+    spmv_kernel <<<num_blocks, block_size>>> (n, nnz, d_val, d_row, d_col, d_x, d_y);
+    
+    cudaMemcpy(y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
+    
+    cudaFree(d_val);
+    cudaFree(d_row);
+    cudaFree(d_col);
+    cudaFree(d_x);
+    cudaFree(d_y);
+}
+```
+This CUDA implementation of the SpMV operation uses a kernel function to perform the matrix-vector multiplication in parallel on the GPU. The `spmv_parallel` function allocates and copies memory to the device, launches the kernel with the appropriate grid and block sizes, and then copies the result back to the host.
+
+Output 7:
+Here is a function implemented in C and CUDA that performs the Sparse matrix–vector multiplication (SpMV) operation:
+
+```c
+#include <stdio.h>
+
+__global__ void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = 0.0;
+        for (int j = row[i]; j < row[i + 1]; j++) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+
+void spmv_parallel_host(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    float *d_val, *d_x, *d_y;
+    int *d_row, *d_col;
+
+    cudaMalloc(&d_val, nnz * sizeof(float));
+    cudaMalloc(&d_x, n * sizeof(float));
+    cudaMalloc(&d_y, n * sizeof(float));
+    cudaMalloc(&d_row, (n + 1) * sizeof(int));
+    cudaMalloc(&d_col, nnz * sizeof(int));
+
+    cudaMemcpy(d_val, val, nnz * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_x, x, n * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_row, row, (n + 1) * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_col, col, nnz * sizeof(int), cudaMemcpyHostToDevice);
+
+    int blockSize = 256;
+    int gridSize = (n + blockSize - 1) / blockSize;
+
+    spmv_parallel<<<gridSize, blockSize>>>(n, nnz, d_val, d_row, d_col, d_x, d_y);
+
+    cudaMemcpy(y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
+
+    cudaFree(d_val);
+    cudaFree(d_x);
+    cudaFree(d_y);
+    cudaFree(d_row);
+    cudaFree(d_col);
+}
+
+int main() {
+    int n = 5;
+    int nnz = 8;
+    float val[8] = {2.0, 1.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0};
+    int row[6] = {0, 2, 3, 5, 7, 8};
+    int col[8] = {0, 2, 1, 3, 0, 2, 3, 4};
+    float x[5] = {1.0, 2.0, 3.0, 4.0, 5.0};
+    float y[5];
+
+    spmv_parallel_host(n, nnz, val, row, col, x, y);
+
+    for (int i = 0; i < n; i++) {
+        printf("%f ", y[i]);
+    }
+    printf("\n");
+
+    return 0;
+}
+```
+
+In this implementation, the function `spmv_parallel` is defined to perform the Sparse matrix–vector multiplication using CUDA. The `spmv_parallel_host` function is called from the main function to execute the SpMV operation on the GPU. The input matrices and vectors are copied from the host to the device, the kernel function `spmv_parallel` is launched with appropriate grid and block dimensions, and the result vector `y` is copied back to the host.
+
+You can compile and run this code on a CUDA-enabled GPU to perform the Sparse matrix–vector multiplication operation in parallel.
+
+Output 8:
+```c
+#include <stdio.h>
+
+__global__ void spmv_kernel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    if (i < n) {
+        y[i] = 0.0;
+        for (int j = row[i]; j < row[i+1]; j++) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+
+void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    float *d_val, *d_x, *d_y;
+    int *d_row, *d_col;
+    int thread_per_block = 256;
+    int block_count = (n + thread_per_block - 1) / thread_per_block;
+
+    cudaMalloc(&d_val, nnz * sizeof(float));
+    cudaMalloc(&d_x, n * sizeof(float));
+    cudaMalloc(&d_y, n * sizeof(float));
+    cudaMalloc(&d_row, (n+1) * sizeof(int));
+    cudaMalloc(&d_col, nnz * sizeof(int));
+
+    cudaMemcpy(d_val, val, nnz * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_row, row, (n+1) * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_col, col, nnz * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_x, x, n * sizeof(float), cudaMemcpyHostToDevice);
+
+    spmv_kernel<<<block_count, thread_per_block>>>(n, nnz, d_val, d_row, d_col, d_x, d_y);
+
+    cudaMemcpy(y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
+
+    cudaFree(d_val);
+    cudaFree(d_row);
+    cudaFree(d_col);
+    cudaFree(d_x);
+    cudaFree(d_y);
+}
+```
+
+Output 9:
+Here is the equivalent function implemented in C and CUDA:
+
+```C
+#include <stdio.h>
+
+#define BLOCK_SIZE 256
+
+__global__ void spmv_kernel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = 0.0;
+        for (int j = row[i]; j < row[i+1]; j++) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+
+void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    float *d_val, *d_x, *d_y;
+    int *d_row, *d_col;
+
+    cudaMalloc(&d_val, nnz * sizeof(float));
+    cudaMalloc(&d_row, (n + 1) * sizeof(int));
+    cudaMalloc(&d_col, nnz * sizeof(int));
+    cudaMalloc(&d_x, n * sizeof(float));
+    cudaMalloc(&d_y, n * sizeof(float));
+
+    cudaMemcpy(d_val, val, nnz * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_row, row, (n + 1) * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_col, col, nnz * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_x, x, n * sizeof(float), cudaMemcpyHostToDevice);
+
+    int num_blocks = (n + BLOCK_SIZE - 1) / BLOCK_SIZE;
+    spmv_kernel<<<num_blocks, BLOCK_SIZE>>>(n, nnz, d_val, d_row, d_col, d_x, d_y);
 
     cudaMemcpy(y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
 
@@ -440,25 +521,34 @@ void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, flo
 
 int main() {
     int n = 5;
-    int nnz = 7;
-    float val[] = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0};
-    int row[] = {0, 2, 4, 5, 6, 7};
-    int col[] = {0, 2, 1, 3, 0, 1, 4};
-    float x[] = {1.0, 2.0, 3.0, 4.0, 5.0};
-    float y[5];
+    int nnz = 9;
+    float val[9] = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0};
+    int row[6] = {0, 3, 5, 7, 8, 9};
+    int col[9] = {0, 1, 3, 1, 2, 4, 0, 3, 4};
+    float x[5] = {1.0, 2.0, 3.0, 4.0, 5.0};
+    float y[5] = {0.0};
 
     spmv_parallel(n, nnz, val, row, col, x, y);
 
-    for (int i=0; i<n; i++) {
-        printf("y[%d] = %f\n", i, y[i]);
+    printf("Result:\n");
+    for (int i = 0; i < n; i++) {
+        printf("%f\n", y[i]);
     }
 
     return 0;
 }
+```
 
-Output 9:
+This C code implements a Sparse Matrix-Vector multiplication operation using CUDA parallelism. It creates a kernel function `spmv_kernel` that performs the actual computation on the GPU, and a host function `spmv_parallel` that handles memory allocation, data transfer, kernel invocation, and result retrieval.
+
+Please note that you need to have an NVIDIA GPU and CUDA installed on your system to run this code. This code is just a rough approximation of the Fortran and OpenMP subroutine, and some adjustments might be necessary depending on the specifics of your application.
+
+Output 10:
+Here is the equivalent function implemented in C and CUDA:
+
+```c
 #include <stdio.h>
-#include <stdlib.h>
+#include <cuda_runtime.h>
 
 __global__ void spmv_kernel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -488,7 +578,6 @@ void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, flo
 
     int block_size = 256;
     int grid_size = (n + block_size - 1) / block_size;
-
     spmv_kernel<<<grid_size, block_size>>>(n, nnz, d_val, d_row, d_col, d_x, d_y);
 
     cudaMemcpy(y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
@@ -499,71 +588,7 @@ void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, flo
     cudaFree(d_x);
     cudaFree(d_y);
 }
-
-int main() {
-    int n = 5;
-    int nnz = 12;
-    float val[12] = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0};
-    int row[6] = {0, 2, 4, 7, 9, 12};
-    int col[12] = {0, 2, 1, 3, 0, 2, 4, 1, 3, 2, 4, 0};
-    float x[5] = {1.0, 2.0, 3.0, 4.0, 5.0};
-    float y[5] = {0.0};
-
-    spmv_parallel(n, nnz, val, row, col, x, y);
-
-    for (int i = 0; i < n; i++) {
-        printf("y[%d]: %.2f\n", i, y[i]);
-    }
-
-    return 0;
-}
-
-Output 10:
-Here is a version of the code in C/C++ with CUDA:
-
-```cpp
-#include <cuda_runtime.h>
-#include <stdio.h>
-
-__global__ void spmv_kernel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
-    int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    if (tid < n) {
-        y[tid] = 0.0;
-        for (int j = row[tid]; j < row[tid + 1]; j++) {
-            y[tid] += val[j] * x[col[j]];
-        }
-    }
-}
-
-void spmv_parallel(int n, int nnz, float *h_val, int *h_row, int *h_col, float *h_x, float *h_y) {
-    float *d_val, *d_x, *d_y;
-    int *d_row, *d_col;
-
-    cudaMalloc((void**)&d_val, nnz * sizeof(float));
-    cudaMalloc((void**)&d_row, (n + 1) * sizeof(int));
-    cudaMalloc((void**)&d_col, nnz * sizeof(int));
-    cudaMalloc((void**)&d_x, n * sizeof(float));
-    cudaMalloc((void**)&d_y, n * sizeof(float));
-
-    cudaMemcpy(d_val, h_val, nnz * sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_row, h_row, (n + 1) * sizeof(int), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_col, h_col, nnz * sizeof(int), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_x, h_x, n * sizeof(float), cudaMemcpyHostToDevice);
-
-    int blockSize = 256;
-    int numBlocks = (n + blockSize - 1) / blockSize;
-
-    spmv_kernel<<<numBlocks, blockSize>>>(n, nnz, d_val, d_row, d_col, d_x, d_y);
-
-    cudaMemcpy(h_y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
-
-    cudaFree(d_val);
-    cudaFree(d_row);
-    cudaFree(d_col);
-    cudaFree(d_x);
-    cudaFree(d_y);
-}
 ```
 
-You can call the `spmv_parallel` function with the appropriate arguments and it will perform the Sparse matrix-vector multiplication operation using CUDA parallel processing. Make sure to include the necessary CUDA headers and link to the CUDA library when compiling the code.
+You can use the `spmv_parallel` function in your C/C++ code to perform Sparse matrix-vector multiplication using CUDA.
 

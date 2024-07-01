@@ -1,39 +1,51 @@
 Output 1:
-Here is an equivalent C/C++ code implementing Sparse Matrix-Vector Multiplication (SpMV) using OpenACC, which can help in offloading computations to GPUs:
+Sure! Below is the equivalent function implemented in C utilizing OpenACC, which performs the same Sparse Matrix–Vector Multiplication (SpMV) operation as described in the provided Fortran subroutine.
 
-```cpp
+First, let's define the structure of the Fortran code:
+1. `n` - Number of rows of the sparse matrix.
+2. `nnz` - Number of non-zero elements in the sparse matrix.
+3. `val` - Array containing the values of the non-zero elements.
+4. `row` - Array where each element `row[i]` denotes the starting index of the non-zero elements for the `i-th` row.
+5. `col` - Array containing the column indices corresponding to each value in `val`.
+6. `x` - Input vector to be multiplied.
+7. `y` - Output vector resulting from the matrix–vector multiplication.
+
+Here's the equivalent C function with OpenACC:
+
+```c
 #include <stdio.h>
-#include <stdlib.h>
-#include <openacc.h>
 
-void spmv_parallel(int n, int nnz, const float *val, const int *row, const int *col, const float *x, float *y) {
+void spmv_parallel(int n, int nnz, float* val, int* row, int* col, float* x, float* y) {
+    int i, j;
+
+    // OpenACC parallel region
     #pragma acc parallel loop copyin(val[0:nnz], row[0:n+1], col[0:nnz], x[0:n]) copyout(y[0:n])
-    for (int i = 0; i < n; ++i) {
-        y[i] = 0.0f;
+    for (i = 0; i < n; ++i) {
+        y[i] = 0.0;
+        
         #pragma acc loop reduction(+:y[i])
-        for (int j = row[i]; j < row[i+1]; ++j) {
+        for (j = row[i]; j < row[i+1]; ++j) {
             y[i] += val[j] * x[col[j]];
         }
     }
 }
 
 int main() {
-    // Example usage:
-    const int n = 5;
-    const int nnz = 13;
+    // Example usage of the spmv_parallel function
+    int n = 5;  // Number of rows
+    int nnz = 9;  // Number of non-zero values in the sparse matrix
 
-    // Example sparse matrix (in CSR format).
-    float val[nnz] = {10.0f, 20.0f, 30.0f, 40.0f, 50.0f, 60.0f, 70.0f, 80.0f, 90.0f, 100.0f, 110.0f, 120.0f, 130.0f};
-    int row[n + 1] = {0, 3, 6, 9, 11, 13};
-    int col[nnz] = {0, 2, 4, 0, 1, 3, 1, 2, 4, 0, 2, 1, 3};
+    // Example sparse matrix in CSR format
+    float val[] = {10, 20, 30, 40, 50, 60, 70, 80, 90};
+    int row[] = {0, 2, 4, 6, 7, 9};
+    int col[] = {0, 1, 1, 2, 2, 3, 1, 3, 4};
 
-    float x[n] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
-    float y[n];
+    float x[] = {1, 2, 3, 4, 5};  // Input vector
+    float y[n];  // Output vector
 
-    // Perform SpMV operation
     spmv_parallel(n, nnz, val, row, col, x, y);
 
-    // Print result
+    // Print the result vector y
     for (int i = 0; i < n; ++i) {
         printf("y[%d] = %f\n", i, y[i]);
     }
@@ -42,296 +54,37 @@ int main() {
 }
 ```
 
-### Explanation:
-1. **Data Directives**:
-    - `#pragma acc parallel loop`: Offloads the outer loop to the GPU.
-    - `copyin` directive ensures the input arrays `val`, `row`, `col`, and `x` are copied from the host to the device.
-    - `copyout` directive ensures the output array `y` is copied back from the device to the host.
+Key points to note:
+1. The `pragma acc parallel loop` directive parallelizes the outer loop.
+2. The `copyin` clause is used to specify arrays transferred to the device.
+3. The `copyout` clause is used to specify arrays transferred back to the host.
+4. The `reduction` clause is used to perform a parallel reduction operation on `y[i]`.
 
-2. **Reduction Directive**:
-    - `#pragma acc loop reduction(+:y[i])`: This directive ensures that the reduction operation (summing up `val[j] * x[col[j]]`) across different threads is correctly handled.
+You can compile this code using an OpenACC-compatible compiler, such as the PGI Compiler (now part of NVIDIA HPC SDK).
 
-3. **Memory Management**:
-    - The directives manage the memory needed for these arrays, ensuring the data is available on the GPU for computation.
-
-4. **Initialization**:
-    - The code initializes an example sparse matrix in CSR (Compressed Sparse Row) format and a dense vector, and then performs the SpMV operation on them.
-
-### Compilation:
-To compile this code, ensure you have an OpenACC-supported compiler (e.g., PGI compiler). The compilation command might look like:
-
-```sh
-pgcc -acc -Minfo=accel -o spmv_spmv_parallel spmv_spmv_parallel.c
+For instance:
+```bash
+pgcc -acc -Minfo=accel spmv_parallel.c -o spmv_parallel
 ```
 
-Adjust the compilation flags based on your specific compiler and system setup.
-
-### Running:
-After successful compilation, execute the generated binary:
-```sh
-./spmv_spmv_parallel
-```
-
-This should display the results of the SpMV operation based on the provided example matrix and vector.
+Note: Ensure that you have an OpenACC-compatible compiler for compilation. Adjust the compiler flags as necessary for your specific compiler and platform.
 
 Output 2:
-Certainly! Below is a version of the Sparse Matrix-Vector Multiplication (SpMV) operation in C/C++ using OpenACC, equivalent to the provided Fortran OpenMP code:
+Below is an equivalent Sparse matrix–vector multiplication (SpMV) operation implemented in C using OpenACC for parallelism. The function, `spmv_parallel`, closely mirrors the structure of the provided Fortran subroutine.
+
+Here's the C/OpenACC function:
 
 ```c
-#include <openacc.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 void spmv_parallel(int n, int nnz, const float *val, const int *row, const int *col, const float *x, float *y) {
-    #pragma acc parallel loop present(val[0:nnz], row[0:n+1], col[0:nnz], x[0:n], y[0:n])
-    for (int i = 0; i < n; i++) {
-        y[i] = 0.0f;
+    int i, j;
 
+    #pragma acc parallel loop present(val[0:nnz], row[0:n+1], col[0:nnz], x[0:n], y[0:n])
+    for (i = 0; i < n; i++) {
+        y[i] = 0.0f;
         #pragma acc loop reduction(+:y[i])
-        for (int j = row[i]; j < row[i + 1]; j++) {
-            y[i] += val[j] * x[col[j]];
-        }
-    }
-}
-```
-
-### Explanation:
-1. **Directive Initialization**:
-   - The `#pragma acc parallel loop` directive is used to parallelize the outer loop (`for (int i = 0; i < n; i++)`).
-   - The `present` clause ensures that the arrays `val`, `row`, `col`, `x`, and `y` are present on the device.
-
-2. **Reduction**:
-   - The `#pragma acc loop reduction(+:y[i])` directive is used to handle the reduction operation properly. It ensures that updates to `y[i]` within the inner loop are correctly managed across parallel iterations.
-
-3. **Zero Initialization**:
-   - `y[i]` is set to 0.0 before starting the inner loop, similar to the original Fortran version.
-
-4. **Matrix-Vector Multiplication**:
-   - Nested loops traverse through the non-zero elements of the sparse matrix to perform the multiplication and accumulate the results in `y`.
-
-### Notes:
-- Ensure that the arrays are correctly allocated and copied to/from the device before/after calling the `spmv_parallel` function if not managed automatically by the OpenACC runtime.
-- The `present` clause assumes that the necessary data has already been moved to the device. If the data needs to be explicitly copied, `#pragma acc enter data` and `#pragma acc exit data` directives should be used accordingly in the surrounding code.
-
-Output 3:
-Certainly! Below is a C/C++ version of the provided Fortran OpenMP code for Sparse Matrix-Vector Multiplication (SpMV), using OpenACC instead. OpenACC is a directive-based parallel programming model similar to OpenMP but designed to target accelerators like GPUs.
-
-Here's the C++ version of the Fortran code:
-
-```cpp
-#include <iostream>
-#include <vector>
-
-// Function to perform Sparse Matrix-Vector Multiplication (SpMV)
-void spmv_parallel(int n, int nnz, const float* val, const int* row, const int* col, const float* x, float* y) {
-    #pragma acc parallel loop present(val[0:nnz], row[0:n+1], col[0:nnz], x[0:n], y[0:n])
-    for (int i = 0; i < n; ++i) {
-        y[i] = 0.0f;
-        #pragma acc loop seq
-        for (int j = row[i]; j < row[i+1]; ++j) {
-            y[i] += val[j] * x[col[j]];
-        }
-    }
-}
-
-int main() {
-    // Example usage
-    const int n = 5; // Number of rows
-    const int nnz = 9; // Number of non-zero entries
-
-    // Example sparse matrix in CSR format
-    const float val[nnz] = {10.0f, 20.0f, 30.0f, 40.0f, 50.0f, 60.0f, 70.0f, 80.0f, 90.0f};
-    const int row[n+1] = {0, 2, 4, 6, 7, 9};
-    const int col[nnz] = {0, 1, 1, 2, 2, 3, 4, 4, 0};
-
-    // Vector x
-    const float x[n] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
-
-    // Output vector y
-    float y[n];
-
-    // Offload data to the device
-    #pragma acc data copyin(val[0:nnz], row[0:n+1], col[0:nnz], x[0:n]) copyout(y[0:n])
-    {
-        spmv_parallel(n, nnz, val, row, col, x, y);
-    }
-
-    // Display the result
-    std::cout << "Resulting vector y:" << std::endl;
-    for (int i = 0; i < n; ++i) {
-        std::cout << y[i] << " ";
-    }
-    std::cout << std::endl;
-
-    return 0;
-}
-```
-
-### Program Explanation:
-
-1. **Function Definition:** `spmv_parallel` function is defined to perform SpMV where:
-    - `n` is the number of rows in the matrix.
-    - `nnz` is the number of non-zero elements.
-    - `val` is the array containing the non-zero values.
-    - `row` is the array representing the row pointer in CSR format.
-    - `col` is the array representing the column indices in CSR format.
-    - `x` is the input vector with which the sparse matrix is multiplied.
-    - `y` is the output vector to store the result.
-
-2. **Offloading and Parallelization:**
-    - The `#pragma acc parallel loop` directive parallelizes the outer loop (over rows `i`).
-    - The `#pragma acc loop seq` directive indicates that the inner loop (over non-zero entries `j` within a row) should not be parallelized, preserving the sequential order of accumulation for each row `i`.
-
-3. **Data Management:** The `#pragma acc data` directive is used to manage data transfer between the host (CPU) and the device (GPU). The `copyin` clause specifies data copied to the device and `copyout` specifies data copied back to the host.
-
-4. **Main Function:**
-    - Sets example values for the sparse matrix and vector.
-    - Calls the `spmv_parallel` function within a data transfer block.
-    - Prints the resulting vector `y`.
-
-Compile and run this code with an appropriate compiler that supports OpenACC, such as PGI, now NVIDIA HPC SDK. Add appropriate compile flags to enable OpenACC, like `-acc` for the PGI or NVIDIA HPC compilers. 
-
-For example:
-```sh
-pgc++ -acc -Minfo=accel spmv_parallel.cpp -o spmv_parallel
-./spmv_parallel
-```
-
-Output 4:
-Sure! Here's the C/C++ version of the Sparse Matrix-Vector Multiplication (SpMV) operation using OpenACC.
-
-Make sure you have an OpenACC-compatible compiler (`pgcc`, `nvc`, etc.) to compile this code.
-
-```c
-#include <stdio.h>
-
-// Declaration of subroutine
-void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y);
-
-// Definition of subroutine
-void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
-    #pragma acc parallel loop present(val[0:nnz], row[0:n+1], col[0:nnz], x[0:n], y[0:n])
-    for (int i = 0; i < n; i++) {
-        y[i] = 0.0f;
-        #pragma acc loop seq
-        for (int j = row[i]; j < row[i+1]; j++) {
-            y[i] += val[j] * x[col[j]];
-        }
-    }
-}
-
-int main() {
-    // Example usage
-    int n = 4;  // number of rows
-    int nnz = 9; // number of non-zero elements
-
-    // Example matrix in CSR format:
-    // ( 10 0 0 0 )
-    // (  0 0 0 20)
-    // ( 30 0 40 0)
-    // ( 0 50 0 60)
-    float val[] = {10.0, 20.0, 30.0, 40.0, 50.0, 60.0}; 
-    int row[] = {0, 1, 2, 4, 6};  // row indices
-    int col[] = {0, 3, 0, 2, 1, 3};  // column indices
-    float x[] = {1.0, 1.0, 1.0, 1.0};  // input vector x
-    float y[4];  // output vector y
-
-    // Initialize OpenACC
-    #pragma acc enter data copyin(val, row, col, x)
-    #pragma acc enter data create(y)
-
-    // Perform SpMV
-    spmv_parallel(n, nnz, val, row, col, x, y);
-
-    // Copy result back to host
-    #pragma acc update self(y)
-
-    // Print the result
-    printf("Result vector y:\n");
-    for (int i = 0; i < n; i++) {
-        printf("%f\n", y[i]);
-    }
-
-    // Cleanup OpenACC
-    #pragma acc exit data delete(val, row, col, x, y)
-
-    return 0;
-}
-```
-
-### Explanation:
-1. **SpMV Parallel Function**:
-   - **Function Signature**: The `spmv_parallel` function follows the structure of the original Fortran subroutine.
-   - **OpenACC Directives**: The `#pragma acc parallel loop` directive is used for parallelism. The `present` clause is specified to indicate that the arrays are already present on the device.
-   - **Inner Loop**: The inner loop is sequential (`#pragma acc loop seq`) as it inherently cannot be parallelized due to the accumulation into a single `y[i]`.
-
-2. **Main Function**:
-   - **Example Matrix and Vectors**: Defines a small example matrix in CSR format and vectors `x` and `y`.
-   - **Data Management**: Data is sent to the GPU and retrieved back using `#pragma acc enter data`, `#pragma acc update`, and `#pragma acc exit data`.
-   - **Output**: The resulting vector `y` is printed out.
-
-Make sure to link the OpenACC library when compiling the code, for example with `nvcc`:
-```sh
-nvcc -o spmv_parallel spmv_parallel.c -acc
-```
-
-Run the compiled program to see the output of the SpMV operation.
-
-
-Output 5:
-To convert the given Fortran code implementing a Sparse matrix–vector multiplication (SpMV) operation using OpenMP to C/C++ using OpenACC, follow the steps outlined below. The OpenACC approach is similar in paradigm to OpenMP but targeted for accelerator devices, such as GPUs.
-
-Here's the equivalent C/C++ implementation using OpenACC:
-
-```c++
-#include <openacc.h>
-
-void spmv_parallel(int n, int nnz, const float *val, const int *row, const int *col, const float *x, float *y) {
-    int i, j;
-
-    #pragma acc parallel loop gang worker present(val[0:nnz], row[0:n+1], col[0:nnz], x[0:n], y[0:n])
-    for (i = 0; i < n; i++) {
-        y[i] = 0.0f;
-
-        #pragma acc loop seq
-        for (j = row[i]; j < row[i + 1]; j++) {
-            y[i] += val[j] * x[col[j]];
-        }
-    }
-}
-```
-
-### Explanation of the Code
-
-1. **Header File Inclusion**:
-   - Include the OpenACC header with `#include <openacc.h>`.
-   
-2. **Function Definition**:
-   - Define the function `spmv_parallel` with the same parameters as the Fortran subroutine.
-   
-3. **OpenACC Directives**:
-   - Use the `#pragma acc parallel loop gang worker` directive to parallelize the outer loop over `i`. The `gang` and `worker` clauses specify hierarchical parallelism and mapping across different levels of parallel execution on the target device.
-   - Use `present` clause to specify the data that should be present on the accelerator device. This avoids implicit data transfers.
-   - The inner loop over `j` is specified with the `#pragma acc loop seq` directive. This indicates that the inner loop should be executed sequentially within each gang of workers.
-   
-4. **Array Indexing Adjustment**:
-   - Note that arrays in C/C++ are zero-indexed, whereas in Fortran, arrays are typically one-indexed. Adjust array indices accordingly to match this difference.
-
-This structure follows closely what was described in the Fortran code but adapted for C/C++ with OpenACC pragmas. The parallelism and loop constructs are maintained to leverage the power of GPUs or other accelerators with OpenACC directives.
-
-Output 6:
-Certainly! Below is a version of the given Fortran OpenMP code, which performs a Sparse Matrix-Vector Multiplication (SpMV) operation, rewritten in C with OpenACC for parallelism.
-
-### C with OpenACC
-
-```c
-#include <stdio.h>
-
-void spmv_parallel(int n, int nnz, const float *val, const int *row, const int *col, const float *x, float *y) {
-    int i, j;
-
-    #pragma acc parallel loop present(val[0:nnz], row[0:n+1], col[0:nnz], x[0:n], y[0:n])
-    for (i = 0; i < n; i++) {
-        y[i] = 0.0;
-        #pragma acc loop seq 
         for (j = row[i]; j < row[i+1]; j++) {
             y[i] += val[j] * x[col[j]];
         }
@@ -339,28 +92,26 @@ void spmv_parallel(int n, int nnz, const float *val, const int *row, const int *
 }
 
 int main() {
-    // Example usage of spmv_parallel function. 
-    // User is expected to provide appropriate n, nnz, val, row, col, x and y.
-    
-    int n = 5;
-    int nnz = 13;
-    
-    float val[] = {2.0, 3.0, -1.0, 4.0, 1.0, 2.0, 5.0, 8.0, -3.0, 6.0, 3.0, -2.0, 7.0};
-    int row[] = {0, 3, 5, 8, 10, 13};
-    int col[] = {0, 1, 4, 1, 2, 0, 3, 4, 1, 3, 0, 2, 4};
-    float x[] = {1.0, 2.0, 3.0, 4.0, 5.0};
-    float y[5];
+    // Example usage of the spmv_parallel function
 
-    // Initialize OpenACC device, allocate memory, and transfer data
-    #pragma acc enter data copyin(val, row, col, x) create(y)
+    int n = 4; // Number of rows (and columns for simplicity, assuming square matrix)
+    int nnz = 9; // Number of non-zero elements
 
-    // Call the SpMV function
-    spmv_parallel(n, nnz, val, row, col, x, y);
+    // Sparse matrix in CSR (Compressed Sparse Row) format
+    float val[] = {10, 20, 30, 40, 50, 60, 70, 80, 90};
+    int row[] = {0, 2, 4, 7, 9};
+    int col[] = {0, 1, 2, 1, 3, 1, 2, 0, 3};
 
-    // Transfer data back from the device
-    #pragma acc exit data copyout(y) delete(val, row, col, x)
+    float x[] = {1, 2, 3, 4};
+    float y[4];
 
-    // Print the result
+    // Ensure data is accessible on the device
+    #pragma acc data copyin(val[0:nnz], row[0:n+1], col[0:nnz], x[0:n]) copyout(y[0:n])
+    {
+        spmv_parallel(n, nnz, val, row, col, x, y);
+    }
+
+    // Print resulting vector
     for (int i = 0; i < n; i++) {
         printf("y[%d] = %f\n", i, y[i]);
     }
@@ -371,69 +122,314 @@ int main() {
 
 ### Explanation:
 
-1. **Data Directives**: We use `#pragma acc enter data` and `#pragma acc exit data` to manage the data transfer between the host and the device.
+1. **Function Signature:**
+   - `spmv_parallel` accepts the number of rows `n`, number of non-zero entries `nnz`, arrays `val`, `row`, `col`, and vectors `x` (input) and `y` (output).
 
-2. **Parallel and Loop Directives**: The `#pragma acc parallel loop` directive parallelizes the outer loop. We use `present` clause to indicate which arrays are already on the device.
+2. **OpenACC Directives:**
+   - `#pragma acc parallel loop` is used to parallelize the outer loop (`i` loop).
+   - Since `y[i]` is updated by multiple threads, its update is enclosed within a `#pragma acc loop reduction(+:y[i])` clause.
 
-3. **Sequential Reduction Loop**: The inner loop (which performs the summation) uses the `#pragma acc loop seq` directive to ensure that it runs sequentially within each parallel iteration of the outer loop.
+3. **Execution and Memory Management:**
+   - The `#pragma acc data` directive is used to copy the necessary data to the device (GPU) and ensure the result is copied back to the host.
 
-Note that OpenACC directives work at a higher level than OpenMP and are often used to offload computation to GPUs or other accelerators. Make sure to compile this code with an OpenACC-compatible compiler, such as `pgcc` from the PGI compilers, now part of the NVIDIA HPC SDK, or GCC with OpenACC support.
+### Notes:
+- Ensure to compile the code with an OpenACC-compatible compiler, such as PGI/NVIDIA HPC compiler.
+- The `present` clause in the `#pragma acc parallel loop` ensures that the data has already been copied to the device and is available for computation. If not using `data` regions, you will need to manage data transfers explicitly.
+- Ensure that your compiler supports and is correctly set up for OpenACC. Compilation of the above code might look like this:
+  ```sh
+  pgcc -acc -Minfo=accel -o spmv_parallel spmv_parallel.c
+  ```
 
-Output 7:
-To translate the provided Fortran OpenMP code for Sparse Matrix-Vector multiplication (SpMV) into C/C++ using OpenACC, you can follow the structure of the original Fortran code but use C/C++ syntax.
+Output 3:
+To perform a Sparse Matrix-Vector (SpMV) multiplication using OpenACC in C, we need to leverage OpenACC directives for parallel processing on CPUs and GPUs. The original Fortran subroutine provided is computing `y = A * x`, where `A` is a sparse matrix represented in the Compressed Sparse Row (CSR) format.
 
-Here's the C/C++ equivalent using OpenACC:
+Below is the equivalent function in C, making use of OpenACC directives:
 
-```cpp
-#include <omp.h>
+```c
+#include <stdio.h>
 
 void spmv_parallel(int n, int nnz, const float *val, const int *row, const int *col, const float *x, float *y) {
-    #pragma acc parallel loop default(none) shared(n, nnz, val, row, col, x, y)
-    for (int i = 0; i < n; i++) {
+    int i, j;
+
+    #pragma acc parallel loop present(val[0:nnz], row[0:n+1], col[0:nnz], x[0:n], y[0:n])
+    for (i = 0; i < n; i++) {
         y[i] = 0.0f;
-        for (int j = row[i]; j < row[i+1]; j++) {
+        #pragma acc loop seq
+        for (j = row[i]; j < row[i + 1]; j++) {
             y[i] += val[j] * x[col[j]];
         }
     }
 }
 
+// A small main function to demonstrate usage
 int main() {
-    // Example usage
-    const int n = 5; // example size of matrix
-    const int nnz = 8; // example non-zero elements count
-    
-    float val[nnz] = {10, 20, 30, 40, 50, 60, 70, 80}; // example values array
-    int row[n+1] = {0, 2, 4, 4, 6, 8}; // example row array
-    int col[nnz] = {0, 1, 1, 2, 3, 4, 0, 4}; // example column array
-    float x[n] = {1, 1, 1, 1, 1}; // example input vector
-    float y[n]; // output vector
+    // Example sparse matrix in CSR format
+    int n = 4; // number of rows/columns
+    int nnz = 5; // number of non-zero elements
 
-    // Call the function
-    spmv_parallel(n, nnz, val, row, col, x, y);
+    // Example data
+    float val[5] = {1.0, 2.0, 3.0, 4.0, 5.0};    // Non-zero values
+    int row[5] = {0, 2, 3, 4, 5};               // Row pointers
+    int col[5] = {0, 1, 2, 3, 0};               // Column indices
+
+    float x[4] = {1.0, 2.0, 3.0, 4.0}; // Input vector
+    float y[4];  // Output vector to store the result
+
+    // Start OpenACC data region
+    #pragma acc data copyin(val[0:nnz], row[0:n+1], col[0:nnz], x[0:n]) copyout(y[0:n])
+    {
+        spmv_parallel(n, nnz, val, row, col, x, y);
+    }
+
+    // Print the result
+    printf("Result vector y:\n");
+    for (int i = 0; i < n; i++) {
+        printf("%f ", y[i]);
+    }
+    printf("\n");
 
     return 0;
 }
 ```
 
-A few notes on the code:
-1. **Data Types**: The original Fortran code uses `real`, which corresponds to `float` in C/C++. If your precision requirements differ, you can use `double`.
-2. **Array Indexing**: Fortran arrays are 1-based, whereas C/C++ arrays are 0-based. The loop ranges and data initialization have been adjusted accordingly.
-3. **OpenACC Directives**: The `#pragma acc parallel loop` directive is used to indicate that the loop should be parallelized by the OpenACC runtime.
+Explanation of the key parts:
 
-You would need to compile this code with an OpenACC-compatible compiler (like PGI/NVIDIA HPC SDK) for parallel execution on an accelerator. Make sure to link the appropriate OpenACC libraries and use the necessary compiler flags, such as `-acc`.
+1. **Function Signature:**
+   - It accepts the matrix dimensions (`n`, `nnz`), the non-zero values (`val`), the CSR row pointers (`row`), the CSR column indices (`col`), the input vector (`x`), and the output vector (`y`).
 
-Output 8:
-Certainly! Below is an equivalent version of the Sparse Matrix-Vector Multiplication (SpMV) operation implemented in C/C++ using OpenACC. This is suitable for execution on GPU architectures.
+2. **OpenACC Data Directives:**
+   - The `#pragma acc data` directive is used to manage the data movement between the host and the device memory. `copyin` and `copyout` clauses specify the arrays to transfer.
+
+3. **Parallel `for` loop:**
+   - The outer loop (`for (i = 0; i < n; i++)`) is parallelized using `#pragma acc parallel loop`.
+   
+4. **Sequential Inner Loop:**
+   - The inner loop (`for (j = row[i]; j < row[i + 1]; j++)`) is marked with `#pragma acc loop seq` to execute sequentially within each parallel iteration of the outer loop.
+
+5. **The `main` function:**
+   - It sets up an example CSR matrix and vector, invokes the `spmv_parallel` function, and prints the resulting vector.
+
+This code provides a parallelized SpMV operation using OpenACC in a C program. The implementation focuses on appropriately distributing the work and managing the data movement between the CPU and the GPU.
+
+Output 4:
+Certainly! Below is a C implementation of your Sparse matrix-vector multiplication (SpMV) subroutine using OpenACC for parallelization. This subroutine takes the same inputs and performs the SpMV operation.
 
 ```c
 #include <openacc.h>
 
-// Function to perform Sparse Matrix-Vector Multiplication (SpMV)
-void spmv_parallel(int n, int nnz, const float* val, const int* row, const int* col, const float* x, float* y) {
-    // Parallelize the outer loop using OpenACC
-    #pragma acc parallel loop
+void spmv_parallel(int n, int nnz, const float *val, const int *row, const int *col, const float *x, float *y) {
+    int i, j;
+    #pragma acc parallel loop present(val[0:nnz], row[0:n+1], col[0:nnz], x[0:n], y[0:n]) private(i, j)
+    for (i = 0; i < n; i++) {
+        float sum = 0.0;
+        for (j = row[i]; j < row[i + 1]; j++) {
+            sum += val[j] * x[col[j]];
+        }
+        y[i] = sum;
+    }
+}
+
+```
+
+### Explanation:
+1. **Includes and Declarations**: The function includes OpenACC directives using the `#pragma acc`.
+2. **Function Arguments**:
+   - `n` and `nnz` are the dimensions.
+   - `val`, `row`, `col`, and `x` are input arrays. 
+   - `y` is the output array.
+3. **Parallelization with OpenACC**: The `#pragma acc parallel loop` directive is used to parallelize the outer loop (iterating over the rows).
+4. **Private and Shared Clauses**: The `private(i, j)` clause ensures that `i` and `j` are private to each parallel instance of the loop.
+5. **Sparse Matrix-Vector Multiplication**:
+   - For each row, the inner loop iterates over the range specified by `row[i]` to `row[i + 1] - 1`.
+   - Each element is accumulated in a local `sum` variable to prevent race conditions.
+   - The result for each row is then written to the output array `y`.
+
+### Compiling and Executing
+To compile this with OpenACC support, you typically use a compiler like PGI (now NVIDIA HPC SDK):
+
+```sh
+pgcc -acc -o spmv spmv.c -lm
+```
+
+Then, simply run the executable:
+
+```sh
+./spmv
+```
+
+Make sure your environment is set up correctly for OpenACC, with the necessary libraries and hardware support available.
+
+Output 5:
+Certainly! Below is the equivalent function in C with OpenACC directives to perform Sparse matrix–vector multiplication (SpMV). 
+
+For better understanding, let’s structure the C function similarly to your Fortran subroutine:
+
+```c
+#include <stdlib.h>
+#include <stdio.h>
+
+// Function to perform Sparse matrix–vector multiplication (SpMV) using OpenACC
+void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    // OpenACC parallel directive to distribute the loop iterations across multiple threads
+    #pragma acc parallel loop copyin(val[0:nnz], row[0:n+1], col[0:nnz], x[0:n]) copyout(y[0:n])
+    for (int i = 0; i < n; i++) {
+        y[i] = 0.0f; // Initialize y[i]
+
+        // Inner loop to perform the multiplication and summation
+        #pragma acc loop
+        for (int j = row[i]; j < row[i + 1]; j++) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+
+// Utility function to print a vector
+void print_vector(const float *vec, int size) {
+    for (int i = 0; i < size; i++) {
+        printf("%f ", vec[i]);
+    }
+    printf("\n");
+}
+
+int main() {
+    // Example sparse matrix in CSR format
+    int n = 5;
+    int nnz = 13;
+    float val[] = {10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130};
+    int row[] = {0, 3, 6, 9, 11, 13};
+    int col[] = {0, 3, 4, 1, 2, 4, 0, 2, 3, 1, 4, 0, 2};
+    float x[] = {1, 2, 3, 4, 5};
+    float y[n];
+
+    // Call the sparse matrix-vector multiplication function
+    spmv_parallel(n, nnz, val, row, col, x, y);
+
+    // Print the result
+    print_vector(y, n);
+
+    return 0;
+}
+```
+
+Here’s what each significant part does:
+1. `#pragma acc parallel loop copyin(...) copyout(...)` ensures that the computation is parallelized over the outer loop, with appropriate data transfers for the input and output arrays. 
+2. `#pragma acc loop` within the inner loop further indicates that this nested loop should also be parallelized.
+3. The utility function `print_vector` is used to display the resulting vector `y` after the computation.
+
+This ensures parallel execution of the sparse MV multiplication on supported hardware (like GPUs), leveraging the capabilities of OpenACC. Make sure you have an OpenACC compiler like PGI or NVIDIA HPC SDK to compile and run this code.
+
+Output 6:
+Certainly! Below is an implementation of the Sparse matrix–vector multiplication (SpMV) operation in C using OpenACC, which achieves comparable parallelism to the provided Fortran subroutine with OpenMP.
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+
+void spmv_parallel(int n, int nnz, const float *val, const int *row, const int *col, const float *x, float *y) {
+    int i, j;
+
+    #pragma acc parallel loop present(val[0:nnz], row[0:n+1], col[0:nnz], x[0:n], y[0:n])
+    for (i = 0; i < n; i++) {
+        float sum = 0.0f;
+        #pragma acc loop reduction(+:sum)
+        for (j = row[i]; j < row[i+1]; j++) {
+            sum += val[j] * x[col[j]];
+        }
+        y[i] = sum;
+    }
+}
+
+int main() {
+    // Example values
+    int n = 5; // The number of rows
+    int nnz = 9; // The number of non-zero elements
+    float val[9] = {10, 20, 30, 40, 50, 60, 70, 80, 90}; // Non-zero values
+    int row[6] = {0, 2, 4, 5, 7, 9}; // Row indices
+    int col[9] = {0, 1, 1, 2, 2, 3, 4, 3, 4}; // Column indices
+    float x[5] = {1, 2, 3, 4, 5}; // Input vector
+    float y[5] = {0}; // Output vector
+    
+    // Making the arrays available to the GPU
+    #pragma acc data copyin(val[0:nnz], row[0:n+1], col[0:nnz], x[0:n]) copyout(y[0:n])
+    {
+        spmv_parallel(n, nnz, val, row, col, x, y);
+    }
+
+    // Print the output vector
+    for (int i = 0; i < n; i++) {
+        printf("%f ", y[i]);
+    }
+    printf("\n");
+
+    return 0;
+}
+```
+
+### Explanation:
+
+1. **Headers**: Include `stdio.h` for standard I/O operations and `stdlib.h` for general utilities.
+2. **Function Definition**:
+   - `spmv_parallel` is the parallel Sparse matrix–vector multiplication function.
+   - Takes the number of rows in the matrix (`n`), the number of non-zero elements (`nnz`), the array of non-zero values (`val`), the row pointer array (`row`), the column indices array (`col`), input vector `x`, and output vector `y`.
+
+3. **OpenACC Directives**:
+   - `#pragma acc parallel loop` directive is used at the outer loop to parallelize it, making use of OpenACC for offloading computation to a GPU.
+   - The `present` clause indicates data already present on the device.
+   - The inner loop is accelerated with `#pragma acc loop reduction(+:sum)` to handle the reduction operation when summing up the contributions to `y[i]`.
+
+4. **Main Function**:
+   - Example data is initialized to demonstrate the function. 
+   - The `#pragma acc data` directive ensures the arrays are copied to the GPU memory (the `copyin` and `copyout` clauses manage data transfers).
+   - The `spmv_parallel` function is called within this directed region, utilizing the copied data on the GPU.
+   - Output (`y`) is printed to show the result.
+
+This implementation shows how to efficiently use OpenACC to parallelize the SpMV operation in C, similar to the parallelism provided by OpenMP in the original Fortran subroutine.
+
+Output 7:
+To implement the Sparse Matrix–Vector Multiplication (SpMV) function in C with OpenACC, we need to understand how the original Fortran subroutine works and then translate it to C while appropriately incorporating OpenACC directives. The original subroutine uses the CSR (Compressed Sparse Row) format for the sparse matrix representation.
+
+Below is the C implementation of the `spmv_parallel` function using OpenACC:
+
+```c
+#include <stdio.h>
+#include <openacc.h>
+
+// Function prototype
+void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y);
+
+int main() {
+    // Example usage
+    int n = 5; // Number of rows
+    int nnz = 13; // Number of non-zero elements
+
+    float val[] = {/* non-zero values in the sparse matrix */};
+    int row[] = {/* row pointers */};
+    int col[] = {/* column indices for each non-zero value */};
+    float x[] = {/* Vector to be multiplied */};
+    float y[n]; // Output vector
+
+    // Initialize y
     for (int i = 0; i < n; ++i) {
         y[i] = 0.0f;
+    }
+
+    // Run the SpMV operation
+    spmv_parallel(n, nnz, val, row, col, x, y);
+
+    // Print the result
+    for (int i = 0; i < n; ++i) {
+        printf("%f\n", y[i]);
+    }
+
+    return 0;
+}
+
+void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    // OpenACC parallel loop
+    #pragma acc parallel loop present(val[0:nnz], row[0:n+1], col[0:nnz], x[0:n], y[0:n])
+    for (int i = 0; i < n; ++i) {
+        y[i] = 0.0f;
+        #pragma acc loop reduction(+:y[i])
         for (int j = row[i]; j < row[i + 1]; ++j) {
             y[i] += val[j] * x[col[j]];
         }
@@ -442,129 +438,133 @@ void spmv_parallel(int n, int nnz, const float* val, const int* row, const int* 
 ```
 
 ### Explanation:
-- The `#pragma acc parallel loop` directive is used to parallelize the loop over `i`, distributing the iterations across the available GPU threads.
-- The inner loop is not explicitly parallelized since each iteration depends on the summation result. However, OpenACC's efficient kernel generation will handle these inner operations effectively.
-- The code assumes zero-based indexing, which is standard in C/C++. In the original Fortran code, 1-based indexing is used, so appropriate adjustments are made.
+1. **Includes and Prototypes**:
+   - Include `stdio.h` for standard input/output.
+   - Include `openacc.h` for OpenACC pragmas.
 
-### Usage:
-You can call this function with appropriate parameters, ensuring that the data arrays (`val`, `row`, `col`, `x`, and `y`) are correctly initialized:
+2. **Main Function**:
+   - Demonstrates an example use of the `spmv_parallel` function, initializing the computation's variables and verifying the results.
+
+3. **SpMV Function Definition**:
+   - `spmv_parallel` computes the sparse matrix-vector multiplication.
+   - Uses `#pragma acc parallel loop` to distribute the outer loop (processing rows) across the available compute resources.
+   - The `reduction(+:y[i])` clause ensures correct parallel reduction for each element of `y[i]` within the inner loop.
+
+### Notes:
+- Ensure matrix and vector data (`val`, `row`, `col`, `x`, `y`) are transferred to the device (GPU) if they aren’t already present. This example assumes they are already on the device.
+- Depending on your OpenACC implementation and environment, specific data management pragmas (e.g., `#pragma acc enter data`) might be necessary to explicitly move data to and from the device.
+- Adjustments to array sizes and initialization might be needed depending on your actual data.
+
+For larger programs or different configurations, ensure data initialization, allocation, domain size handling, and device data management are correctly addressed.
+
+Output 8:
+Certainly! Below is a C version of the Sparse Matrix-Vector Multiplication (SpMV) routine with OpenACC parallelization, equivalent to the provided Fortran and OpenMP code.
 
 ```c
-int main() {
-    // Example parameters
-    int n = ...; // number of rows
-    int nnz = ...; // number of non-zero entries
-    float val[nnz] = {...}; // values of the non-zero entries
-    int row[n+1] = {...}; // row pointers
-    int col[nnz] = {...}; // column indices
-    float x[n] = {...}; // input vector
-    float y[n]; // output vector
+#include <stdio.h>
+#include <openacc.h>
 
-    // Call the SpMV function
-    spmv_parallel(n, nnz, val, row, col, x, y);
+void spmv_parallel(int n, int nnz, const float *val, const int *row, const int *col, const float *x, float *y) {
+    int i, j;
 
-    // Use the result stored in y
-    ...
-}
-```
+    // Initialize output vector y
+    #pragma acc parallel loop copyin(val[0:nnz], row[0:n+1], col[0:nnz], x[0:n]) copyout(y[0:n])
+    for (i = 0; i < n; ++i) {
+        y[i] = 0.0;
+    }
 
-### Compiling:
-When compiling this C/C++ code, you'll need an OpenACC-compatible compiler like the PGI/NVIDIA compiler. For example:
-
-```sh
-pgcc -acc -o spmv spmv.c
-```
-
-This command compiles the `spmv.c` file with OpenACC support. Ensure you have the required compiler and libraries installed for OpenACC to function properly.
-
-Output 9:
-Sure! Here is a C/C++ version of the Sparse matrix–vector multiplication (SpMV) operation using OpenACC:
-
-```cpp
-#include <stdlib.h>
-
-void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
-    #pragma acc parallel loop
-    for (int i = 0; i < n; ++i) {
-        y[i] = 0.0f;
-        for (int j = row[i]; j < row[i+1]; ++j) {
+    // Perform the SpMV operation
+    #pragma acc parallel loop copyin(val[0:nnz], row[0:n+1], col[0:nnz], x[0:n]) copy(y[0:n]) private(j)
+    for (i = 0; i < n; ++i) {
+        for (j = row[i]; j < row[i+1]; ++j) {
             y[i] += val[j] * x[col[j]];
         }
     }
+}
+
+// Test function to verify the SpMV implementation
+int main() {
+    // Example matrix in CSR format
+    int n = 5;       // Number of rows/columns
+    int nnz = 13;    // Number of non-zero elements
+    float val[] = {1, 4, 2, 7, 1, 3, 1, 8, 1, 1, 5, 9, 1};
+    int row[] = {0, 3, 4, 7, 9, 13};
+    int col[] = {0, 1, 4, 2, 0, 3, 4, 1, 4, 0, 2, 3, 4};
+    float x[] = {1, 2, 3, 4, 5};
+    float y[5] = {0, 0, 0, 0, 0};
+
+    spmv_parallel(n, nnz, val, row, col, x, y);
+
+    // Print result
+    for (int i = 0; i < n; ++i) {
+        printf("%f ", y[i]);
+    }
+    printf("\n");
+
+    return 0;
 }
 ```
 
 ### Explanation:
-- `#pragma acc parallel loop`: This directive tells the OpenACC compiler to parallelize the loop that follows. The loop is distributed among the available processing units (such as GPUs).
-- The outer loop (`for (int i = 0; i < n; ++i)`) is parallelized with OpenACC.
-- Inside the loop, the `y[i]` value is initialized to `0.0f`.
-- An inner loop iterates from `row[i]` to `row[i+1]-1`, computing the product of `val[j]` and `x[col[j]]` and accumulating it into `y[i]`.
+1. **Data Initialization**: Copies the input matrix (in CSR format) and vector `x` into the GPU's memory, along with initializing the result vector `y`.
+2. **Loop Parallelization**:
+   - The first `#pragma acc parallel loop` initializes the result vector `y` to zero. This loop is parallelized to ensure that all elements are initialized quickly.
+   - The second `#pragma acc parallel loop` performs the actual sparse matrix-vector multiplication. Each iteration of the outer loop runs in parallel, and the OpenACC runtime manages the distribution of computations across the GPU.
+3. **Memory Management**:
+   - `copyin` specifies arrays that are read-only from the host CPU's perspective.
+   - `copyout` specifies arrays that are written to by the GPU and sent back to the host after computation.
+   - `copy` specifies arrays that are read from the host, used by the GPU, and then written back to the host.
+   - `private` declares per-thread private variables (here, `j`), to avoid race conditions.
 
-### Note:
-Be sure to compile the code with an OpenACC-compatible compiler, such as the PGI (now part of NVIDIA HPC SDK) compiler, using the appropriate flags to enable OpenACC support (e.g., `-acc`).
+### Test Function:
+A simple `main` function is provided to test the `spmv_parallel` function with an example sparse matrix and vector.
 
-### Example Compilation Command (PGI):
-```sh
-pgcc -acc -o spmv spmv_parallel.c
-```
+Make sure to compile the code using a compatible compiler with OpenACC support, such as GCC with OpenACC enabled (`gcc -fopenacc`), or using PGI Compilers (`pgcc`) for proper execution.
 
-This code assumes the following:
-- The sparse matrix is represented in Compressed Sparse Row (CSR) format.
-- `n` is the number of rows in the matrix.
-- `nnz` is the number of non-zero elements in the matrix.
-- `val` is an array of non-zero values.
-- `row` is an array where `row[i]` indicates the start of the non-zero values for row `i` in `val` and `col`.
-- `col` is an array of column indices corresponding to the non-zero values in `val`.
-- `x` is the input vector.
-- `y` is the output vector, which will hold the result after the SpMV operation.
+Output 9:
+To translate the Fortran subroutine using OpenMP for a Sparse matrix–vector multiplication (SpMV) into C and OpenACC, we can follow these steps. First, let's understand how SpMV works with the CSR (Compressed Sparse Row) format which is employed in the original Fortran code.
 
-Output 10:
-### C/C++ Version of Sparse Matrix-Vector Multiplication (SpMV) Using OpenACC
+The CSR format stores a sparse matrix using three arrays:
+- `val`: Non-zero values.
+- `col`: Column indices of the non-zero values.
+- `row`: Indexes in `val` where the new row starts.
 
-The provided Fortran code performs a sparse matrix-vector multiplication (SpMV) using OpenMP. Below is a C/C++ version of the same functionality using OpenACC, which is analogous to leveraging GPU acceleration similarly accessible through OpenMP for parallel CPU execution.
+Here is the equivalent C function with OpenACC for the `spmv_parallel` subroutine:
 
-```cpp
-#include <openacc.h>
-#include <vector>
+```c
+#include <stdio.h>
+#include <stdlib.h>
 
-// Function prototype for the SpMV operation
-void spmv_parallel(int n, int nnz, const std::vector<float> &val, 
-                   const std::vector<int> &row, const std::vector<int> &col, 
-                   const std::vector<float> &x, std::vector<float> &y);
-
-void spmv_parallel(int n, int nnz, const std::vector<float> &val, 
-                   const std::vector<int> &row, const std::vector<int> &col, 
-                   const std::vector<float> &x, std::vector<float> &y) 
-{
-    // Initialization of output vector
-    y.assign(n, 0.0f);
-
-    // Parallel region using OpenACC
-    #pragma acc parallel loop present(val[0:nnz], row[0:n+1], col[0:nnz], x[0:n], y[0:n])
-    for (int i = 0; i < n; ++i) {
-        // Inner loop to perform the dot product
-        for (int j = row[i]; j < row[i+1]; ++j) {
+void spmv_parallel(int n, int nnz, const float *val, const int *row, const int *col, const float *x, float *y) {
+    #pragma acc parallel loop gang vector present(val, row, col, x, y)
+    for (int i = 0; i < n; i++) {
+        y[i] = 0.0;
+        #pragma acc loop vector
+        for (int j = row[i]; j < row[i+1]; j++) {
             y[i] += val[j] * x[col[j]];
         }
     }
 }
 
 int main() {
-    // Sample data for testing
-    const int n = 5; // Number of rows
-    const int nnz = 13; // Number of non-zero elements
-    
-    std::vector<float> val = {10, 20, 30, 1, 5, 12, 6, 3, 2, 4, 10, 6, 2}; 
-    std::vector<int> row = {0, 3, 4, 7, 9, 13};
-    std::vector<int> col = {0, 1, 4, 2, 0, 3, 4, 1, 2, 0, 2, 3, 4}; 
-    std::vector<float> x = {1, 2, 3, 4, 5}; 
-    std::vector<float> y(n, 0.0f); // Output vector
+    // Example usage
+    int n = 5;
+    int nnz = 13;
 
-    // Call the SpMV function
-    spmv_parallel(n, nnz, val, row, col, x, y);
+    float val[] = {10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130};
+    int row[] = {0, 3, 5, 8, 10, 13};
+    int col[] = {0, 2, 4, 2, 3, 0, 1, 4, 1, 2, 0, 3, 4};
+    float x[] = {1, 2, 3, 4, 5};
+    float y[5];
+
+    // Transfer data to the device
+    #pragma acc data copyin(val[0:nnz], row[0:n+1], col[0:nnz], x[0:n]) copyout(y[0:n])
+    {
+        spmv_parallel(n, nnz, val, row, col, x, y);
+    }
 
     // Print the result
-    for (int i = 0; i < n; ++i) {
+    for (int i = 0; i < n; i++) {
         printf("y[%d] = %f\n", i, y[i]);
     }
 
@@ -572,30 +572,89 @@ int main() {
 }
 ```
 
-### Explanation:
+Explanation:
+1. The main function initializes sample CSR data for testing. `n` is the number of rows, `nnz` is the number of non-zero elements.
+2. `val` stores the non-zero values of the matrix.
+3. `row` stores row pointers, meaning the index in `val` where the particular row starts and ends.
+4. `col` stores the column indices corresponding to the values in `val`.
+5. The `x` array is the input vector and `y` is for the output vector.
+6. The `#pragma acc` directives are used to parallelize the loops and manage data transfer between the host (CPU) and the device (GPU).
 
-1. **Data Layout**:
-   - `val`: Array of the non-zero values.
-   - `row`: Row pointer array.
-   - `col`: Column indices array.
-   - `x`: Input vector.
-   - `y`: Output vector.
+Note that:
+- `#pragma acc parallel loop gang vector` is used to parallelize the outer loop.
+- `#pragma acc loop vector` is used for the inner loop.
 
-2. **Initialization**:
-   - Output vector `y` is initialized to zeros.
+Make sure to compile with an OpenACC-aware compiler, such as `pgcc` from the PGI suite or the `nvhpc` compiler.
+  
+For example:
+```bash
+pgcc -acc -Minfo=accel spmv_parallel.c -o spmv_parallel
+```
 
-3. **Parallel Computation**:
-   - The `#pragma acc parallel loop` directive is used for parallelization. It specifies that the loop can be executed in parallel.
-   - The `present` clause ensures the required arrays are available in the device memory for GPU computation.
+Ensure that the compiler supports OpenACC and the system has required GPU drivers or runtime.
 
-4. **Inner Loop**:
-   - Each iteration of the outer loop processes a row of the sparse matrix, which involves iterating over the non-zero elements of that row to compute the corresponding entry of the vector `y`.
+Output 10:
+Certainly! Below is the equivalent C code with OpenACC for a Sparse matrix-vector multiplication (SpMV) function:
 
-##### Notes:
+```c
+#include <stdio.h>
+#include <stdlib.h>
 
-- Ensure that OpenACC is properly supported and configured in your compiler.
-- The sample data used in the `main()` function is for illustration. Adjust the values and sizes per actual use case.
-- Proper synchronization and data moving clauses might be necessary depending on the specific OpenACC implementation and hardware in use.
+void spmv_parallel(int n, int nnz, const float *val, const int *row, const int *col, const float *x, float *y) {
+    int i, j;
 
-This C/C++ code translates the same parallel structure and logic from the provided Fortran OpenMP code using OpenACC for C/C++ to leverage GPU parallelism for the SpMV operation.
+    // Initialize the output vector y to zero
+    for (i = 0; i < n; i++) {
+        y[i] = 0.0;
+    }
+
+    // Use OpenACC parallel loop to perform the SpMV
+    #pragma acc parallel loop present(val[0:nnz], row[0:n+1], col[0:nnz], x[0:n], y[0:n])
+    for (i = 0; i < n; i++) {
+        #pragma acc loop seq
+        for (j = row[i]; j < row[i + 1]; j++) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+
+int main() {
+    // Example usage of the spmv_parallel function
+
+    // Number of rows/columns
+    int n = 5;
+    // Number of non-zero elements
+    int nnz = 9;
+
+    // Example sparse matrix in CSR format
+    float val[9] = {10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0};
+    int row[6] = {0, 2, 4, 6, 8, 9};
+    int col[9] = {0, 1, 0, 2, 1, 2, 0, 2, 1};
+
+    // Example input vector
+    float x[5] = {1.0, 2.0, 3.0, 4.0, 5.0};
+
+    // Output vector
+    float y[5];
+
+    // Execute the SpMV operation
+    spmv_parallel(n, nnz, val, row, col, x, y);
+
+    // Print the result
+    int i;
+    for (i = 0; i < n; i++) {
+        printf("y[%d] = %f\n", i, y[i]);
+    }
+
+    return 0;
+}
+```
+
+Explanation:
+- The function `spmv_parallel` performs the Sparse matrix-vector multiplication (SpMV) operation.
+- The pointers `val`, `row`, `col`, `x`, and `y` represent the sparse matrix in CSR format, the input vector, and the output vector respectively.
+- The OpenACC `#pragma acc parallel loop` directive is used to parallelize the outer loop over the rows of the matrix.
+- The `#pragma acc loop seq` directive ensures that the inner loop over the non-zero elements within each row remains sequential to avoid race conditions.
+
+This code should be compiled with an OpenACC-compatible compiler (e.g., `pgcc` from PGI/NVIDIA or a supported GCC version with OpenACC support). Make sure the compiler is instructed to enable OpenACC directives.
 

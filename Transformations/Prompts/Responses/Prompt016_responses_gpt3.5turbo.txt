@@ -1,12 +1,9 @@
 Output 1:
-Here is the C/C++ OpenACC version of the Fortran code implementing the Generalized Matrix multiplication (GEMM) operation:
+Here is the C implementation of the subroutine gemm_parallel with OpenACC directives:
 
 ```c
-#include <stdio.h>
-#include <openacc.h>
-
 void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
-    #pragma acc parallel loop collapse(2) copyin(a[0:m*k], b[0:k*n]) copy(c[0:m*n])
+    #pragma acc parallel loop collapse(2)
     for (int j = 0; j < n; j++) {
         for (int i = 0; i < m; i++) {
             double temp = 0.0;
@@ -16,72 +13,72 @@ void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double
             c[i*ldc + j] = alpha * temp + beta * c[i*ldc + j];
         }
     }
-}
-
-int main() {
-    int m = 3, n = 3, k = 3;
-    double alpha = 1.0, beta = 0.0;
-    double a[3][3] = {{1, 2, 3}, {4, 5, 6}, {7, 8, 9}};
-    double b[3][3] = {{9, 8, 7}, {6, 5, 4}, {3, 2, 1}};
-    double c[3][3] = {{0}};
-
-    gemm_parallel(m, n, k, alpha, (double *)a, m, (double *)b, k, beta, (double *)c, m);
-
-    // Print the result matrix c
-    for (int i = 0; i < m; i++) {
-        for (int j = 0; j < n; j++) {
-            printf("%f ", c[i][j]);
-        }
-        printf("\n");
-    }
-
-    return 0;
 }
 ```
 
-Note: Make sure to compile this code with appropriate flags to enable OpenACC support, such as `-ta=tesla:cc70`. Also, adjust the matrix dimensions and values as needed for your application.
+In this C implementation, the `#pragma acc parallel loop collapse(2)` directive is used to parallelize the nested loops in the same way as the OpenACC directive in the Fortran subroutine. The loop variables are defined inside the loops and the indexing into the matrices `a`, `b`, and `c` is adjusted accordingly.
 
 Output 2:
 ```c
-void gemm_parallel(int m, int n, int k, double alpha, double* a, int lda, double* b, int ldb, double beta, double* c, int ldc) {
-    #pragma acc parallel loop collapse(2) copyin(a[0:m*lda], b[0:k*ldb]) copyout(c[0:m*ldc])
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+    #pragma acc parallel loop collapse(2) present(a[0:lda*k], b[0:ldb*n], c[0:ldc*n])
     for (int j = 0; j < n; j++) {
         for (int i = 0; i < m; i++) {
             double temp = 0.0;
             for (int l = 0; l < k; l++) {
-                temp += a[i*lda + l] * b[l*ldb + j];
+                temp += a[i + l*lda] * b[l + j*ldb];
             }
-            c[i*ldc + j] = alpha * temp + beta * c[i*ldc + j];
+            c[i + j*ldc] = alpha * temp + beta * c[i + j*ldc];
         }
     }
 }
 ```
 
 Output 3:
-```cpp
+Here is the equivalent function implemented in C and OpenACC:
+
+```c
 void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
-  #pragma acc parallel loop collapse(2) copyin(a[0:lda*k],b[0:ldb*n]) copy(c[0:ldc*n])
-  for (int j = 0; j < n; j++) {
-    for (int i = 0; i < m; i++) {
-      double temp = 0.0;
-      for (int l = 0; l < k; l++) {
-        temp += a[i*lda + l] * b[l*ldb + j];
-      }
-      c[i*ldc + j] = alpha * temp + beta * c[i*ldc + j];
+    #pragma acc kernels
+    {
+        #pragma acc loop independent collapse(2)
+        for (int j = 0; j < n; j++) {
+            for (int i = 0; i < m; i++) {
+                double temp = 0.0;
+                for (int l = 0; l < k; l++) {
+                    temp += a[i*lda + l] * b[l*ldb + j];
+                }
+                c[i*ldc + j] = alpha * temp + beta * c[i*ldc + j];
+            }
+        }
     }
-  }
 }
 ```
 
+In this function, the `#pragma acc kernels` directive is used to mark the region of code that will offload to the GPU. The `#pragma acc loop independent collapse(2)` directive is used to instruct the compiler to parallelize the nested loops over `i` and `j` indices, which are collapsed into a single loop and executed in parallel on the GPU.
+
 Output 4:
-Here is the equivalent version of the Fortran OpenACC code in C/C++ with OpenACC directives for parallelization:
+```c
+void gemm_parallel(int m, int n, int k, double alpha, double* a, int lda, double* b, int ldb, double beta, double* c, int ldc){
+    #pragma acc parallel loop collapse(2) copyin(a[0:lda*k], b[0:ldb*n]) copy(c[0:ldc*n])
+    for(int j = 0; j < n; j++){
+        for(int i = 0; i < m; i++){
+            double temp = 0.0;
+            for(int l = 0; l < k; l++){
+                temp += a[i*lda + l] * b[l*ldb + j];
+            }
+            c[i*ldc + j] = alpha * temp + beta * c[i*ldc + j];
+        }
+    }
+}
+```
+
+Output 5:
+Here is the equivalent function implemented in C with OpenACC directives:
 
 ```c
-#include <stdio.h>
-#include <openacc.h>
-
 void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
-    #pragma acc parallel loop collapse(2) copyin(a[0:lda*k], b[0:ldb*n]) copy(c[0:ldc*n])
+    #pragma acc parallel loop collapse(2) present(a[0:m*lda], b[0:k*ldb], c[0:m*ldc])
     for (int j = 0; j < n; j++) {
         for (int i = 0; i < m; i++) {
             double temp = 0.0;
@@ -92,37 +89,48 @@ void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double
         }
     }
 }
-```
+``` 
 
-This C/C++ code uses OpenACC directives to parallelize the computation of the Generalized Matrix multiplication (GEMM) operation similar to the Fortran OpenACC code. The `#pragma acc parallel loop collapse(2)` directive specifies that both the outer and inner loops should be parallelized. The `copyin` and `copy` clauses are used to manage data transfers between the host and device.
+This function performs a Generalized Matrix multiplication (GEMM) operation similar to the Fortran subroutine, using OpenACC directives to parallelize the computation on the GPU.
 
-Output 5:
-Here is the C/C++ OpenACC version of the given Fortran OpenACC code:
-
+Output 6:
 ```c
 void gemm_parallel(int m, int n, int k, double alpha, double* a, int lda, double* b, int ldb, double beta, double* c, int ldc) {
-  int i, j, l;
-  double temp;
-  
-  #pragma acc parallel loop collapse(2) private(i, j, l, temp)
-  for (j = 0; j < n; j++) {
-    for (i = 0; i < m; i++) {
-      temp = 0.0;
-      for (l = 0; l < k; l++) {
-        temp += a[i*lda + l] * b[l*ldb + j];
-      }
-      c[i*ldc + j] = alpha * temp + beta * c[i*ldc + j];
+    #pragma acc parallel loop collapse(2) copyin(a[0:lda*k], b[0:ldb*n]) copy(c[0:ldc*n])
+    for (int j = 0; j < n; j++) {
+        for (int i = 0; i < m; i++) {
+            double temp = 0.0;
+            for (int l = 0; l < k; l++) {
+                temp += a[i + l*lda] * b[l + j*ldb];
+            }
+            c[i + j*ldc] = alpha * temp + beta * c[i + j*ldc];
+        }
     }
-  }
 }
 ```
 
-In this version, we use the `#pragma acc parallel loop` directive to parallelize the loops over `j` and `i`. The `collapse(2)` clause is used to combine the two nested loops into a single parallel loop. We also specify the private variables `i`, `j`, `l`, and `temp` to ensure that each thread has its own copy of these variables.
+Output 7:
+Here is the equivalent function implemented in C and OpenACC:
 
-Output 6:
-Here is the C/C++ version of the Fortran OpenACC code implementing the Generalized Matrix Multiplication (GEMM) operation:
+```c
+void gemm_parallel(int m, int n, int k, double alpha, double* a, int lda, double* b, int ldb, double beta, double* c, int ldc) {
+    #pragma acc parallel loop collapse(2)
+    for(int j = 0; j < n; j++) {
+        for(int i = 0; i < m; i++) {
+            double temp = 0.0;
+            for(int l = 0; l < k; l++) {
+                temp += a[i*lda + l] * b[l*ldb + j];
+            }
+            c[i*ldc + j] = alpha * temp + beta * c[i*ldc + j];
+        }
+    }
+}
+```
 
-```cpp
+Output 8:
+Here is the corresponding function implemented in C and OpenACC:
+
+```c
 void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
     #pragma acc parallel loop collapse(2) present(a[lda*k], b[ldb*n], c[ldc*n])
     for (int j = 0; j < n; j++) {
@@ -135,13 +143,32 @@ void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double
         }
     }
 }
+``` 
+
+In this C function, we use the `#pragma acc parallel loop` directive to parallelize the nested loops with `collapse(2)` which specifies that both loops should be parallelized. The `present()` clause is used to specify the arrays that will be accessed in the parallel region.
+
+Output 9:
+```c
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+    #pragma acc parallel loop collapse(2) copyin(a[0:lda*k], b[0:ldb*n]) copyout(c[0:ldc*n])
+    for(int j = 0; j < n; j++) {
+        for(int i = 0; i < m; i++) {
+            double temp = 0.0;
+            for(int l = 0; l < k; l++) {
+                temp += a[i + l*lda] * b[l + j*ldb];
+            }
+            c[i + j*ldc] = alpha * temp + beta * c[i + j*ldc];
+        }
+    }
+}
 ```
 
-This C/C++ version uses OpenACC directives to parallelize the nested loops and optimize the matrix multiplication operation. The `#pragma acc parallel loop` directive indicates that the inner two loops are parallelizable and should be executed in parallel on the GPU.
+Output 10:
+Here is a function implemented in C and OpenACC that performs a Generalized Matrix multiplication (GEMM) operation:
 
-Output 7:
+```c
 void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
-    #pragma acc parallel loop collapse(2)
+    #pragma acc parallel loop collapse(2) present(a[lda*k], b[ldb*n], c[ldc*n])
     for (int j = 0; j < n; j++) {
         for (int i = 0; i < m; i++) {
             double temp = 0.0;
@@ -152,69 +179,7 @@ void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double
         }
     }
 }
-
-Output 8:
-```c
-void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
-    int i, j, l;
-    double temp;
-    #pragma acc parallel loop collapse(2) private(i, j, l, temp)
-    for (j = 0; j < n; j++) {
-        for (i = 0; i < m; i++) {
-            temp = 0.0;
-            for (l = 0; l < k; l++) {
-                temp += a[i * lda + l] * b[l * ldb + j];
-            }
-            c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
-        }
-    }
-}
 ```
 
-Output 9:
-Here is a version of the code in C/C++ with OpenACC directives that implements the same Generalized Matrix multiplication (GEMM) operation:
-
-```c
-void gemm_parallel(int m, int n, int k, double alpha, double a[m][k], int lda, double b[k][n], int ldb, double beta, double c[m][n], int ldc) {
-  int i, j, l;
-  double temp;
-
-  #pragma acc parallel loop collapse(2) private(i, j, l, temp)
-  for (j = 0; j < n; j++) {
-    for (i = 0; i < m; i++) {
-      temp = 0.0;
-      for (l = 0; l < k; l++) {
-        temp += a[i][l] * b[l][j];
-      }
-      c[i][j] = alpha * temp + beta * c[i][j];
-    }
-  }
-}
-```
-
-This code uses OpenACC directives to parallelize the matrix multiplication operation on the GPU. The `collapse(2)` directive is used to collapse the two nested loops into one, allowing the GPU to parallelize both loops simultaneously. The `private(i, j, l, temp)` directive ensures that each thread has its own private copy of loop variables, avoiding race conditions during parallel execution.
-
-Output 10:
-Here is the equivalent version of the Fortran OpenACC code in C/C++ with OpenACC directives for Generalized Matrix Multiplication (GEMM) operation:
-
-```c
-void gemm_parallel(int m, int n, int k, double alpha, double* a, int lda, double* b, int ldb, double beta, double* c, int ldc)
-{
-    #pragma acc parallel loop collapse(2) copyin(a[0:m*k], b[0:k*n]) copy(c[0:m*n])
-    for (int j = 0; j < n; j++)
-    {
-        for (int i = 0; i < m; i++)
-        {
-            double temp = 0.0;
-            for (int l = 0; l < k; l++)
-            {
-                temp += a[i*lda + l] * b[l*ldb + j];
-            }
-            c[i*ldc + j] = alpha * temp + beta * c[i*ldc + j];
-        }
-    }
-}
-```
-
-This C/C++ code uses OpenACC directives to parallelize the computation of the GEMM operation across the matrix elements. The `copyin` and `copy` clauses are used to specify data movement between the host and device, ensuring that the necessary data is available on the device for parallel computation. The `collapse(2)` directive is used to collapse the nested loops for parallel execution to optimize performance.
+Make sure to include the necessary header files and function prototypes before using this function.
 

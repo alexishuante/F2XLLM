@@ -1,366 +1,229 @@
 Output 1:
+Here is a function implemented in C and HIP that computes the Generalized Matrix multiplication (GEMM) operation based on the Fortran subroutine provided:
+
+```c
 #include <hip/hip_runtime.h>
-#include <iostream>
-
-__global__ void gemm_kernel(int m, int n, int k, float alpha, float beta, float *a, int lda, float *b, int ldb, float *c, int ldc) {
-    int i = blockIdx.y * blockDim.y + threadIdx.y;
-    int j = blockIdx.x * blockDim.x + threadIdx.x;
-    float temp = 0.0;
-
-    if (i < m && j < n) {
-        for (int l = 0; l < k; l++) {
-            temp += a[i * lda + l] * b[l * ldb + j];
-        }
-        c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
-    }
-}
-
-extern "C" void gemm_parallel(int m, int n, int k, float alpha, float *a, int lda, float *b, int ldb, float beta, float *c, int ldc) {
-    int blockSize = 32;
-    dim3 threadsPerBlock(blockSize, blockSize);
-    dim3 numBlocks((n + blockSize - 1) / blockSize, (m + blockSize - 1) / blockSize);
-
-    // Allocate memory on device
-    float *d_a, *d_b, *d_c;
-    hipMalloc(&d_a, sizeof(float) * lda * k);
-    hipMalloc(&d_b, sizeof(float) * ldb * n);
-    hipMalloc(&d_c, sizeof(float) * ldc * n);
-
-    // Copy data to device
-    hipMemcpy(d_a, a, sizeof(float) * lda * k, hipMemcpyHostToDevice);
-    hipMemcpy(d_b, b, sizeof(float) * ldb * n, hipMemcpyHostToDevice);
-    hipMemcpy(d_c, c, sizeof(float) * ldc * n, hipMemcpyHostToDevice);
-
-    // Launch kernel
-    gemm_kernel<<<numBlocks, threadsPerBlock>>>(m, n, k, alpha, beta, d_a, lda, d_b, ldb, d_c, ldc);
-
-    // Copy result back to host
-    hipMemcpy(c, d_c, sizeof(float) * ldc * n, hipMemcpyDeviceToHost);
-
-    // Free device memory
-    hipFree(d_a);
-    hipFree(d_b);
-    hipFree(d_c);
-}
-
-int main() {
-    int m = 3;
-    int n = 3;
-    int k = 3;
-    float alpha = 1.0;
-    float beta = 0.0;
-    float a[3][3] = {{1, 2, 3}, {4, 5, 6}, {7, 8, 9}};
-    float b[3][3] = {{9, 8, 7}, {6, 5, 4}, {3, 2, 1}};
-    float c[3][3] = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
-    int lda = 3;
-    int ldb = 3;
-    int ldc = 3;
-
-    gemm_parallel(m, n, k, alpha, &a[0][0], lda, &b[0][0], ldb, beta, &c[0][0], ldc);
-
-    // Output result
-    for (int i = 0; i < m; i++) {
-        for (int j = 0; j < n; j++) {
-            std::cout << c[i][j] << " ";
-        }
-        std::cout << std::endl;
-    }
-
-    return 0;
-}
-
-Output 2:
-#include <hip/hip_runtime.h>
-
-__global__ void gemm_kernel(int m, int n, int k, double alpha, double* a, int lda, double* b, int ldb, double beta, double* c, int ldc) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    int j = blockIdx.y * blockDim.y + threadIdx.y;
-
-    if (i < m && j < n) {
-        double temp = 0.0;
-
-        for (int l = 0; l < k; l++) {
-            temp += a[i * lda + l] * b[l * ldb + j];
-        }
-
-        c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
-    }
-}
-
-extern "C" void gemm_parallel(int m, int n, int k, double alpha, double* a, int lda, double* b, int ldb, double beta, double* c, int ldc) {
-    dim3 grid((m + 15) / 16, (n + 15) / 16);
-    dim3 block(16, 16);
-
-    hipLaunchKernelGGL(gemm_kernel, grid, block, 0, 0, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
-}
-
-Output 3:
-#include <hip/hip_runtime.h>
-
-__global__ void gemm_kernel(int m, int n, int k, double alpha, double* a, int lda, double* b, int ldb, double beta, double* c, int ldc) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    int j = blockIdx.y * blockDim.y + threadIdx.y;
-
-    if (i < m && j < n) {
-        double temp = 0.0;
-        for (int l = 0; l < k; l++) {
-            temp += a[i * lda + l] * b[l * ldb + j];
-        }
-        c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
-    }
-}
 
 void gemm_parallel(int m, int n, int k, double alpha, double* a, int lda, double* b, int ldb, double beta, double* c, int ldc) {
-    double* d_a, d_b, d_c;
-    hipMalloc(&d_a, sizeof(double) * lda * k);
-    hipMalloc(&d_b, sizeof(double) * ldb * n);
-    hipMalloc(&d_c, sizeof(double) * ldc * n);
-
-    hipMemcpy(d_a, a, sizeof(double) * lda * k, hipMemcpyHostToDevice);
-    hipMemcpy(d_b, b, sizeof(double) * ldb * n, hipMemcpyHostToDevice);
-    hipMemcpy(d_c, c, sizeof(double) * ldc * n, hipMemcpyHostToDevice);
-
-    dim3 block_size(16, 16);
-    dim3 grid_size((m + block_size.x - 1) / block_size.x, (n + block_size.y - 1) / block_size.y);
-
-    gemm_kernel<<<grid_size, block_size>>>(m, n, k, alpha, d_a, lda, d_b, ldb, beta, d_c, ldc);
-
-    hipMemcpy(c, d_c, sizeof(double) * ldc * n, hipMemcpyDeviceToHost);
-
-    hipFree(d_a);
-    hipFree(d_b);
-    hipFree(d_c);
-}
-
-Output 4:
-#include <hip/hip_runtime.h>
-
-__global__ void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    int j = blockIdx.y * blockDim.y + threadIdx.y;
-
-    if (i < m && j < n) {
-        double temp = 0.0;
-        for (int l = 0; l < k; l++) {
-            temp += a[i * lda + l] * b[l * ldb + j];
+    hipLaunchKernelGGL([&](hipLaunchParm lp) {
+        int i = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
+        int j = hipBlockDim_y * hipBlockIdx_y + hipThreadIdx_y;
+        if (i < m && j < n) {
+            double temp = 0.0;
+            for (int l = 0; l < k; l++) {
+                temp += a[i * lda + l] * b[l * ldb + j];
+            }
+            c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
         }
-        c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
-    }
-}
-
-void gemm_parallel_hip(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
-    dim3 blockSize(16, 16);
-    dim3 gridSize((m + 15) / 16, (n + 15) / 16);
-
-    hipLaunchKernelGGL(gemm_parallel, gridSize, blockSize, 0, 0, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
-}
-
-Output 5:
-__global__ void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc){
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    int j = blockIdx.y * blockDim.y + threadIdx.y;
-    
-    if(i < m && j < n){
-        double temp = 0.0;
-        for(int l = 0; l < k; l++){
-            temp += a[i*lda + l] * b[l*ldb + j];
-        }
-        c[i*ldc + j] = alpha * temp + beta * c[i*ldc + j];
-    }
-}
-
-Output 6:
-#include <hip/hip_runtime.h>
-#include <iostream>
-
-__global__ void gemm_kernel(int m, int n, int k, double alpha, double beta, double *a, int lda, double *b, int ldb, double *c, int ldc) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    int j = blockIdx.y * blockDim.y + threadIdx.y;
-    
-    if (i < m && j < n) {
-        double temp = 0.0;
-        for (int l = 0; l < k; l++) {
-            temp += a[i * lda + l] * b[l * ldb + j];
-        }
-        c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
-    }
-}
-
-void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
-    dim3 block_size(16, 16);
-    dim3 grid_size((m + block_size.x - 1) / block_size.x, (n + block_size.y - 1) / block_size.y);
-    
-    double *d_a, *d_b, *d_c;
-    hipMalloc(&d_a, m * k * sizeof(double));
-    hipMalloc(&d_b, k * n * sizeof(double));
-    hipMalloc(&d_c, m * n * sizeof(double));
-    
-    hipMemcpy(d_a, a, m * k * sizeof(double), hipMemcpyHostToDevice);
-    hipMemcpy(d_b, b, k * n * sizeof(double), hipMemcpyHostToDevice);
-    hipMemcpy(d_c, c, m * n * sizeof(double), hipMemcpyHostToDevice);
-    
-    gemm_kernel<<<grid_size, block_size>>>(m, n, k, alpha, beta, d_a, lda, d_b, ldb, d_c, ldc);
-    
-    hipMemcpy(c, d_c, m * n * sizeof(double), hipMemcpyDeviceToHost);
-    
-    hipFree(d_a);
-    hipFree(d_b);
-    hipFree(d_c);
-}
-
-int main() {
-    int m = 3;
-    int n = 4;
-    int k = 5;
-    
-    double alpha = 1.0;
-    double beta = 1.0;
-    
-    double a[m][k] = {{1.0, 2.0, 3.0, 4.0, 5.0},
-                      {1.0, 2.0, 3.0, 4.0, 5.0},
-                      {1.0, 2.0, 3.0, 4.0, 5.0}};
-    
-    double b[k][n] = {{1.0, 1.0, 1.0, 1.0},
-                      {2.0, 2.0, 2.0, 2.0},
-                      {3.0, 3.0, 3.0, 3.0},
-                      {4.0, 4.0, 4.0, 4.0},
-                      {5.0, 5.0, 5.0, 5.0}};
-    
-    double c[m][n] = {{0.0, 0.0, 0.0, 0.0},
-                      {0.0, 0.0, 0.0, 0.0},
-                      {0.0, 0.0, 0.0, 0.0}};
-    
-    gemm_parallel(m, n, k, alpha, &a[0][0], k, &b[0][0], n, beta, &c[0][0], n);
-    
-    for (int i = 0; i < m; i++) {
-        for (int j = 0; j < n; j++) {
-            std::cout << c[i][j] << " ";
-        }
-        std::cout << std::endl;
-    }
-    
-    return 0;
-}
-
-Output 7:
-```cpp
-#include <hip/hip_runtime.h>
-
-__global__ void gemm_kernel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    int j = blockIdx.y * blockDim.y + threadIdx.y;
-
-    if (i < m && j < n) {
-        double temp = 0.0;
-        for (int l = 0; l < k; l++) {
-            temp += a[i * lda + l] * b[l * ldb + j];
-        }
-        c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
-    }
-}
-
-extern "C" void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
-    dim3 block_size(16, 16);
-    dim3 grid_size((m + block_size.x - 1) / block_size.x, (n + block_size.y - 1) / block_size.y);
-
-    hipLaunchKernelGGL(gemm_kernel, grid_size, block_size, 0, 0, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+    }, dim3((m + 31) / 32, (n + 31) / 32), dim3(32, 32), 0, 0, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
 }
 ```
 
-Output 8:
-#include <hip/hip_runtime.h>
+In this C and HIP implementation, we use HIP directives and functions to launch a kernel that performs the GEMM operation in parallel. The kernel function receives parameters for the matrix dimensions (m, n, k), alpha and beta coefficients, the input matrices A and B, and the output matrix C.
 
-__global__ void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    int j = blockIdx.y * blockDim.y + threadIdx.y;
+Please note that you need to have the HIP toolchain installed to compile and run this code.
 
-    if (i < m && j < n) {
-        double temp = 0.0;
-        for (int l = 0; l < k; l++) {
-            temp += a[i * lda + l] * b[l * ldb + j];
-        }
-        c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
-    }
-}
-
-extern "C" void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
-    dim3 blockSize(16, 16);
-    dim3 gridSize((m + blockSize.x - 1) / blockSize.x, (n + blockSize.y - 1) / blockSize.y);
-
-    hipLaunchKernelGGL(gemm_parallel, gridSize, blockSize, 0, 0, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
-
-    hipDeviceSynchronize();
-}
-
-Output 9:
-Here is the provided Fortran OpenMP code implemented in C/C++ with HIP:
-
+Output 2:
 ```c
 #include <hip/hip_runtime.h>
 
 __global__ void gemm_kernel(int m, int n, int k, double alpha, double* a, int lda, double* b, int ldb, double beta, double* c, int ldc) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if (i < m && j < n) {
+        double temp = 0.0;
+        for (int l = 0; l < k; l++) {
+            temp += a[i * lda + l] * b[l * ldb + j];
+        }
+        c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+    }
+}
+
+void gemm_parallel(int m, int n, int k, double alpha, double* a, int lda, double* b, int ldb, double beta, double* c, int ldc) {
+    double* d_a, *d_b, *d_c;
+    size_t size_a = lda * k * sizeof(double);
+    size_t size_b = ldb * n * sizeof(double);
+    size_t size_c = ldc * n * sizeof(double);
+
+    hipMalloc(&d_a, size_a);
+    hipMalloc(&d_b, size_b);
+    hipMalloc(&d_c, size_c);
+
+    hipMemcpy(d_a, a, size_a, hipMemcpyHostToDevice);
+    hipMemcpy(d_b, b, size_b, hipMemcpyHostToDevice);
+    hipMemcpy(d_c, c, size_c, hipMemcpyHostToDevice);
+
+    dim3 blockSize(32, 32);
+    dim3 gridSize((m + blockSize.x - 1) / blockSize.x, (n + blockSize.y - 1) / blockSize.y);
+
+    gemm_kernel<<<gridSize, blockSize>>>(m, n, k, alpha, d_a, lda, d_b, ldb, beta, d_c, ldc);
+
+    hipMemcpy(c, d_c, size_c, hipMemcpyDeviceToHost);
+
+    hipFree(d_a);
+    hipFree(d_b);
+    hipFree(d_c);
+}
+```
+
+Output 3:
+```c
+#include <hip/hip_runtime.h>
+
+__global__ void gemm_parallel(int m, int n, int k, double alpha, double* a, int lda, double* b, int ldb, double beta, double* c, int ldc) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if (i < m && j < n) {
+        double temp = 0.0;
+        for (int l = 0; l < k; l++) {
+            temp += a[i * lda + l] * b[l * ldb + j];
+        }
+        c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+    }
+}
+```
+
+Output 4:
+Here is a function implemented in C and HIP that performs a Generalized Matrix multiplication operation:
+
+```c
+#include <hip/hip_runtime.h>
+
+void gemm_parallel(int m, int n, int k, double alpha, double* a, int lda, double* b, int ldb, double beta, double* c, int ldc) {
+    int i, j, l;
+    double temp;
+
+    hipLaunchKernelGGL([&](int i, int j) {
+        temp = 0.0;
+        for (l = 0; l < k; l++) {
+            temp += a[i * lda + l] * b[l * ldb + j];
+        }
+        c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+    }, dim3(m, n), dim3(1, 1), 0, 0);
+}
+```
+
+In this implementation, we use the HIP runtime API to launch a kernel that computes the GEMM operation in parallel on a GPU device. The kernel function takes the necessary parameters for the GEMM operation (m, n, k, alpha, a, lda, b, ldb, beta, c, ldc) and uses the input matrices `a`, `b`, and `c` to calculate the resulting matrix `c`. The kernel is launched with a grid size of (m, n) and a block size of (1, 1) to ensure that each element of the output matrix is computed in parallel.
+
+Output 5:
+```c
+#include <hip/hip_runtime.h>
+
+__global__ void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+    int i = blockDim.x * blockIdx.x + threadIdx.x;
+    int j = blockDim.y * blockIdx.y + threadIdx.y;
     
     if (i < m && j < n) {
         double temp = 0.0;
         for (int l = 0; l < k; l++) {
             temp += a[i * lda + l] * b[l * ldb + j];
         }
-        
         c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
     }
 }
+```
 
-void gemm_parallel(int m, int n, int k, double alpha, double* a, int lda, double* b, int ldb, double beta, double* c, int ldc) {
-    dim3 blockSize(16, 16);
-    dim3 gridSize((m + blockSize.x - 1) / blockSize.x, (n + blockSize.y - 1) / blockSize.y);
+Output 6:
+```c
+#include <hip/hip_runtime.h>
+
+__global__ void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
     
-    hipLaunchKernelGGL(gemm_kernel, gridSize, blockSize, 0, 0, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+    if(i < m && j < n) {
+        double temp = 0.0;
+        for(int l = 0; l < k; l++) {
+            temp += a[i * lda + l] * b[l * ldb + j];
+        }
+        c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+    }
 }
 ```
 
-In this version, the HIP kernel function `gemm_kernel` performs the matrix multiplication operation using HIP syntax for GPU parallelization. The `gemm_parallel` function acts as the host code that launches the kernel with appropriate block and grid dimensions. Make sure you have the necessary HIP environment set up to compile and execute this code.
-
-Output 10:
-```cpp
+Output 7:
+```c
 #include <hip/hip_runtime.h>
-#include <hip/hip_fp16.h>
 
-__global__ void gemm_kernel(int m, int n, int k, float alpha, float *a, int lda, float *b, int ldb, float beta, float *c, int ldc) {
-    int i = blockDim.x * blockIdx.x + threadIdx.x;
-    int j = blockDim.y * blockIdx.y + threadIdx.y;
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+    hipLaunchKernelGGL([=] HIP_KERNEL
+    (int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+        int i = blockIdx.x * blockDim.x + threadIdx.x;
+        int j = blockIdx.y * blockDim.y + threadIdx.y;
+        double temp = 0.0;
+
+        if (i < m && j < n) {
+            for (int l = 0; l < k; l++) {
+                temp += a[i * lda + l] * b[l * ldb + j];
+            }
+            c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+        }
+    }, dim3((m + 15) / 16, (n + 15) / 16), dim3(16, 16), 0, 0, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+}
+```
+
+Output 8:
+```c
+#include <hip/hip_runtime.h>
+
+__global__ void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
     
     if (i < m && j < n) {
-        float temp = 0.0f;
+        double temp = 0.0;
         for (int l = 0; l < k; l++) {
             temp += a[i * lda + l] * b[l * ldb + j];
         }
         c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
     }
 }
+```
 
-void gemm_parallel(int m, int n, int k, float alpha, float *a, int lda, float *b, int ldb, float beta, float *c, int ldc) {
-    float *d_a, *d_b, *d_c;
-    
-    hipMalloc(&d_a, m * k * sizeof(float));
-    hipMalloc(&d_b, k * n * sizeof(float));
-    hipMalloc(&d_c, m * n * sizeof(float));
-    
-    hipMemcpy(d_a, a, m * k * sizeof(float), hipMemcpyHostToDevice);
-    hipMemcpy(d_b, b, k * n * sizeof(float), hipMemcpyHostToDevice);
-    hipMemcpy(d_c, c, m * n * sizeof(float), hipMemcpyHostToDevice);
-    
-    dim3 block(16, 16);
-    dim3 grid((m + block.x - 1) / block.x, (n + block.y - 1) / block.y);
-    
-    gemm_kernel<<<grid, block>>>(m, n, k, alpha, d_a, lda, d_b, ldb, beta, d_c, ldc);
-    
-    hipMemcpy(c, d_c, m * n * sizeof(float), hipMemcpyDeviceToHost);
-    
-    hipFree(d_a);
-    hipFree(d_b);
-    hipFree(d_c);
+Output 9:
+```c
+#include <hip/hip_runtime.h>
+
+__global__ void gemm_parallel_kernel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if(i < m && j < n) {
+        double temp = 0.0;
+        for(int l = 0; l < k; l++) {
+            temp += a[i + l*lda] * b[l + j*ldb];
+        }
+        c[i + j*ldc] = alpha * temp + beta * c[i + j*ldc];
+    }
+}
+
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+    dim3 blockDim(16, 16);
+    dim3 gridDim((m + blockDim.x - 1) / blockDim.x, (n + blockDim.y - 1) / blockDim.y);
+
+    hipLaunchKernelGGL(gemm_parallel_kernel, gridDim, blockDim, 0, 0, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
 }
 ```
+
+Output 10:
+```c
+#include <hip/hip_runtime.h>
+
+__global__ void gemm_parallel(int m, int n, int k, double alpha, double* a, int lda, double* b, int ldb, double beta, double* c, int ldc) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if (i < m && j < n) {
+        double temp = 0.0;
+        for (int l = 0; l < k; l++) {
+            temp += a[i*lda + l] * b[l*ldb + j];
+        }
+        c[i*ldc + j] = alpha * temp + beta * c[i*ldc + j];
+    }
+}
+```
+
+Note: This is a simple implementation of the GEMM operation using HIP, additional error checking and memory management may be required for production use.
 

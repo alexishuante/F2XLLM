@@ -1,10 +1,134 @@
 Output 1:
-Here is a version of C/C++ with HIP of the provided Fortran OpenACC code:
+Here is the equivalent function in C and HIP that performs Sparse matrix–vector multiplication (SpMV) operation:
 
 ```c
 #include <hip/hip_runtime.h>
 
-__global__ void spmv_parallel(int n, int nnz, float* val, int* row, int* col, float* x, float* y) {
+void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    hipLaunchKernelGGL([=] __global__ (int *row, int *col, float *val, float *x, float *y) {
+        int i = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
+        
+        if (i < n) {
+            y[i] = 0.0f;
+            for (int j = row[i]; j < row[i+1]; j++) {
+                y[i] += val[j] * x[col[j]];
+            }
+        }
+    }, dim3((n + 255) / 256), dim3(256), 0, 0, row, col, val, x, y);
+}
+```
+
+In this code, the function `spmv_parallel` in C and HIP computes Sparse matrix–vector multiplication (SpMV) operation for a given sparse matrix in CSR format (val, row, col) and a vector x. The result is stored in the output vector y. The HIP kernel is launched using `hipLaunchKernelGGL` and each thread processes a different row of the matrix.
+
+Output 2:
+Here is a C and HIP implementation of the above subroutine for Sparse matrix-vector multiplication (SpMV):
+
+```c
+#include <hip/hip_runtime.h>
+
+void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y){
+    int i, j;
+    hipLaunchKernelGGL([&] __device__(int i) {
+        y[i] = 0.0f;
+        for(j = row[i]; j < row[i+1]; j++){
+            y[i] += val[j] * x[col[j]];
+        }
+    }, dim3(n), 1, 0, 0);
+}
+```
+
+In this code:
+- `hip/hip_runtime.h` header file provides the necessary functions for the HIP platform.
+- `hipLaunchKernelGGL` launches a HIP kernel with a grid dimension equal to the number of elements `n` in the input vector `x`.
+- The kernel function is a lambda function that computes the SpMV operation for each element of the vectors `x` and `y`.
+
+Please note that you need to setup your HIP environment and properly load the input data before calling the `spmv_parallel` function.
+
+Output 3:
+```c
+#include <hip/hip_runtime.h>
+
+__global__ void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    if (i < n) {
+        y[i] = 0.0f;
+        for (int j = row[i]; j < row[i + 1]; j++) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+```
+
+Output 4:
+C and HIP function for the SpMV operation:
+
+```c
+#define BLOCK_SIZE 256
+
+__global__ void spmv_kernel(int n, int nnz, float* val, int* row, int* col, float* x, float* y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    if (i < n) {
+        for (int j = row[i]; j < row[i+1]; j++) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+
+void spmv_parallel(int n, int nnz, float* val, int* row, int* col, float* x, float* y) {
+    float *d_val, *d_x, *d_y;
+    int *d_row, *d_col;
+    
+    cudaMalloc(&d_val, nnz * sizeof(float));
+    cudaMalloc(&d_row, (n+1) * sizeof(int));
+    cudaMalloc(&d_col, nnz * sizeof(int));
+    cudaMalloc(&d_x, n * sizeof(float));
+    cudaMalloc(&d_y, n * sizeof(float));
+    
+    cudaMemcpy(d_val, val, nnz * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_row, row, (n+1) * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_col, col, nnz * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_x, x, n * sizeof(float), cudaMemcpyHostToDevice);
+    
+    int block_size = BLOCK_SIZE;
+    int grid_size = (n + block_size - 1) / block_size;
+    
+    spmv_kernel<<<grid_size, block_size>>>(n, nnz, d_val, d_row, d_col, d_x, d_y);
+    
+    cudaMemcpy(y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
+    
+    cudaFree(d_val);
+    cudaFree(d_row);
+    cudaFree(d_col);
+    cudaFree(d_x);
+    cudaFree(d_y);
+}
+```
+In this implementation, we define a CUDA kernel `spmv_kernel` that performs the Sparse matrix-vector multiplication. We allocate memory on the GPU, copy data from host to device, launch the kernel with the appropriate grid and block size, and then copy the result back to the host.
+
+Note: This implementation assumes that you have the necessary CUDA setup to compile and run the code.
+
+Output 5:
+```c
+void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    #pragma omp target enter data map(to: val[0:nnz], row[0:n+1], col[0:nnz], x[0:n]) map(from: y[0:n])
+    #pragma omp target teams distribute parallel for
+    for (int i = 0; i < n; i++) {
+        y[i] = 0.0;
+        for (int j = row[i]; j < row[i+1]; j++) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+    #pragma omp target exit data map(from: y[0:n])
+}
+```
+
+Output 6:
+```c
+#include <hip/hip_runtime.h>
+
+__global__ void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < n) {
         y[i] = 0.0f;
@@ -14,239 +138,20 @@ __global__ void spmv_parallel(int n, int nnz, float* val, int* row, int* col, fl
     }
 }
 
-void spmv_host(int n, int nnz, float* val, int* row, int* col, float* x, float* y) {
-    float *d_val, *d_x, *d_y;
-    int *d_row, *d_col;
-
-    hipMalloc(&d_val, nnz * sizeof(float));
-    hipMalloc(&d_row, (n + 1) * sizeof(int));
-    hipMalloc(&d_col, nnz * sizeof(int));
-    hipMalloc(&d_x, n * sizeof(float));
-    hipMalloc(&d_y, n * sizeof(float));
-
-    hipMemcpy(d_val, val, nnz * sizeof(float), hipMemcpyHostToDevice);
-    hipMemcpy(d_row, row, (n + 1) * sizeof(int), hipMemcpyHostToDevice);
-    hipMemcpy(d_col, col, nnz * sizeof(int), hipMemcpyHostToDevice);
-    hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
-
-    hipLaunchKernelGGL(spmv_parallel, dim3((n+255)/256), dim3(256), 0, 0, n, nnz, d_val, d_row, d_col, d_x, d_y);
-
-    hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
-
-    hipFree(d_val);
-    hipFree(d_row);
-    hipFree(d_col);
-    hipFree(d_x);
-    hipFree(d_y);
-}
-```
-
-This code defines a HIP kernel `spmv_parallel` that performs sparse matrix-vector multiplication. The `spmv_host` function allocates memory on the device, copies the data from the host to the device, launches the kernel, and copies the result back to the host.
-
-Output 2:
-#include <hip/hip_runtime.h>
-
-__global__ void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i < n) {
-        y[i] = 0.0f;
-        for (int j = row[i]; j < row[i+1]; j++) {
-            y[i] += val[j] * x[col[j]];
-        }
-    }
-}
-
 void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
-    float *d_val, *d_x, *d_y;
     int *d_row, *d_col;
-
-    hipMalloc(&d_val, nnz * sizeof(float));
-    hipMalloc(&d_row, (n+1) * sizeof(int));
-    hipMalloc(&d_col, nnz * sizeof(int));
-    hipMalloc(&d_x, n * sizeof(float));
-    hipMalloc(&d_y, n * sizeof(float));
-
-    hipMemcpy(d_val, val, nnz * sizeof(float), hipMemcpyHostToDevice);
-    hipMemcpy(d_row, row, (n+1) * sizeof(int), hipMemcpyHostToDevice);
-    hipMemcpy(d_col, col, nnz * sizeof(int), hipMemcpyHostToDevice);
-    hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
-
-    int blockSize = 256;
-    int numBlocks = (n + blockSize - 1) / blockSize;
-
-    hipLaunchKernelGGL(spmv_parallel, dim3(numBlocks), dim3(blockSize), 0, 0, n, nnz, d_val, d_row, d_col, d_x, d_y);
-
-    hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
-
-    hipFree(d_val);
-    hipFree(d_row);
-    hipFree(d_col);
-    hipFree(d_x);
-    hipFree(d_y);
-}
-
-Output 3:
-Here is a version in C/C++ with HIP of the given Fortran OpenACC code for Sparse matrix-vector multiplication (SpMV) operation:
-
-```cpp
-#include <hip/hip_runtime.h>
-
-__global__ void spmv_kernel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
-  int i = blockIdx.x * blockDim.x + threadIdx.x;
-
-  if (i < n) {
-    y[i] = 0.0f;
-    for (int j = row[i]; j < row[i+1]; j++) {
-      y[i] += val[j] * x[col[j]];
-    }
-  }
-}
-
-void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
-  float *d_val, *d_x, *d_y;
-  int *d_row, *d_col;
-
-  hipMalloc(&d_val, nnz * sizeof(float));
-  hipMalloc(&d_row, (n+1) * sizeof(int));
-  hipMalloc(&d_col, nnz * sizeof(int));
-  hipMalloc(&d_x, n * sizeof(float));
-  hipMalloc(&d_y, n * sizeof(float));
-
-  hipMemcpy(d_val, val, nnz * sizeof(float), hipMemcpyHostToDevice);
-  hipMemcpy(d_row, row, (n+1) * sizeof(int), hipMemcpyHostToDevice);
-  hipMemcpy(d_col, col, nnz * sizeof(int), hipMemcpyHostToDevice);
-  hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
-
-  int blockSize = 256;
-  int numBlocks = (n + blockSize - 1) / blockSize;
-
-  spmv_kernel<<<numBlocks, blockSize>>>(n, nnz, d_val, d_row, d_col, d_x, d_y);
-
-  hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
-
-  hipFree(d_val);
-  hipFree(d_row);
-  hipFree(d_col);
-  hipFree(d_x);
-  hipFree(d_y);
-}
-```
-
-This C/C++ code uses HIP APIs for parallel execution on GPUs and performs the Sparse matrix-vector multiplication operation similar to the original Fortran OpenACC code provided. Make sure to include the necessary HIP headers and link the HIP library when compiling this code.
-
-Output 4:
-#include <hip/hip_runtime.h>
-
-__global__ void spmv_kernel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i < n) {
-        y[i] = 0.0;
-        for (int j = row[i]; j < row[i+1]; j++) {
-            y[i] += val[j] * x[col[j]];
-        }
-    }
-}
-
-void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
     float *d_val, *d_x, *d_y;
-    int *d_row, *d_col;
-
-    hipMalloc(&d_val, nnz * sizeof(float));
-    hipMalloc(&d_row, (n+1)*sizeof(int));
-    hipMalloc(&d_col, nnz * sizeof(int));
-    hipMalloc(&d_x, n * sizeof(float));
-    hipMalloc(&d_y, n * sizeof(float));
-
-    hipMemcpy(d_val, val, nnz * sizeof(float), hipMemcpyHostToDevice);
-    hipMemcpy(d_row, row, (n+1) * sizeof(int), hipMemcpyHostToDevice);
-    hipMemcpy(d_col, col, nnz * sizeof(int), hipMemcpyHostToDevice);
-    hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
-
-    int blockSize = 256;
-    int numBlocks = (n + blockSize - 1) / blockSize;
-
-    spmv_kernel<<<numBlocks, blockSize>>>(n, nnz, d_val, d_row, d_col, d_x, d_y);
-
-    hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
-
-    hipFree(d_val);
-    hipFree(d_row);
-    hipFree(d_col);
-    hipFree(d_x);
-    hipFree(d_y);
-}
-
-Output 5:
-#include <hip/hip_runtime.h>
-
-__global__ void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i < n) {
-        y[i] = 0.0f;
-        for (int j = row[i]; j < row[i+1]; j++) {
-            y[i] += val[j] * x[col[j]];
-        }
-    }
-}
-
-void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
-    float *d_val, *d_x, *d_y;
-    int *d_row, *d_col;
-
-    hipMalloc(&d_val, nnz * sizeof(float));
-    hipMalloc(&d_row, (n + 1) * sizeof(int));
-    hipMalloc(&d_col, nnz * sizeof(int));
-    hipMalloc(&d_x, n * sizeof(float));
-    hipMalloc(&d_y, n * sizeof(float));
-
-    hipMemcpy(d_val, val, nnz * sizeof(float), hipMemcpyHostToDevice);
-    hipMemcpy(d_row, row, (n + 1) * sizeof(int), hipMemcpyHostToDevice);
-    hipMemcpy(d_col, col, nnz * sizeof(int), hipMemcpyHostToDevice);
-    hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
-
-    int blockSize = 256;
-    int gridSize = (n + blockSize - 1) / blockSize;
-
-    spmv_parallel<<<gridSize, blockSize>>>(n, nnz, d_val, d_row, d_col, d_x, d_y);
-
-    hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
-
-    hipFree(d_val);
-    hipFree(d_row);
-    hipFree(d_col);
-    hipFree(d_x);
-    hipFree(d_y);
-}
-
-
-Output 6:
-#include <hip/hip_runtime.h>
-#include <hip/hip_runtime_api.h>
-
-__global__ void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i < n) {
-        y[i] = 0.0;
-        for (int j = row[i]; j < row[i+1]; j++) {
-            y[i] += val[j] * x[col[j]];
-        }
-    }
-}
-
-extern "C" void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
-    float *d_val, *d_x, *d_y;
-    int *d_row, *d_col;
-
-    hipMalloc(&d_val, nnz * sizeof(float));
-    hipMalloc(&d_x, n * sizeof(float));
-    hipMalloc(&d_y, n * sizeof(float));
-    hipMalloc(&d_row, (n+1) * sizeof(int));
-    hipMalloc(&d_col, nnz * sizeof(int));
     
+    hipMalloc(&d_row, (n + 1) * sizeof(int));
+    hipMalloc(&d_col, nnz * sizeof(int));
+    hipMalloc(&d_val, nnz * sizeof(float));
+    hipMalloc(&d_x, n * sizeof(float));
+    hipMalloc(&d_y, n * sizeof(float));
+    
+    hipMemcpy(d_row, row, (n + 1) * sizeof(int), hipMemcpyHostToDevice);
+    hipMemcpy(d_col, col, nnz * sizeof(int), hipMemcpyHostToDevice);
     hipMemcpy(d_val, val, nnz * sizeof(float), hipMemcpyHostToDevice);
     hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
-    hipMemcpy(d_row, row, (n+1) * sizeof(int), hipMemcpyHostToDevice);
-    hipMemcpy(d_col, col, nnz * sizeof(int), hipMemcpyHostToDevice);
     
     int block_size = 256;
     int grid_size = (n + block_size - 1) / block_size;
@@ -255,150 +160,21 @@ extern "C" void spmv_parallel(int n, int nnz, float *val, int *row, int *col, fl
     
     hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
     
+    hipFree(d_row);
+    hipFree(d_col);
     hipFree(d_val);
     hipFree(d_x);
     hipFree(d_y);
-    hipFree(d_row);
-    hipFree(d_col);
 }
+```
 
 Output 7:
+Below is the C and HIP implementation of the provided subroutine for Sparse matrix-vector multiplication operation (SpMV):
+
+```c
 #include <hip/hip_runtime.h>
 
 __global__ void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    
-    if (i < n) {
-        y[i] = 0.0f;
-        
-        for (int j = row[i]; j < row[i+1]; j++) {
-            y[i] += val[j] * x[col[j]];
-        }
-    }
-}
-
-extern "C" void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
-    float *d_val, *d_x, *d_y;
-    int *d_row, *d_col;
-    
-    hipMalloc(&d_val, nnz * sizeof(float));
-    hipMalloc(&d_row, (n+1) * sizeof(int));
-    hipMalloc(&d_col, nnz * sizeof(int));
-    hipMalloc(&d_x, n * sizeof(float));
-    hipMalloc(&d_y, n * sizeof(float));
-    
-    hipMemcpy(d_val, val, nnz * sizeof(float), hipMemcpyHostToDevice);
-    hipMemcpy(d_row, row, (n+1) * sizeof(int), hipMemcpyHostToDevice);
-    hipMemcpy(d_col, col, nnz * sizeof(int), hipMemcpyHostToDevice);
-    hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
-    
-    int blockSize = 256;
-    int numBlocks = (n + blockSize - 1) / blockSize;
-    
-    spmv_parallel<<<numBlocks, blockSize>>>(n, nnz, d_val, d_row, d_col, d_x, d_y);
-    
-    hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
-    
-    hipFree(d_val);
-    hipFree(d_row);
-    hipFree(d_col);
-    hipFree(d_x);
-    hipFree(d_y);
-}
-
-Output 8:
-#include <hip/hip_runtime.h>
-
-__global__ void spmv_kernel(int n, int nnz, float *val, int *row, int *col, float *x, float *y)
-{
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if(i < n)
-    {
-        y[i] = 0.0;
-        for(int j = row[i]; j < row[i+1]; j++)
-        {
-            y[i] += val[j] * x[col[j]];
-        }
-    }
-}
-
-extern "C" void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y)
-{
-    float *d_val, *d_x, *d_y;
-    int *d_row, *d_col;
-
-    hipMalloc(&d_val, nnz * sizeof(float));
-    hipMalloc(&d_x, n * sizeof(float));
-    hipMalloc(&d_y, n * sizeof(float));
-    hipMalloc(&d_row, (n+1) * sizeof(int));
-    hipMalloc(&d_col, nnz * sizeof(int));
-
-    hipMemcpy(d_val, val, nnz * sizeof(float), hipMemcpyHostToDevice);
-    hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
-    hipMemcpy(d_row, row, (n+1) * sizeof(int), hipMemcpyHostToDevice);
-    hipMemcpy(d_col, col, nnz * sizeof(int), hipMemcpyHostToDevice);
-
-    int block_size = 256;
-    int grid_size = (n + block_size - 1) / block_size;
-
-    hipLaunchKernelGGL(spmv_kernel, dim3(grid_size), dim3(block_size), 0, 0, n, nnz, d_val, d_row, d_col, d_x, d_y);
-
-    hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
-
-    hipFree(d_val);
-    hipFree(d_x);
-    hipFree(d_y);
-    hipFree(d_row);
-    hipFree(d_col);
-}
-
-Output 9:
-#include <hip/hip_runtime.h>
-
-__global__ void spmv_parallel_kernel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i < n) {
-        y[i] = 0.0;
-        for (int j = row[i]; j < row[i+1]; j++) {
-            y[i] += val[j] * x[col[j]];
-        }
-    }
-}
-
-void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
-    float *d_val, *d_x, *d_y;
-    int *d_row, *d_col;
-
-    hipMalloc(&d_val, nnz * sizeof(float));
-    hipMalloc(&d_row, (n+1) * sizeof(int));
-    hipMalloc(&d_col, nnz * sizeof(int));
-    hipMalloc(&d_x, n * sizeof(float));
-    hipMalloc(&d_y, n * sizeof(float));
-
-    hipMemcpy(d_val, val, nnz * sizeof(float), hipMemcpyHostToDevice);
-    hipMemcpy(d_row, row, (n+1) * sizeof(int), hipMemcpyHostToDevice);
-    hipMemcpy(d_col, col, nnz * sizeof(int), hipMemcpyHostToDevice);
-    hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
-
-    int blockSize = 256;
-    int numBlocks = (n + blockSize - 1) / blockSize;
-
-    hipLaunchKernelGGL(spmv_parallel_kernel, dim3(numBlocks), dim3(blockSize), 0, 0, n, nnz, d_val, d_row, d_col, d_x, d_y);
-
-    hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
-
-    hipFree(d_val);
-    hipFree(d_row);
-    hipFree(d_col);
-    hipFree(d_x);
-    hipFree(d_y);
-}
-
-Output 10:
-#include <hip/hip_runtime.h>
-#include <hip/hip_runtime_api.h>
-
-__global__ void spmv_kernel(int n, int *row, int *col, float *val, float *x, float *y) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < n) {
         y[i] = 0.0f;
@@ -408,18 +184,150 @@ __global__ void spmv_kernel(int n, int *row, int *col, float *val, float *x, flo
     }
 }
 
-extern "C" void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
-    hipMemcpy(val, val, nnz * sizeof(float), hipMemcpyDeviceToDevice);
-    hipMemcpy(row, row, (n + 1) * sizeof(int), hipMemcpyDeviceToDevice);
-    hipMemcpy(col, col, nnz * sizeof(int), hipMemcpyDeviceToDevice);
-    hipMemcpy(x, x, n * sizeof(float), hipMemcpyDeviceToDevice);
-    hipMemcpy(y, y, n * sizeof(float), hipMemcpyDeviceToDevice);
+void spmv(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    float *d_val, *d_x, *d_y;
+    int *d_row, *d_col;
 
+    hipMalloc(&d_val, nnz * sizeof(float));
+    hipMemcpy(d_val, val, nnz * sizeof(float), hipMemcpyHostToDevice);
+    
+    hipMalloc(&d_row, (n + 1) * sizeof(int));
+    hipMemcpy(d_row, row, (n + 1) * sizeof(int), hipMemcpyHostToDevice);
+
+    hipMalloc(&d_col, nnz * sizeof(int));
+    hipMemcpy(d_col, col, nnz * sizeof(int), hipMemcpyHostToDevice);
+
+    hipMalloc(&d_x, n * sizeof(float));
+    hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
+
+    hipMalloc(&d_y, n * sizeof(float);
+
+    hipLaunchKernelGGL(spmv_parallel, dim3((n - 1) / 256 + 1), dim3(256), 0, 0, n, nnz, d_val, d_row, d_col, d_x, d_y);
+
+    hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
+
+    hipFree(d_val);
+    hipFree(d_row);
+    hipFree(d_col);
+    hipFree(d_x);
+    hipFree(d_y);
+}
+```
+
+In this implementation, the `spmv_parallel` function is the HIP kernel that computes the sparse matrix-vector multiplication for each element of the output vector `y`. The `spvm` function is the host function that allocates memory on the GPU, copies data from the host to the device, launches the kernel, and copy the result back to the host.
+
+Note: For this code to work, you need to include the appropriate HIP header and link against the HIP runtime library.
+
+Output 8:
+```c
+void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    for (int i = 0; i < n; i++) {
+        y[i] = 0.0f;
+        for (int j = row[i]; j < row[i+1]; j++) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+```
+
+```c
+#include <hip/hip_runtime.h>
+
+__global__ void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = 0.0f;
+        for (int j = row[i]; j < row[i+1]; j++) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+
+void spmv_parallel_hip(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
     int blockSize = 256;
     int numBlocks = (n + blockSize - 1) / blockSize;
-
-    spmv_kernel<<<numBlocks, blockSize>>>(n, row, col, val, x, y);
-
-    hipMemcpy(y, y, n * sizeof(float), hipMemcpyDeviceToDevice);
+    hipLaunchKernelGGL(spmv_parallel, dim3(numBlocks), dim3(blockSize), 0, 0, n, nnz, val, row, col, x, y);
 }
+``` 
+
+In this code snippet, we provided the implementation of the subroutine `spmv_parallel` in C and HIP, which computes a Sparse matrix–vector multiplication (SpMV) operation. The C function directly mirrors the Fortran subroutine logic, while the HIP implementation includes a kernel function and a host function to launch the kernel on the GPU.
+
+Output 9:
+```c
+#include <hip/hip_runtime.h>
+
+__global__ void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    if (i < n) {
+        y[i] = 0.0;
+        for (int j = row[i]; j < row[i+1]; j++) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+
+void spmv_parallel_wrapper(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    int blockSize = 256;
+    int numBlocks = (n + blockSize - 1) / blockSize;
+    
+    hipLaunchKernelGGL(spmv_parallel, dim3(numBlocks), dim3(blockSize), 0, 0, n, nnz, val, row, col, x, y);
+}
+```
+
+Output 10:
+```c
+void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    int i, j;
+    
+    #pragma omp parallel for
+    for (i = 0; i < n; i++) {
+        y[i] = 0.0;
+        for (j = row[i]; j < row[i+1]; j++) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+```
+
+```c
+#include <hip/hip_runtime.h>
+
+__global__ void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    if (i < n) {
+        y[i] = 0.0f;
+        for (int j = row[i]; j < row[i+1]; j++) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+
+void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+    int *d_row, *d_col;
+    float *d_val, *d_x, *d_y;
+    
+    hipMalloc(&d_val, nnz * sizeof(float));
+    hipMalloc(&d_row, (n+1) * sizeof(int));
+    hipMalloc(&d_col, nnz * sizeof(int));
+    hipMalloc(&d_x, n * sizeof(float));
+    hipMalloc(&d_y, n * sizeof(float));
+    
+    hipMemcpy(d_val, val, nnz * sizeof(float), hipMemcpyHostToDevice);
+    hipMemcpy(d_row, row, (n+1) * sizeof(int), hipMemcpyHostToDevice);
+    hipMemcpy(d_col, col, nnz * sizeof(int), hipMemcpyHostToDevice);
+    hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
+    
+    hipLaunchKernelGGL(spmv_parallel, dim3((n+255)/256), dim3(256), 0, 0, n, nnz, d_val, d_row, d_col, d_x, d_y);
+    
+    hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
+    
+    hipFree(d_val);
+    hipFree(d_row);
+    hipFree(d_col);
+    hipFree(d_x);
+    hipFree(d_y);
+}
+```
 
