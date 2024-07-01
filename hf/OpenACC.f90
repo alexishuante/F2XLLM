@@ -1,3 +1,8 @@
+! Change input size: n
+!  - natom = n
+!  - size of tgeom array = 3 * n 
+!    - change `real(8):: tgeom(24)` in main and basic_hf_proxy
+
 module params
     real(8)      pi
     parameter  ( pi = 3.1415926535897931d0 )
@@ -20,9 +25,9 @@ PROGRAM main
 
     ! initialize input variables
     ngauss = 3
-    natom = 8
+    natom = 8 
     erep = 0
-
+    
     ! Input data
     data txpnt / 6.3624214, 1.1589230, 0.3136498 /
     data tcoef / 0.154328967295, 0.535328142282, 0.444634542185 /
