@@ -21,7 +21,7 @@ PROGRAM main
 
     ! initialize input variables
     ngauss = 3
-    natom = 15000
+    natom = 5
     erep = 0
 
     print *, 'Max threads: ', OMP_GET_MAX_THREADS()

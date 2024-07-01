@@ -2,8 +2,8 @@
 PROGRAM main
     USE iso_c_binding, ONLY: c_int, c_float
     IMPLICIT NONE
-    INTEGER, PARAMETER :: n = 500000000
-    REAL, DIMENSION(n) :: x, y
+    INTEGER, PARAMETER :: n = 5000000
+    REAL, POINTER, DIMENSION(:) :: x, y
     REAL :: a
     INTEGER :: i
 
@@ -18,6 +18,9 @@ PROGRAM main
         end subroutine saxpy_wrapper
     end interface
 
+    ! Allocate the arrays
+    allocate(x(n), y(n))
+
     ! Initialize the scalar and vectors
     a = 2.0
     x = 3.0
@@ -31,6 +34,7 @@ PROGRAM main
     !    PRINT *, "y(", i, ") = ", y(i)
     !END DO
 
-END PROGRAM main
+    ! Deallocate the arrays
+    deallocate(x, y)
 
-! Remove the Fortran saxpy subroutine
+END PROGRAM main
