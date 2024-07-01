@@ -1,6 +1,7 @@
-
+//******************************************************************************** */
 // F -> COpenMP
 
+1.
 Code Block 7:
 void saxpy_parallel(int n, float a, float *x, float *y) {
     #pragma omp parallel for
@@ -9,16 +10,7 @@ void saxpy_parallel(int n, float a, float *x, float *y) {
     }
 }
 
-Code Block 7:
-void saxpy_parallel(int n, float a, float *x, float *y) {
-    int i;
-
-    #pragma omp parallel for
-    for (i = 0; i < n; i++) {
-        y[i] = a * x[i] + y[i];
-    }
-}
-
+2.
 Code Block 7:
 void saxpy_parallel(int n, float a, float *x, float *y) {
     int i;
@@ -28,8 +20,19 @@ void saxpy_parallel(int n, float a, float *x, float *y) {
     }
 }
 
+3.
+Code Block 7:
+void saxpy_parallel(int n, float a, float *x, float *y) {
+    int i;
+    #pragma omp parallel for
+    for (i = 0; i < n; i++) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+//********************************************************************************
 // F -> C(OpenACC)
 
+4.
 Code Block 6:
 void saxpy_parallel(int n, float a, float *x, float *y) {
     #pragma acc kernels loop present(x, y)
@@ -38,6 +41,7 @@ void saxpy_parallel(int n, float a, float *x, float *y) {
     }
 }
 
+5.
 Code Block 1:
 void saxpy_parallel(int n, float a, float *x, float *y) {
     #pragma acc parallel loop present(x[0:n], y[0:n])
@@ -46,6 +50,7 @@ void saxpy_parallel(int n, float a, float *x, float *y) {
     }
 }
 
+6.
 Code Block 2:
 void saxpy_parallel(int n, float a, const float *x, float *y) {
     int i;
@@ -54,9 +59,9 @@ void saxpy_parallel(int n, float a, const float *x, float *y) {
         y[i] = a * x[i] + y[i];
     }
 }
-
+//********************************************************************************
 // FOpenMP -> C HIP
-
+7.
 Code Block 2:
 void saxpy_parallel(int n, float a, float* x, float* y) {
     float* d_x;
@@ -85,6 +90,7 @@ __global__ void saxpy_kernel(int n, float a, float* x, float* y) {
     }
 }
 
+8.
 Code Block 2:
 void saxpy_parallel(int n, float a, const float *x, float *y) {
     float *d_x, *d_y;
@@ -119,6 +125,7 @@ __global__ void saxpy_kernel(int n, float a, const float *x, float *y) {
     }
 }
 
+9.
 Code Block _:
 __global__ void saxpy_parallel(int n, float a, float *x, float *y) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -126,9 +133,9 @@ __global__ void saxpy_parallel(int n, float a, float *x, float *y) {
         y[i] = a * x[i] + y[i];
     }
 }
-
+//********************************************************************************
 // F(OpenMP) -> C CUDA
-
+10
 Code Block 3:
 void saxpy(int n, float a, float *x, float *y) {
     float *d_x, *d_y;
@@ -157,6 +164,7 @@ __global__ void saxpy_parallel(int n, float a, float *x, float *y) {
     }
 }
 
+11.
 Code Block 2:
 void saxpy_parallel(int n, float a, float *x, float *y) {
     // Allocate device memory for x and y
@@ -190,6 +198,7 @@ __global__ void saxpy(int n, float a, float *x, float *y) {
     }
 }
 
+12.
 Code Block _:
 __global__ void saxpy_parallel(int n, float a, float *x, float *y) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -197,6 +206,6 @@ __global__ void saxpy_parallel(int n, float a, float *x, float *y) {
     y[idx] = a * x[idx] + y[idx];
   }
 }
-
+//********************************************************************************
 
 
