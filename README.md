@@ -7,6 +7,11 @@ Command to run OpenACC fortran with milan0:
 nvfortran -fast -Minfo=all -acc=gpu -gpu=cc70 file_name -o outputFileName
 ```
 
+For C OpenACC on milan0:
+```shell
+nvcc cFile.c -o outputFileName
+```
+
 Command to run OpenACC fortran with cousteau:
 ```shell
 gfortran -fopenacc -fopt-info-optimized file_name -o outputFileName
