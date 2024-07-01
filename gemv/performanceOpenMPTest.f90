@@ -1,23 +1,24 @@
 PROGRAM main
     IMPLICIT NONE
-    INTEGER, PARAMETER :: n = 50000000
+    INTEGER, PARAMETER :: n = 1400
     REAL, DIMENSION(n, n) :: A
     REAL, DIMENSION(n) :: x, y
     INTEGER :: i, j, k
     INTEGER :: start, finish, rate
     REAL :: total_time, average_time
+    REAL :: startTime, endTime, totalTime, averageTime
     total_time = 0.0
 
     ! Call the gemv_parallel subroutine 10 times and record the time
     DO k = 1, 10
-        CALL system_clock(start)
+        ! CALL system_clock(start)
+        CALL CPU_TIME(startTime)
         CALL gemv_parallel(n, A, x, y)
-        CALL system_clock(finish)
-        time_taken(k) = REAL(finish - start) / REAL(rate)
-        total_time = total_time + time_taken(k)
+        CALL CPU_TIME(endTime)
+        totalTime = totalTime + (endTime - startTime)
     END DO
 
-    average_time = total_time / 10.0
+    average_time = totalTime / 10.0
 
     ! Print the average execution time
     PRINT *, "Average execution time: ", average_time, " seconds."
