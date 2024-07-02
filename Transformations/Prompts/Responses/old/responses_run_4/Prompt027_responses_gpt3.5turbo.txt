@@ -1,0 +1,441 @@
+Output 1:
+C function implementing Jacobi operation with HIP:
+
+```c
+#include <hip/hip_runtime.h>
+
+__global__ void jacobi_kernel(double* u, double* unew, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    int k = blockIdx.z * blockDim.z + threadIdx.z;
+
+    if (i > 0 && i < n - 1 && j > 0 && j < n - 1 && k > 0 && k < n - 1) {
+        unew[i + j * n + k * n * n] = 0.125 * (u[(i-1) + j * n + k * n * n] + u[(i+1) + j * n + k * n * n] +
+                                              u[i + (j-1) * n + k * n * n] + u[i + (j+1) * n + k * n * n] +
+                                              u[i + j * n + (k-1) * n * n] + u[i + j * n + (k+1) * n * n] +
+                                              u[i + j * n + k * n * n]);
+    }
+}
+
+void jacobi_hip(double* u, double* unew, int n, int niter) {
+    double *d_u, *d_unew;
+    hipMalloc((void**)&d_u, n * n * n * sizeof(double));
+    hipMalloc((void**)&d_unew, n * n * n * sizeof(double));
+
+    hipMemcpy(d_u, u, n * n * n * sizeof(double), hipMemcpyHostToDevice);
+
+    dim3 blockDim(16, 16, 16);
+    dim3 gridDim((n + blockDim.x - 1) / blockDim.x, (n + blockDim.y - 1) / blockDim.y, (n + blockDim.z - 1) / blockDim.z);
+
+    for (int iter = 0; iter < niter; iter++) {
+        jacobi_kernel<<<gridDim, blockDim>>>(d_u, d_unew, n);
+        hipDeviceSynchronize();
+
+        hipMemcpy(unew, d_unew, n * n * n * sizeof(double), hipMemcpyDeviceToHost);
+        memcpy(u, unew, n * n * n * sizeof(double));
+    }
+
+    hipFree(d_u);
+    hipFree(d_unew);
+}
+```
+
+The Fortran subroutine `jacobi_parallel` remains unchanged as it already implements the Jacobi operation in a parallel manner with OpenMP.
+
+Output 2:
+// C function for Jacobi operation with HIP
+#include <hip/hip_runtime.h>
+
+__global__ void jacobi_kernel(double *u, double *unew, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    int k = blockIdx.z * blockDim.z + threadIdx.z;
+
+    if (i > 0 && i < n-1 && j > 0 && j < n-1 && k > 0 && k < n-1) {
+        unew[i + j*n + k*n*n] = 0.125 * (u[(i-1) + j*n + k*n*n] + u[(i+1) + j*n + k*n*n] +
+                                          u[i + (j-1)*n + k*n*n] + u[i + (j+1)*n + k*n*n] +
+                                          u[i + j*n + (k-1)*n*n] + u[i + j*n + (k+1)*n*n] +
+                                          u[i + j*n + k*n*n]);
+    }
+}
+
+void jacobi_hip(double *u, double *unew, int n, int niter) {
+    double *d_u, *d_unew;
+    size_t size = n * n * n * sizeof(double);
+
+    hipMalloc(&d_u, size);
+    hipMalloc(&d_unew, size);
+
+    hipMemcpy(d_u, u, size, hipMemcpyHostToDevice);
+
+    dim3 blockSize(16, 16, 16);
+    dim3 gridSize((n+15)/16, (n+15)/16, (n+15)/16);
+
+    for (int iter = 0; iter < niter; iter++) {
+        jacobi_kernel<<<gridSize, blockSize>>>(d_u, d_unew, n);
+        hipDeviceSynchronize();
+        
+        hipMemcpy(unew, d_unew, size, hipMemcpyDeviceToHost);
+        hipMemcpy(u, d_u, size, hipMemcpyDeviceToDevice);
+    }
+
+    hipFree(d_u);
+    hipFree(d_unew);
+}
+
+Output 3:
+```c
+#include <hip/hip_runtime.h>
+
+__global__ void jacobi_kernel(double *u, double *unew, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    int k = blockIdx.z * blockDim.z + threadIdx.z;
+
+    if (i > 0 && i < n-1 && j > 0 && j < n-1 && k > 0 && k < n-1) {
+        int idx = i + j * n + k * n * n;
+        unew[idx] = 0.125 * (u[idx - n] + u[idx + n] + u[idx - 1] + u[idx + 1]
+                            + u[idx - n*n] + u[idx + n*n] + u[idx]);
+    }
+}
+
+void jacobi_parallel(double *u, double *unew, int n, int niter, int nthreads) {
+    int size = n * n * n * sizeof(double);
+    double *d_u, *d_unew;
+
+    hipMalloc(&d_u, size);
+    hipMalloc(&d_unew, size);
+
+    hipMemcpy(d_u, u, size, hipMemcpyHostToDevice);
+
+    dim3 block_size(16, 16, 16);
+    dim3 grid_size((n + block_size.x - 1) / block_size.x,
+                   (n + block_size.y - 1) / block_size.y,
+                   (n + block_size.z - 1) / block_size.z);
+
+    for (int iter = 0; iter < niter; iter++) {
+        jacobi_kernel<<<grid_size, block_size>>>(d_u, d_unew, n);
+        hipDeviceSynchronize();
+        hipMemcpy(u, d_u, size, hipMemcpyDeviceToHost);
+    }
+
+    hipFree(d_u);
+    hipFree(d_unew);
+}
+```
+
+In this C code, we define a HIP kernel function `jacobi_kernel` that performs the Jacobi operation on a 3D grid. We also implement the `jacobi_parallel` function that launches the kernel on the GPU using HIP.
+
+The corresponding Fortran subroutine `jacobi_parallel` with OpenMP parallelization has been provided in the question. Both implementations compute the Jacobi operation iteratively over `niter` iterations and utilize parallel processing to improve performance.
+
+Output 4:
+Here is a C function for the Jacobi operation implemented with HIP:
+
+```c
+#include <hip/hip_runtime.h>
+
+__global__ void jacobi_kernel(double *u, double *unew, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    int k = blockIdx.z * blockDim.z + threadIdx.z;
+
+    if (i > 0 && i < n-1 && j > 0 && j < n-1 && k > 0 && k < n-1) {
+        int index = i + j*n + k*n*n;
+        unew[index] = 0.125 * (u[index-n] + u[index+n] + u[index-1] +
+                               u[index+1] + u[index-n*n] + u[index+n*n] + u[index]);
+    }
+}
+
+void jacobi_parallel(double *u, double *unew, int n, int niter, int numBlocks) {
+    double *d_u, *d_unew;
+    size_t size = n * n * n * sizeof(double);
+
+    hipMalloc(&d_u, size);
+    hipMalloc(&d_unew, size);
+
+    hipMemcpy(d_u, u, size, hipMemcpyHostToDevice);
+
+    dim3 blockDim(8,8,8);
+    dim3 gridDim(numBlocks, numBlocks, numBlocks);
+
+    for (int iter = 0; iter < niter; iter++) {
+        jacobi_kernel<<<gridDim, blockDim>>>(d_u, d_unew, n);
+        hipDeviceSynchronize();
+        hipMemcpy(u, unew, size, hipMemcpyDeviceToHost);
+    }
+
+    hipFree(d_u);
+    hipFree(d_unew);
+}
+```
+
+This C function can be used to perform the Jacobi operation on a 3D array using the HIP platform.
+
+The corresponding subroutine in Fortran with OpenMP that calls this C function would be:
+
+```fortran
+subroutine jacobi_parallel(u, unew, n, niter, nthreads)
+  implicit none
+  integer, intent(in) :: n, niter, nthreads
+  real(kind=8), dimension(n, n, n), intent(inout) :: u, unew
+  integer :: numBlocks
+
+  numBlocks = n
+  call hipSetDevice(0)
+  call jacobi_parallel(u, unew, n, niter, numBlocks)
+end subroutine jacobi_parallel
+```
+
+In this Fortran subroutine, we set the number of blocks equal to the size of the array in one dimension and then call the C function `jacobi_parallel` using the HIP platform to perform the Jacobi operation in parallel with the specified number of threads.
+
+Output 5:
+```c
+#include <hip/hip_runtime.h>
+
+__global__ void jacobi_kernel(double *u, double *unew, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x + 1;
+    int j = blockIdx.y * blockDim.y + threadIdx.y + 1;
+    int k = blockIdx.z * blockDim.z + threadIdx.z + 1;
+
+    if (i < (n - 1) && j < (n - 1) && k < (n - 1)) {
+        unew[i + j*n + k*n*n] = 0.125 * (u[(i-1) + j*n + k*n*n] + u[(i+1) + j*n + k*n*n] +
+                                          u[i + (j-1)*n + k*n*n] + u[i + (j+1)*n + k*n*n] +
+                                          u[i + j*n + (k-1)*n*n] + u[i + j*n + (k+1)*n*n] + u[i + j*n + k*n*n]);
+    }
+}
+
+void jacobi_parallel(double *u, double *unew, int n, int niter, int nthreads) {
+    dim3 blockDim(8, 8, 8);
+    dim3 gridDim((n-2 + blockDim.x - 1) / blockDim.x, (n-2 + blockDim.y - 1) / blockDim.y, (n-2 + blockDim.z - 1) / blockDim.z);
+
+    double *d_u, *d_unew;
+    hipMalloc(&d_u, n*n*n*sizeof(double));
+    hipMalloc(&d_unew, n*n*n*sizeof(double));
+
+    hipMemcpy(d_u, u, n*n*n*sizeof(double), hipMemcpyHostToDevice);
+
+    for (int iter = 0; iter < niter; iter++) {
+        jacobi_kernel<<<gridDim, blockDim>>>(d_u, d_unew, n);
+        hipDeviceSynchronize();
+        
+        hipMemcpy(unew, d_unew, n*n*n*sizeof(double), hipMemcpyDeviceToHost);
+        
+        hipMemcpy(d_u, unew, n*n*n*sizeof(double), hipMemcpyHostToDevice);
+    }
+
+    hipFree(d_u);
+    hipFree(d_unew);
+}
+```
+
+Output 6:
+```c
+void jacobi_parallel(float *u, float *unew, int n, int niter, int nthreads);
+```
+
+```fortran
+subroutine jacobi_parallel(u, unew, n, niter, nthreads)
+  implicit none
+  integer, intent(in) :: n, niter, nthreads
+  real(kind=8), dimension(n, n, n), intent(inout) :: u, unew
+  integer :: i, j, k, iter
+  !$OMP PARALLEL NUM_THREADS(nthreads) PRIVATE(i, j, k, iter)
+  do iter = 1, niter
+    !$OMP DO SCHEDULE(STATIC)
+    do k = 2, n - 1
+      do j = 2, n - 1
+        do i = 2, n - 1
+          unew(i, j, k) = 0.125 * (u(i-1, j, k) + u(i+1, j, k) + u(i,j-1, k) &
+            + u(i, j+1, k) + u(i, j, k-1) + u(i, j, k+1) + u(i, j, k))
+        end do
+      end do
+    end do
+    !$OMP END DO
+    !$OMP BARRIER
+    u(:, :, :) = unew(:, :, :)
+  end do
+  !$OMP END PARALLEL
+end subroutine jacobi_parallel
+```
+
+Output 7:
+```c
+#include <hip/hip_runtime.h>
+
+__global__ void jacobi_kernel(double *u, double *unew, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    int k = blockIdx.z;
+
+    if (i > 0 && i < n - 1 && j > 0 && j < n - 1 && k > 0 && k < n - 1) {
+        int idx = k * n * n + j * n + i;
+        unew[idx] = 0.125 * (u[idx - n] + u[idx + n] + u[idx - 1] +
+                             u[idx + 1] + u[idx - n * n] + u[idx + n * n] + u[idx]);
+    }
+}
+
+void jacobi_hip(double *u, double *unew, int n, int niter, int nthreads) {
+    double *d_u, *d_unew;
+    size_t size = n * n * n * sizeof(double);
+
+    hipMalloc((void**)&d_u, size);
+    hipMalloc((void**)&d_unew, size);
+
+    hipMemcpy(d_u, u, size, hipMemcpyHostToDevice);
+
+    dim3 threadsPerBlock(16, 16, 1);
+    dim3 numBlocks((n + threadsPerBlock.x - 1) / threadsPerBlock.x,
+                   (n + threadsPerBlock.y - 1) / threadsPerBlock.y, n);
+
+    for (int iter = 0; iter < niter; iter++) {
+        jacobi_kernel<<<numBlocks, threadsPerBlock>>>(d_u, d_unew, n);
+        hipDeviceSynchronize();
+
+        hipMemcpy(unew, d_unew, size, hipMemcpyDeviceToHost);
+        hipMemcpy(u, d_u, size, hipMemcpyDeviceToDevice);
+    }
+
+    hipFree(d_u);
+    hipFree(d_unew);
+}
+```
+
+Output 8:
+```c
+// Function in C with HIP that computes Jacobi operation
+#include <hip/hip_runtime.h>
+
+__global__ void jacobi_kernel(double* u, double* unew, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    int k = blockIdx.z * blockDim.z + threadIdx.z;
+
+    if (i > 0 && i < n-1 && j > 0 && j < n-1 && k > 0 && k < n-1) {
+        int idx = i + j*n + k*n*n;
+        unew[idx] = 0.125 * (u[idx - n] + u[idx + n] + u[idx - 1] + u[idx + 1] + u[idx - n*n] + u[idx + n*n] + u[idx]);
+    }
+}
+
+void jacobi_operation(double* u, double* unew, int n, int niter) {
+    double *d_u, *d_unew;
+    hipMalloc(&d_u, n*n*n*sizeof(double));
+    hipMalloc(&d_unew, n*n*n*sizeof(double));
+
+    hipMemcpy(d_u, u, n*n*n*sizeof(double), hipMemcpyHostToDevice);
+
+    dim3 blockSize(16, 16, 1);
+    dim3 gridSize((n + blockSize.x - 1) / blockSize.x, (n + blockSize.y - 1) / blockSize.y, (n + blockSize.z - 1) / blockSize.z);
+
+    for (int iter = 0; iter < niter; iter++) {
+        jacobi_kernel<<<gridSize, blockSize>>>(d_u, d_unew, n);
+        hipDeviceSynchronize();
+
+        hipMemcpy(d_u, d_unew, n*n*n*sizeof(double), hipMemcpyDeviceToDevice);
+    }
+
+    hipMemcpy(unew, d_unew, n*n*n*sizeof(double), hipMemcpyDeviceToHost);
+
+    hipFree(d_u);
+    hipFree(d_unew);
+}
+```
+
+In the above code, a CUDA kernel function `jacobi_kernel` is implemented to perform the Jacobi operation on a 3D array `u` and store the result in another array `unew`. The `jacobi_operation` function copies the data to the device, launches the kernel in parallel, and updates the arrays for a specified number of iterations.
+
+Please note that this code uses HIP for portability across CUDA and AMD GPUs. You can compile and run this code on AMD GPUs using a HIP-enabled compiler.
+
+Output 9:
+```c
+void jacobi(double *u, double *unew, int n, int niter);
+
+void jacobi(double *u, double *unew, int n, int niter) {
+    int i, j, k, iter;
+    for (iter = 0; iter < niter; iter++) {
+        for (k = 1; k < n - 1; k++) {
+            for (j = 1; j < n - 1; j++) {
+                for (i = 1; i < n - 1; i++) {
+                    unew[i + n * (j + n * k)] = 0.125 * (u[i - 1 + n * (j + n * k)] +
+                                                          u[i + 1 + n * (j + n * k)] +
+                                                          u[i + n * (j - 1 + n * k)] +
+                                                          u[i + n * (j + 1 + n * k)] +
+                                                          u[i + n * (j + n * (k - 1))] +
+                                                          u[i + n * (j + n * (k + 1))] +
+                                                          u[i + n * (j + n * k)]);
+                }
+            }
+        }
+        
+        for (i = 0; i < n; i++) {
+            for (j = 0; j < n; j++) {
+                for (k = 0; k < n; k++) {
+                    u[i + n * (j + n * k)] = unew[i + n * (j + n * k)];
+                }
+            }
+        }
+    }
+}
+```
+
+Output 10:
+```c
+#include <hip/hip_runtime.h>
+
+__global__ void jacobi_kernel(double* u, double* unew, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    int k = blockIdx.z * blockDim.z + threadIdx.z;
+
+    if (i < n && j < n && k < n && i > 0 && j > 0 && k > 0 && i < n - 1 && j < n - 1 && k < n - 1) {
+        unew[i + j*n + k*n*n] = 0.125 * (u[(i-1) + j*n + k*n*n] + u[(i+1) + j*n + k*n*n] + u[i + (j-1)*n + k*n*n] +
+                                          u[i + (j+1)*n + k*n*n] + u[i + j*n + (k-1)*n*n] + u[i + j*n + (k+1)*n*n] + u[i + j*n + k*n*n]);
+    }
+}
+
+void jacobi(double* u, double* unew, int n, int niter) {
+    int blockSize = 512;
+    int gridSize = (n + blockSize - 1) / blockSize;
+    
+    double *d_u, *d_unew;
+    
+    hipMalloc(&d_u, n*n*n*sizeof(double));
+    hipMalloc(&d_unew, n*n*n*sizeof(double));
+    
+    hipMemcpy(d_u, u, n*n*n*sizeof(double), hipMemcpyHostToDevice);
+    
+    for (int iter = 0; iter < niter; iter++) {
+        hipLaunchKernelGGL(jacobi_kernel, dim3(gridSize, gridSize, gridSize), dim3(blockSize, blockSize, blockSize), 0, 0, d_u, d_unew, n);
+        hipDeviceSynchronize();
+        
+        hipMemcpy(u, d_u, n*n*n*sizeof(double), hipMemcpyDeviceToHost);
+    }
+    
+    hipFree(d_u);
+    hipFree(d_unew);
+}
+``` 
+
+```fortran
+subroutine jacobi_parallel(u, unew, n, niter, nthreads)
+    implicit none
+    integer, intent(in) :: n, niter, nthreads
+    real(kind=8), dimension(n, n, n), intent(inout) :: u, unew
+    integer :: i, j, k, iter
+    !$OMP PARALLEL NUM_THREADS(nthreads) PRIVATE(i, j, k, iter)
+    do iter = 1, niter
+        !$OMP DO SCHEDULE(STATIC)
+        do k = 2, n - 1
+            do j = 2, n - 1
+                do i = 2, n - 1
+                    unew(i, j, k) = 0.125 * (u(i-1, j, k) + u(i+1, j, k) + u(i,j-1, k) &
+                        + u(i, j+1, k) + u(i, j, k-1) + u(i, j, k+1) + u(i, j, k))
+                end do
+            end do
+        end do
+        !$OMP END DO
+        !$OMP BARRIER
+        u(:, :, :) = unew(:, :, :)
+    end do
+    !$OMP END PARALLEL
+end subroutine jacobi_parallel
+```
+
