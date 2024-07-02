@@ -1,0 +1,893 @@
+Output 1:
+Sure, here is the equivalent implementation of the Jacobi operation using C with OpenMP.
+
+```c
+#include <omp.h>
+#include <stdio.h>
+
+void jacobi_parallel(double*** u, double*** unew, int n, int niter, int nthreads) {
+    int i, j, k, iter;
+
+    // Set the number of threads
+    omp_set_num_threads(nthreads);
+
+    #pragma omp parallel private(i, j, k, iter)
+    {
+        for (iter = 1; iter <= niter; iter++) {
+            #pragma omp for schedule(static)
+            for (k = 1; k < n - 1; k++) {
+                for (j = 1; j < n - 1; j++) {
+                    for (i = 1; i < n - 1; i++) {
+                        unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] +
+                                                 u[i][j-1][k] + u[i][j+1][k] +
+                                                 u[i][j][k-1] + u[i][j][k+1] +
+                                                 u[i][j][k]);
+                    }
+                }
+            }
+
+            #pragma omp barrier
+
+            // Copy unew to u
+            #pragma omp for schedule(static)
+            for (k = 0; k < n; k++) {
+                for (j = 0; j < n; j++) {
+                    for (i = 0; i < n; i++) {
+                        u[i][j][k] = unew[i][j][k];
+                    }
+                }
+            }
+
+            #pragma omp barrier
+        }
+    }
+}
+
+int main() {
+    // Example usage:
+    int n = 10;
+    int niter = 1000;
+    int nthreads = 4;
+
+    // Allocate memory for 3D arrays
+    double*** u = (double***)malloc(n * sizeof(double**));
+    double*** unew = (double***)malloc(n * sizeof(double**));
+    for (int i = 0; i < n; i++) {
+        u[i] = (double**)malloc(n * sizeof(double*));
+        unew[i] = (double**)malloc(n * sizeof(double*));
+        for (int j = 0; j < n; j++) {
+            u[i][j] = (double*)malloc(n * sizeof(double));
+            unew[i][j] = (double*)malloc(n * sizeof(double));
+        }
+    }
+
+    // Initialize u and unew with some values
+    // (This is just an example; you should initialize as needed.)
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            for (int k = 0; k < n; k++) {
+                u[i][j][k] = 0.0;
+                unew[i][j][k] = 0.0;
+            }
+        }
+    }
+
+    // Call the Jacobi parallel function
+    jacobi_parallel(u, unew, n, niter, nthreads);
+
+    // Free allocated memory
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            free(u[i][j]);
+            free(unew[i][j]);
+        }
+        free(u[i]);
+        free(unew[i]);
+    }
+    free(u);
+    free(unew);
+
+    return 0;
+}
+```
+
+### Points to Note:
+1. **Memory Allocation**: 
+   - In the example, the `u` and `unew` arrays are allocated dynamically. Make sure this suits your requirements.
+   - Each array is allocated as a 3D array using triple pointers and `malloc`.
+   
+2. **Initialization**: 
+   - You should initialize the arrays `u` and `unew` based on your own application needs.
+
+3. **Parallelism with OpenMP**:
+   - The `#pragma omp parallel` directive creates a team of threads.
+   - The `#pragma omp for` directive distributes loop iterations among the threads in the parallel region.
+   - The `#pragma omp barrier` ensures that all threads are synchronized before and after copying data.
+
+4. **Thread Safety**: 
+   - The variables `i`, `j`, `k`, and `iter` are declared private to each thread which ensures there are no race conditions.
+
+Before running this program, you need to ensure your environment supports OpenMP, and you compile it using a compiler that has OpenMP support, such as `gcc` with the `-fopenmp` flag:
+
+```sh
+gcc -fopenmp -o jacobi jacobi_parallel.c
+./jacobi
+```
+
+This should work similarly to the provided Fortran code which computes a Jacobi operation in parallel. Adjust the initialization and boundaries according to your problem requirements.
+
+Output 2:
+Certainly! Below is the equivalent C function using OpenMP to perform the Jacobi operation as described in your Fortran subroutine. Note that in C we usually work with pointers and dynamically allocated memory for the arrays. The code is designed to be as similar as possible to the original Fortran code.
+
+```c
+#include <omp.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+void jacobi_parallel(double *u, double *unew, int n, int niter, int nthreads) {
+    int i, j, k, iter;
+
+    #pragma omp parallel num_threads(nthreads) private(i, j, k, iter)
+    {
+        for (iter = 1; iter <= niter; iter++) {
+            #pragma omp for schedule(static)
+            for (k = 1; k < n - 1; k++) {
+                for (j = 1; j < n - 1; j++) {
+                    for (i = 1; i < n - 1; i++) {
+                        int idx = i + j * n + k * n * n;
+                        int idx_im1 = (i - 1) + j * n + k * n * n;
+                        int idx_ip1 = (i + 1) + j * n + k * n * n;
+                        int idx_jm1 = i + (j - 1) * n + k * n * n;
+                        int idx_jp1 = i + (j + 1) * n + k * n * n;
+                        int idx_km1 = i + j * n + (k - 1) * n * n;
+                        int idx_kp1 = i + j * n + (k + 1) * n * n;
+                        
+                        unew[idx] = 0.125 * (u[idx_im1] + u[idx_ip1] +
+                                             u[idx_jm1] + u[idx_jp1] +
+                                             u[idx_km1] + u[idx_kp1] +
+                                             u[idx]);
+                    }
+                }
+            }
+
+            #pragma omp barrier
+            #pragma omp for schedule(static)
+            for (k = 0; k < n; k++) {
+                for (j = 0; j < n; j++) {
+                    for (i = 0; i < n; i++) {
+                        int idx = i + j * n + k * n * n;
+                        u[idx] = unew[idx];
+                    }
+                }
+            }
+        }
+    }
+}
+
+int main() {
+    int n = 100; // Example size, replace with actual value
+    int niter = 1000;
+    int nthreads = 4;
+
+    // Allocate memory for 3D arrays u and unew
+    double *u = (double *)malloc(n * n * n * sizeof(double));
+    double *unew = (double *)malloc(n * n * n * sizeof(double));
+
+    // Initialize arrays (example, replace with actual initialization)
+    for (int i = 0; i < n * n * n; i++) {
+        u[i] = 1.0;
+        unew[i] = 0.0;
+    }
+
+    // Call the Jacobi parallel function
+    jacobi_parallel(u, unew, n, niter, nthreads);
+
+    // Free allocated memory
+    free(u);
+    free(unew);
+
+    return 0;
+}
+```
+
+Explanation:
+
+- `u` and `unew` are passed as pointers to the function. They represent 3D arrays which are allocated and initialized in the `main` function.
+- 3D arrays are linearized as 1D arrays for simplicity in memory handling.
+- The OpenMP parallel region and private variables are defined as in Fortran.
+- A nested loop structure iterates over the 3D array indices while performing the Jacobi update.
+- A barrier is used between the update of `unew` and copying it back to `u` to synchronize threads.
+
+Please ensure the size `n` and the number of iterations `niter` are correctly set, along with appropriate initialization of the arrays `u` and `unew` as required for your specific application.
+
+Output 3:
+Here's an equivalent function in C employing OpenMP to perform the Jacobi operation described in your Fortran subroutine:
+
+```c
+#include <omp.h>
+#include <stdio.h>
+
+void jacobi_parallel(double ***u, double ***unew, int n, int niter, int nthreads) {
+    int iter, i, j, k;
+
+#pragma omp parallel num_threads(nthreads) private(iter, i, j, k)
+    {
+        for (iter = 1; iter <= niter; iter++) {
+#pragma omp for schedule(static)
+            for (k = 1; k < n-1; k++) {
+                for (j = 1; j < n-1; j++) {
+                    for (i = 1; i < n-1; i++) {
+                        unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] +
+                                                 u[i][j-1][k] + u[i][j+1][k] +
+                                                 u[i][j][k-1] + u[i][j][k+1] + u[i][j][k]);
+                    }
+                }
+            }
+#pragma omp barrier
+#pragma omp for schedule(static)
+            for (k = 0; k < n; k++) {
+                for (j = 0; j < n; j++) {
+                    for (i = 0; i < n; i++) {
+                        u[i][j][k] = unew[i][j][k];
+                    }
+                }
+            }
+#pragma omp barrier
+        }
+    }
+}
+
+int main() {
+    // Example initialization and usage for demonstration purposes
+    int n = 5;
+    int niter = 10;
+    int nthreads = 4;
+
+    // Allocate memory for 3D arrays (u and unew)
+    double ***u = (double ***)malloc(n * sizeof(double **));
+    double ***unew = (double ***)malloc(n * sizeof(double **));
+    for (int i = 0; i < n; i++) {
+        u[i] = (double **)malloc(n * sizeof(double *));
+        unew[i] = (double **)malloc(n * sizeof(double *));
+        for (int j = 0; j < n; j++) {
+            u[i][j] = (double *)malloc(n * sizeof(double));
+            unew[i][j] = (double *)malloc(n * sizeof(double));
+        }
+    }
+
+    // Initialize the arrays with some values
+    for (int k = 0; k < n; k++) {
+        for (int j = 0; j < n; j++) {
+            for (int i = 0; i < n; i++) {
+                u[i][j][k] = (double)(i + j + k);
+                unew[i][j][k] = 0.0;
+            }
+        }
+    }
+
+    // Call the Jacobi parallel function
+    jacobi_parallel(u, unew, n, niter, nthreads);
+
+    // Free allocated memory
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            free(u[i][j]);
+            free(unew[i][j]);
+        }
+        free(u[i]);
+        free(unew[i]);
+    }
+    free(u);
+    free(unew);
+
+    return 0;
+}
+```
+
+### Explanation:
+1. **Memory Allocation:** This example includes code for allocating and initializing the 3D arrays `u` and `unew`.
+2. **OpenMP Directives:** OpenMP pragmas (`#pragma omp`) are used to parallelize the loops and synchronize the threads:
+   - `#pragma omp parallel` creates a team of threads.
+   - `#pragma omp for` distributes the loop iterations among the threads.
+   - `#pragma omp barrier` ensures that all threads reach the same point before proceeding (used for synchronization).
+
+3. **Jacobi Iteration:**
+   - The core of the operation is a triply nested loop that calculates the new values of `unew` based on the surrounding values in `u`.
+   - After each iteration, the `u` array is updated with the values from `unew`.
+
+4. **Static Scheduling:** The `schedule(static)` clause ensures a simple and effective workload distribution, especially for nested loops. Each thread gets roughly the same amount of work.
+
+5. **Memory Deallocation:** The arrays are deallocated to prevent memory leaks.
+
+This code assumes the use of standard `malloc` for memory allocation. Your actual implementation might differ based on how you handle arrays in C, especially in HPC applications. Note that boundary conditions are not explicitly handled in this stub and should be included based on your application requirements.
+
+Output 4:
+Certainly! Below is an implementation in C with OpenMP that mimics the functionality of the provided Fortran subroutine for performing a Jacobi iteration:
+
+```c
+#include <omp.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+void jacobi_parallel(double ***u, double ***unew, int n, int niter, int nthreads) {
+    int i, j, k, iter;
+
+    // Setting the number of threads for OpenMP
+    omp_set_num_threads(nthreads);
+
+    #pragma omp parallel private(i, j, k, iter)
+    {
+        for (iter = 1; iter <= niter; iter++) {
+            #pragma omp for schedule(static)
+            for (k = 1; k < n - 1; k++) {
+                for (j = 1; j < n - 1; j++) {
+                    for (i = 1; i < n - 1; i++) {
+                        unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] +
+                                                  u[i][j-1][k] + u[i][j+1][k] +
+                                                  u[i][j][k-1] + u[i][j][k+1] +
+                                                  u[i][j][k]);
+                    }
+                }
+            }
+            #pragma omp barrier
+
+            // Copy unew to u
+            #pragma omp for schedule(static)
+            for (k = 0; k < n; k++) {
+                for (j = 0; j < n; j++) {
+                    for (i = 0; i < n; i++) {
+                        u[i][j][k] = unew[i][j][k];
+                    }
+                }
+            }
+        }
+    }
+}
+
+int main() {
+    int n = 100;        // Example value for the size of the grid (n*n*n)
+    int niter = 1000;   // Example value for the number of iterations
+    int nthreads = 4;   // Example value for the number of threads
+
+    // Allocate memory for u and unew
+    double ***u = (double ***) malloc(n * sizeof(double **));
+    double ***unew = (double ***) malloc(n * sizeof(double **));
+    for (int i = 0; i < n; i++) {
+        u[i] = (double **) malloc(n * sizeof(double *));
+        unew[i] = (double **) malloc(n * sizeof(double *));
+        for (int j = 0; j < n; j++) {
+            u[i][j] = (double *) malloc(n * sizeof(double));
+            unew[i][j] = (double *) malloc(n * sizeof(double));
+        }
+    }
+
+    // Initialize the grids u and unew (example initialization)
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            for (int k = 0; k < n; k++) {
+                u[i][j][k] = 1.0;
+                unew[i][j][k] = 1.0;
+            }
+        }
+    }
+
+    // Perform the Jacobi iteration
+    jacobi_parallel(u, unew, n, niter, nthreads);
+
+    // Free the allocated memory
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            free(u[i][j]);
+            free(unew[i][j]);
+        }
+        free(u[i]);
+        free(unew[i]);
+    }
+    free(u);
+    free(unew);
+
+    return 0;
+}
+```
+
+### Explanation
+
+1. **Matrix Allocation:** The 3D arrays `u` and `unew` are dynamically allocated. In C, this is typically done with `malloc` and requires nested pointer allocations to create a 3D effect.
+2. **OpenMP Parallelization:** The `#pragma omp parallel` directive creates a team of threads. The `#pragma omp for` directive parallelizes the loop with static scheduling, similar to the Fortran `!$OMP DO SCHEDULE(STATIC)`.
+3. **Copy Operation:** After each iteration of the Jacobi method, the new values `unew` are copied back to `u`.
+4. **Memory Management:** The allocated memory for `u` and `unew` is freed at the end to avoid memory leaks.
+5. **Initialization:** An example initialization for `u` and `unew` is provided where all values are set to `1.0`.
+
+This implementation assumes that you have OpenMP installed and configured. You can compile the program with an OpenMP-supporting compiler (e.g., `gcc`) as follows:
+```bash
+gcc -fopenmp -o jacobi_program jacobi_program.c
+```
+
+Output 5:
+Certainly! Below is an equivalent function in C using OpenMP to perform the Jacobi iteration as described in the Fortran subroutine `jacobi_parallel`:
+
+```c
+#include <omp.h>
+
+void jacobi_parallel(double ***u, double ***unew, int n, int niter, int nthreads) {
+    int i, j, k, iter;
+
+    #pragma omp parallel num_threads(nthreads) private(i, j, k, iter)
+    {
+        for (iter = 1; iter <= niter; iter++) {
+            #pragma omp for schedule(static)
+            for (k = 1; k < n - 1; k++) {
+                for (j = 1; j < n - 1; j++) {
+                    for (i = 1; i < n - 1; i++) {
+                        unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] + 
+                                                 u[i][j-1][k] + u[i][j+1][k] + 
+                                                 u[i][j][k-1] + u[i][j][k+1] + 
+                                                 u[i][j][k]);
+                    }
+                }
+            }
+
+            #pragma omp barrier
+
+            #pragma omp for schedule(static)
+            for (k = 0; k < n; k++) {
+                for (j = 0; j < n; j++) {
+                    for (i = 0; i < n; i++) {
+                        u[i][j][k] = unew[i][j][k];
+                    }
+                }
+            }
+
+            #pragma omp barrier
+        }
+    }
+}
+
+```
+
+### Explanation:
+1. `#pragma omp parallel num_threads(nthreads) private(i, j, k, iter)`: This directive initializes the parallel region with the specified number of threads, and declares loop variables `i`, `j`, `k`, and `iter` as private to each thread.
+
+2. Inner Loops (Jacobi Calculation):
+   - `#pragma omp for schedule(static)`: This directive tells OpenMP to parallelize the loop with static scheduling. The loops are distributed among threads.
+   - The innermost loop computes the Jacobi iteration for updating the values in `unew`.
+
+3. Barrier:
+   - `#pragma omp barrier`: This ensures all threads have completed the computation and are synchronized before proceeding to the next operation.
+
+4. Copy `unew` to `u`:
+   - Parallelize copying operation using OpenMP loops.
+   - Another barrier ensures that all threads have finished copying before starting the next iteration.
+
+### Notes:
+- The indices in C are 0-based, while in Fortran, they are 1-based; hence array indices are adjusted properly.
+- Memory allocation and deallocation of `u` and `unew` should be done outside this function. The arrays should be passed as dynamically allocated 3D arrays.
+- Ensure appropriate initialization and boundary conditions before calling `jacobi_parallel`.
+
+This translation maintains the parallelism and logic described in the Fortran code using OpenMP in C.
+
+Output 6:
+Certainly! Below is the equivalent C function implementation with OpenMP for the given Fortran subroutine that performs a Jacobi operation:
+
+```c
+#include <omp.h>
+
+void jacobi_parallel(double ***u, double ***unew, int n, int niter, int nthreads) {
+    int i, j, k, iter;
+
+    omp_set_num_threads(nthreads);
+
+    #pragma omp parallel private(i, j, k, iter)
+    {
+        for (iter = 1; iter <= niter; ++iter) {
+            #pragma omp for schedule(static)
+            for (k = 1; k < n - 1; ++k) {
+                for (j = 1; j < n - 1; ++j) {
+                    for (i = 1; i < n - 1; ++i) {
+                        unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] + 
+                                                 u[i][j-1][k] + u[i][j+1][k] + 
+                                                 u[i][j][k-1] + u[i][j][k+1] + 
+                                                 u[i][j][k]);
+                    }
+                }
+            }
+            #pragma omp barrier
+            #pragma omp for schedule(static)
+            for (k = 0; k < n; ++k) {
+                for (j = 0; j < n; ++j) {
+                    for (i = 0; i < n; ++i) {
+                        u[i][j][k] = unew[i][j][k];
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Helper function to allocate a 3D array dynamically.
+double*** allocate_3d_array(int n) {
+    double*** array = (double***)malloc(n * sizeof(double**));
+    for (int i = 0; i < n; i++) {
+        array[i] = (double**)malloc(n * sizeof(double*));
+        for (int j = 0; j < n; j++) {
+            array[i][j] = (double*)malloc(n * sizeof(double));
+        }
+    }
+    return array;
+}
+
+// Helper function to deallocate a 3D array allocated dynamically.
+void free_3d_array(double*** array, int n) {
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            free(array[i][j]);
+        }
+        free(array[i]);
+    }
+    free(array);
+}
+```
+
+#### Explanation:
+- **OMP Directives**:
+  - `omp_set_num_threads(nthreads);` sets the number of threads for parallel execution.
+  - `#pragma omp parallel private(i, j, k, iter)` specifies the start of a parallel region with private copies of `i, j, k, iter` for each thread.
+  - `#pragma omp for schedule(static)` ensures that the iterations of the for loops are distributed statically among the threads.
+  - `#pragma omp barrier` is used to synchronize all threads.
+
+- **Memory Management**:
+  - Helper functions `allocate_3d_array` and `free_3d_array` help with dynamic allocation and deallocation of the 3D arrays `u` and `unew`.
+
+Remember to link the OpenMP library when compiling, by using the `-fopenmp` flag with `gcc`:
+```sh
+gcc -fopenmp -o jacobi jacobi.c
+```
+
+Output 7:
+Here's the equivalent C function using OpenMP to perform the Jacobi operation defined in the provided Fortran subroutine:
+
+```c
+#include <omp.h>
+
+void jacobi_parallel(double ***u, double ***unew, int n, int niter, int nthreads)
+{
+    int i, j, k, iter;
+
+    omp_set_num_threads(nthreads);
+
+    #pragma omp parallel private(i, j, k, iter) shared(u, unew)
+    {
+        for (iter = 1; iter <= niter; iter++)
+        {
+            #pragma omp for schedule(static)
+            for (k = 1; k < n - 1; k++)
+            {
+                for (j = 1; j < n - 1; j++)
+                {
+                    for (i = 1; i < n - 1; i++)
+                    {
+                        unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] + 
+                                                 u[i][j-1][k] + u[i][j+1][k] + 
+                                                 u[i][j][k-1] + u[i][j][k+1] + 
+                                                 u[i][j][k]);
+                    }
+                }
+            }
+            // Barrier to ensure all threads have completed their computations.
+            #pragma omp barrier
+            
+            // Single thread to update u with unew
+            #pragma omp single
+            {
+                for (k = 1; k < n - 1; k++)
+                {
+                    for (j = 1; j < n - 1; j++)
+                    {
+                        for (i = 1; i < n - 1; i++)
+                        {
+                            u[i][j][k] = unew[i][j][k];
+                        }
+                    }
+                }
+            }
+            // Barrier to ensure all threads wait until the update operation is complete
+            #pragma omp barrier
+        }
+    }
+}
+```
+
+### Explanation:
+1. **OpenMP Setup:**
+   - `omp_set_num_threads(nthreads);` sets the desired number of threads.
+   - `#pragma omp parallel` starts a parallel region with `private` variables `i`, `j`, `k`, and `iter`.
+
+2. **Nested Loops:**
+   - `#pragma omp for schedule(static)` parallelizes the outer loop (`k` loop here). The `schedule(static)` clause distributes loop iterations in contiguous chunks.
+
+3. **Barrier Synchronization:**
+   - `#pragma omp barrier` ensures that all threads complete the current iteration of the nested loops before proceeding. This is necessary to synchronize threads before the next iteration of the Jacobi method.
+
+4. **Array Update:**
+   - `#pragma omp single` makes sure only one thread executes the update from `unew` to `u`, to preserve the consistency of the `u` array across iterations.
+  
+Make sure your 3D arrays `u` and `unew` are dynamically allocated with one-based indexing as in Fortran which corresponds to two-based indices in C. Ensure that your C memory allocations correctly handle the padding at edges (boundary nodes), if necessary.
+
+Output 8:
+Sure! Below is the C implementation of the given Fortran subroutine for the Jacobi operation using OpenMP. In this C code, I will use OpenMP directives to parallelize the nested loops, similar to the original Fortran code.
+
+```c
+#include <omp.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+void jacobi_parallel(double*** u, double*** unew, int n, int niter, int nthreads) {
+    #pragma omp parallel num_threads(nthreads)
+    {
+        int i, j, k, iter;
+        for (iter = 1; iter <= niter; iter++) {
+            #pragma omp for schedule(static) collapse(3)
+            for (k = 1; k < n-1; k++) {
+                for (j = 1; j < n-1; j++) {
+                    for (i = 1; i < n-1; i++) {
+                        unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] + 
+                                                u[i][j-1][k] + u[i][j+1][k] + 
+                                                u[i][j][k-1] + u[i][j][k+1] + 
+                                                u[i][j][k]);
+                    }
+                }
+            }
+            
+            #pragma omp barrier
+
+            #pragma omp for collapse(3)
+            for (k = 0; k < n; k++) {
+                for (j = 0; j < n; j++) {
+                    for (i = 0; i < n; i++) {
+                        u[i][j][k] = unew[i][j][k];
+                    }
+                }
+            }
+            
+            #pragma omp barrier
+        }
+    }
+}
+
+double*** allocate_3d_array(int n) {
+    double*** array = (double***)malloc(n * sizeof(double**));
+    for (int i = 0; i < n; i++) {
+        array[i] = (double**)malloc(n * sizeof(double*));
+        for (int j = 0; j < n; j++) {
+            array[i][j] = (double*)malloc(n * sizeof(double));
+        }
+    }
+    return array;
+}
+
+void deallocate_3d_array(double*** array, int n) {
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            free(array[i][j]);
+        }
+        free(array[i]);
+    }
+    free(array);
+}
+
+int main() {
+    int n = 10;     // Example size
+    int niter = 100; // Example number of iterations
+    int nthreads = 4; // Example number of threads
+
+    // Allocate memory for u and unew
+    double*** u = allocate_3d_array(n);
+    double*** unew = allocate_3d_array(n);
+
+    // Initialize arrays (example initialization)
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            for (int k = 0; k < n; k++) {
+                u[i][j][k] = (i + j + k) % 5; // Example initial values
+                unew[i][j][k] = 0.0;
+            }
+        }
+    }
+
+    // Perform the Jacobi operation
+    jacobi_parallel(u, unew, n, niter, nthreads);
+
+    // Print result (example output)
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            for (int k = 0; k < n; k++) {
+                printf("%f ", u[i][j][k]);
+            }
+            printf("\n");
+        }
+        printf("\n");
+    }
+
+    // Deallocate memory
+    deallocate_3d_array(u, n);
+    deallocate_3d_array(unew, n);
+
+    return 0;
+}
+```
+
+This C implementation includes the necessary OpenMP directives to parallelize the Jacobi iteration calculation. The function `jacobi_parallel` performs the Jacobi update on the 3D arrays `u` and `unew`. The 3D dynamic arrays are allocated and deallocated using helper functions `allocate_3d_array` and `deallocate_3d_array`, respectively.
+
+The `main` function demonstrates the usage of `jacobi_parallel`, including example initializations and allocations of the 3D arrays, as well as example output printing. Adjust the array sizes, iteration count, thread count, and initial values as needed for your specific use case.
+
+Output 9:
+Below is a C implementation of the Jacobi operation using OpenMP, equivalent to the provided Fortran subroutine `jacobi_parallel`.
+
+```c
+#include <stdio.h>
+#include <omp.h>
+
+void jacobi_parallel(double ***u, double ***unew, int n, int niter, int nthreads) {
+    int i, j, k, iter;
+
+    // Parallel block with OpenMP
+    #pragma omp parallel num_threads(nthreads) private(i, j, k, iter)
+    {
+        // Iteration loop
+        for (iter = 1; iter <= niter; iter++) {
+            // Parallelized loop over the 3D grid
+            #pragma omp for schedule(static)
+            for (k = 1; k < n - 1; k++) {
+                for (j = 1; j < n - 1; j++) {
+                    for (i = 1; i < n - 1; i++) {
+                        unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] + 
+                                                 u[i][j-1][k] + u[i][j+1][k] +
+                                                 u[i][j][k-1] + u[i][j][k+1] +
+                                                 u[i][j][k]);
+                    }
+                }
+            }
+            // Barrier to ensure that all threads have completed the update
+            #pragma omp barrier
+            // Update the old array `u` with the new values from `unew`
+            #pragma omp for collapse(3)
+            for (k = 0; k < n; k++) {
+                for (j = 0; j < n; j++) {
+                    for (i = 0; i < n; i++) {
+                        u[i][j][k] = unew[i][j][k];
+                    }
+                }
+            }
+            // Barrier for synchronization
+            #pragma omp barrier
+        }
+    }
+}
+
+// Helper function to allocate a 3D array
+double ***allocate_3d_array(int n) {
+    double ***array = malloc(n * sizeof(double **));
+    for (int i = 0; i < n; i++) {
+        array[i] = malloc(n * sizeof(double *));
+        for (int j = 0; j < n; j++) {
+            array[i][j] = malloc(n * sizeof(double));
+        }
+    }
+    return array;
+}
+
+// Helper function to deallocate a 3D array
+void deallocate_3d_array(double ***array, int n) {
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            free(array[i][j]);
+        }
+        free(array[i]);
+    }
+    free(array);
+}
+
+int main() {
+    int n = 100;     // Grid size
+    int niter = 100; // Number of iterations
+    int nthreads = 8; // Number of threads for OpenMP
+
+    // Allocate memory for the arrays
+    double ***u = allocate_3d_array(n);
+    double ***unew = allocate_3d_array(n);
+
+    // Initialize the arrays with some values (example)
+    for (int k = 0; k < n; k++) {
+        for (int j = 0; j < n; j++) {
+            for (int i = 0; i < n; i++) {
+                u[i][j][k] = 1.0;
+                unew[i][j][k] = 0.0;
+            }
+        }
+    }
+
+    // Call the Jacobi parallel function
+    jacobi_parallel(u, unew, n, niter, nthreads);
+
+    // Deallocate memory
+    deallocate_3d_array(u, n);
+    deallocate_3d_array(unew, n);
+
+    return 0;
+}
+```
+
+A few notes:
+1. The `allocate_3d_array` and `deallocate_3d_array` functions help manage the dynamic allocation and deallocation of the 3D arrays.
+2. The `jacobi_parallel` function replicates the same functionality as the Fortran subroutine using OpenMP directives in C.
+3. The main function initializes the 3D arrays with example values and calls `jacobi_parallel` to perform the Jacobi iteration.
+
+Remember to compile this C program with the `-fopenmp` flag to enable OpenMP support:
+```sh
+gcc -fopenmp -o jacobi jacobi_parallel.c
+```
+
+Output 10:
+Sure, here's the corresponding C code with OpenMP for the Jacobi operation described in your Fortran subroutine:
+
+```c
+#include <omp.h>
+
+void jacobi_parallel(double ***u, double ***unew, int n, int niter, int nthreads) {
+    int i, j, k, iter;
+
+    #pragma omp parallel num_threads(nthreads) private(i, j, k, iter)
+    {
+        for (iter = 1; iter <= niter; iter++) {
+            #pragma omp for schedule(static)
+            for (k = 1; k < n - 1; k++) {
+                for (j = 1; j < n - 1; j++) {
+                    for (i = 1; i < n - 1; i++) {
+                        unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] 
+                                               + u[i][j-1][k] + u[i][j+1][k]
+                                               + u[i][j][k-1] + u[i][j][k+1]
+                                               + u[i][j][k]);
+                    }
+                }
+            }
+
+            #pragma omp barrier
+            // Copy unew to u
+            #pragma omp for schedule(static)
+            for (k = 0; k < n; k++) {
+                for (j = 0; j < n; j++) {
+                    for (i = 0; i < n; i++) {
+                        u[i][j][k] = unew[i][j][k];
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+### Explanation:
+
+1. **Parallel Region**:
+   ```c
+   #pragma omp parallel num_threads(nthreads) private(i, j, k, iter)
+   ```
+   This directive creates a parallel region with `nthreads` threads. The `private` clause ensures each thread has its own private copies of `i`, `j`, `k`, and `iter`.
+
+2. **Loop Construct**:
+   ```c
+   #pragma omp for schedule(static)
+   ```
+   This directive distributes iterations of the loops across threads. `schedule(static)` ensures that loop iterations are divided into contiguous chunks of approximately equal size.
+
+3. **Barrier**:
+   ```c
+   #pragma omp barrier
+   ```
+   This directive synchronizes all threads in a team. This means that no thread will proceed beyond the barrier until all threads have reached it.
+
+4. **Copying `unew` to `u`**:
+   The nested loop structure is used to copy the values of `unew` to `u`.
+
+In the above code, `u` and `unew` are assumed to be dynamically allocated 3D arrays. In a complete program, you should handle the memory allocation and deallocation for these arrays, and ensure proper error handling as needed.
+
