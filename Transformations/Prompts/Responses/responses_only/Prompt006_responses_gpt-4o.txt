@@ -1,0 +1,629 @@
+Output 1:
+Certainly! Below is a C function utilizing OpenMP to perform the Generalized Matrix Multiplication (GEMM) operation equivalent to the given Fortran subroutine that uses OpenACC.
+
+```c
+#include <omp.h>
+#include <stdio.h>
+
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+    int i, j, l;
+
+    #pragma omp parallel for collapse(2) private(i, j, l) shared(a, b, c)
+    for (j = 0; j < n; j++) {
+        for (i = 0; i < m; i++) {
+            double temp = 0.0;
+            for (l = 0; l < k; l++) {
+                temp += a[i * lda + l] * b[l * ldb + j];
+            }
+            c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+        }
+    }
+}
+
+int main() {
+    // Example usage of the gemm_parallel function
+    int m = 2, n = 3, k = 2;
+    double alpha = 1.0, beta = 1.0;
+    double a[4] = {1.0, 2.0, 
+                   3.0, 4.0}; // 2x2 matrix
+    double b[6] = {5.0, 6.0, 7.0, 
+                   8.0, 9.0, 10.0}; // 2x3 matrix
+    double c[6] = {11.0, 12.0, 13.0, 
+                   14.0, 15.0, 16.0}; // 2x3 matrix
+
+    gemm_parallel(m, n, k, alpha, a, k, b, n, beta, c, n);
+
+    for (int i = 0; i < m; i++) {
+        for (int j = 0; j < n; j++) {
+            printf("%f ", c[i * n + j]);
+        }
+        printf("\n");
+    }
+
+    return 0;
+}
+```
+
+### Key Points:
+1. **OpenMP Directives**: `#pragma omp parallel for collapse(2)` is used to parallelize the outer two loops. The `collapse(2)` clause merges the nested loops for parallel work distribution.
+2. **Matrix Indexing**: In C, matrices are stored in row-major order by default, so the indices are handled accordingly.
+3. **Matrix `a`, `b`, and `c`**: These matrices are passed as 1-dimensional arrays, and indexing is done manually.
+4. **Parallel Execution**: Private variables ensure that each thread has its own instance of the iteration variables and intermediate `temp` variable.
+
+Note: The `main` function demonstrates how to use the `gemm_parallel` function. In production code, you would call the `gemm_parallel` function with appropriate parameters and data. Make sure to add appropriate error checking and possibly additional OpenMP settings as needed.
+
+Output 2:
+To translate the provided Fortran subroutine that uses OpenACC to a C function with OpenMP, we need to ensure that the core logic remains the same and that parallelism is appropriately handled. The equivalent C function, leveraging OpenMP for parallelization, might look like this:
+
+```c
+#include <omp.h>
+
+void gemm_parallel(int m, int n, int k, double alpha, const double *a, int lda, 
+                   const double *b, int ldb, double beta, double *c, int ldc) {
+
+    // Use OpenMP to parallelize the outer two loops.
+    #pragma omp parallel for collapse(2) private(i, j, l, temp)
+    for (int j = 0; j < n; ++j) {
+        for (int i = 0; i < m; ++i) {
+            double temp = 0.0;
+            for (int l = 0; l < k; ++l) {
+                temp += a[i * lda + l] * b[l * ldb + j];
+            }
+            c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+        }
+    }
+}
+```
+
+**Explanation:**
+1. **Function Signature:** The function `gemm_parallel` receives the same parameters as the Fortran subroutine, but with C-style array notation and types.
+2. **OpenMP Directive:** The `#pragma omp parallel for collapse(2) private(i, j, l, temp)` directive instructs the compiler to parallelize the nested loops and collapse them into a single parallel loop.
+3. **Array Indexing in C:** Arrays `a`, `b`, and `c` need to be indexed correctly according to C conventions. The matrix elements are accessed using row-major order.
+
+**Important Adjustments:**
+- **Private Variables:** Variables `i`, `j`, `l`, and `temp` are declared private to ensure each thread has its own copy.
+- **Loop Indices:** Loops in C are zero-based, unlike Fortran which is one-based, so adjustments in the loop bounds are made.
+- **Linearized Indexing:** Matrix elements are addressed using linearized indexing (`i * lda + l` for `a`, `l * ldb + j` for `b`, and `i * ldc + j` for `c`).
+
+**Usage:**
+This function assumes that the matrices `a`, `b`, and `c` are passed as 1D arrays, which is typical in C for representing 2D matrices.
+
+Compile with an OpenMP-enabled compiler (e.g., GCC) using the `-fopenmp` flag:
+
+```
+gcc -fopenmp -o gemm_parallel gemm_parallel.c
+```
+
+Then, ensure when calling this function, the arrays are properly packed in row-major order, and the leading dimensions (`lda`, `ldb`, `ldc`) are correctly set.
+
+Output 3:
+To translate the given Fortran subroutine with OpenACC to a C function with OpenMP, we need to leverage OpenMP directives for parallelism. Below is the implementation of the function in C with OpenMP.
+
+```c
+#include <stdio.h>
+#include <omp.h>
+
+void gemm_parallel(int m, int n, int k, double alpha, double* a, int lda, double* b, int ldb, double beta, double* c, int ldc) {
+    int i, j, l;
+    double temp;
+
+    #pragma omp parallel for private(i, j, l, temp) collapse(2)
+    for (j = 0; j < n; j++) {
+        for (i = 0; i < m; i++) {
+            temp = 0.0;
+            for (l = 0; l < k; l++) {
+                temp += a[i + l * lda] * b[l + j * ldb];
+            }
+            c[i + j * ldc] = alpha * temp + beta * c[i + j * ldc];
+        }
+    }
+}
+
+int main() {
+    // Example usage
+    int m = 2, n = 2, k = 2;
+    double alpha = 1.0, beta = 1.0;
+    double a[4] = {1, 2, 3, 4};
+    double b[4] = {1, 2, 3, 4};
+    double c[4] = {1, 2, 3, 4};
+
+    gemm_parallel(m, n, k, alpha, a, 2, b, 2, beta, c, 2);
+
+    for(int i = 0; i < 4; ++i) {
+        printf("%f ", c[i]);
+    }
+
+    return 0;
+}
+```
+
+### Explanation
+
+1. **Function Signature**:
+    - The `gemm_parallel` function takes the same parameters as the Fortran subroutine.
+    - `m`, `n`, `k`: dimensions of the matrices.
+    - `alpha`, `beta`: scalar values.
+    - `a`, `b`, `c`: matrices (stored in column-major order, similar to Fortran).
+    - `lda`, `ldb`, `ldc`: leading dimensions of matrices `a`, `b`, and `c`.
+
+2. **OpenMP Directives**:
+    - `#pragma omp parallel for`: Parallelizes the nested loops.
+    - `private(i, j, l, temp)`: Specifies private variables for each thread to avoid race conditions.
+    - `collapse(2)`: Collapses the outer two loops (`j` and `i`) into a single loop to allow better parallel load balancing.
+
+3. **Matrix Indexing**:
+    - In Fortran, arrays are column-major, which is why in C, we use indices like `i + l * lda` to access elements of `a`, `l + j * ldb` for `b`, and `i + j * ldc` for `c`.
+
+### How to Compile and Run
+
+To compile the program with OpenMP support, use:
+
+```sh
+gcc -fopenmp -o gemm_parallel gemm_parallel.c
+```
+
+Then, run the compiled program:
+
+```sh
+./gemm_parallel
+```
+
+This will print the transformed values of matrix `c` after performing the GEMM operation.
+
+Output 4:
+Here is the equivalent function in C using OpenMP that performs a Generalized Matrix Multiplication (GEMM) operation. This implementation parallels the nested loops using OpenMP's parallel and for constructs.
+
+### Fortran Subroutine (for reference)
+```fortran
+subroutine gemm_parallel(m, n, k, alpha, a, lda, b, ldb, beta, c, ldc)
+    implicit none
+    integer, intent(in) :: m, n, k, lda, ldb, ldc
+    real(kind=8), intent(in) :: alpha, beta
+    real(kind=8), intent(in) :: a(lda, k), b(ldb, n)
+    real(kind=8), intent(inout) :: c(ldc, n)
+    integer :: i, j, l
+    real(kind=8) :: temp
+    !$ACC PARALLEL LOOP COLLAPSE(2) PRIVATE(i, j, l, temp)
+    do j = 1, n
+      do i = 1, m
+        temp = 0.0
+        do l = 1, k
+          temp = temp + a(i, l) * b(l, j)
+        end do
+        c(i, j) = alpha * temp + beta * c(i, j)
+      end do
+    end do
+    !$ACC END PARALLEL LOOP
+end subroutine gemm_parallel
+```
+
+### Equivalent C Function with OpenMP
+```c
+#include <omp.h>
+
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int i, j, l;
+  double temp;
+
+  #pragma omp parallel for collapse(2) private(i, j, l, temp)
+  for (j = 0; j < n; j++) {
+    for (i = 0; i < m; i++) {
+      temp = 0.0;
+      for (l = 0; l < k; l++) {
+        temp += a[i * lda + l] * b[l * ldb + j];
+      }
+      c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+    }
+  }
+}
+```
+
+### Explanation:
+- The outer loops (over `j` and `i`) are parallelized using `#pragma omp parallel for collapse(2)` to collapse the two loops into a single parallel construct.
+- The variables `i`, `j`, `l`, and `temp` are declared as private to ensure each thread has its own instance.
+- The matrix elements are accessed using pointer arithmetic to follow C's row-major order.
+- `a` is a matrix of size `lda * k` and is accessed as `a[i * lda + l]`.
+- `b` is a matrix of size `ldb * n` and is accessed as `b[l * ldb + j]`.
+- `c` is a matrix of size `ldc * n` and is accessed as `c[i * ldc + j]`.
+
+### Usage Example:
+```c
+#include <stdio.h>
+
+int main() {
+  int m = 2, n = 2, k = 2;
+  double alpha = 2.0, beta = 0.5;
+  double a[4] = {1.0, 2.0, 3.0, 4.0}; // 2x2 matrix
+  double b[4] = {5.0, 6.0, 7.0, 8.0}; // 2x2 matrix
+  double c[4] = {9.0, 10.0, 11.0, 12.0}; // 2x2 result matrix
+
+  gemm_parallel(m, n, k, alpha, a, 2, b, 2, beta, c, 2);
+
+  for (int i = 0; i < m; i++) {
+    for (int j = 0; j < n; j++) {
+      printf("%f ", c[i * 2 + j]);
+    }
+    printf("\n");
+  }
+
+  return 0;
+}
+```
+This will compile and execute the `gemm_parallel` function, showing the computed result. Ensure to compile with OpenMP support with `-fopenmp` (GCC compiler) or equivalent flag for other compilers.
+
+Output 5:
+Here's a C implementation of the `gemm_parallel` subroutine from Fortran using OpenMP for parallelization. This function in C translates the Generalized Matrix Multiplication (GEMM) operation and is meant to be parallelized across multiple threads.
+
+```c
+#include <stdio.h>
+#include <omp.h>
+
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, 
+                   double *b, int ldb, double beta, double *c, int ldc) {
+    int i, j, l;
+    double temp;
+
+    #pragma omp parallel for private(i, j, l, temp) collapse(2)
+    for (j = 0; j < n; ++j) {
+        for (i = 0; i < m; ++i) {
+            temp = 0.0;
+            for (l = 0; l < k; ++l) {
+                // Access the elements of the matrices
+                temp += a[i * lda + l] * b[l * ldb + j];
+            }
+            c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+        }
+    }
+}
+
+int main() {
+    // Example usage of gemm_parallel
+    int m = 3, n = 3, k = 3;
+    double alpha = 1.0, beta = 1.0;
+    double a[] = {1, 2, 3,
+                  4, 5, 6,
+                  7, 8, 9};
+    double b[] = {9, 8, 7,
+                  6, 5, 4,
+                  3, 2, 1};
+    double c[] = {1, 4, 7,
+                  2, 5, 8,
+                  3, 6, 9};
+    int lda = 3, ldb = 3, ldc = 3;
+
+    gemm_parallel(m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+
+    // Printing result matrix C
+    for (int i = 0; i < m; ++i) {
+        for (int j = 0; j < n; ++j) {
+            printf("%f ", c[i * ldc + j]);
+        }
+        printf("\n");
+    }
+
+    return 0;
+}
+```
+
+Here are some notes about the code:
+- Matrix indexing is handled in C-style row-major order: `a[i*lda + l]`, `b[l*ldb + j]`, and `c[i*ldc + j]`.
+- OpenMP `#pragma omp parallel for` is used to parallelize the outer two loops, similar to the `collapse(2)` directive in OpenACC.
+- The `private` clause ensures each thread has its own copies of `i`, `j`, `l`, and `temp`.
+- The `collapse(2)` clause instructs OpenMP to collapse the nested loops into a single loop for better load balancing and parallel efficiency.
+
+To compile this code with OpenMP, you would use a flag like `-fopenmp` with GCC:
+
+```sh
+gcc -fopenmp -o gemm_parallel gemm_parallel.c
+```
+
+This will enable OpenMP support in the compilation, allowing the program to utilize multiple threads for the GEMM operation.
+
+Output 6:
+OpenMP can be used to parallelize the GEMM operation similarly to how OpenACC does. Below is a C function that implements the same GEMM operation as the Fortran subroutine you provided, but using OpenMP for parallelism.
+
+```c
+#include <omp.h>
+
+void gemm_parallel(int m, int n, int k, double alpha, double **a, int lda, double **b, int ldb, double beta, double **c, int ldc) {
+    int i, j, l;
+    double temp;
+    
+    #pragma omp parallel for collapse(2) private(i, j, l, temp)
+    for (j = 0; j < n; j++) {
+        for (i = 0; i < m; i++) {
+            temp = 0.0;
+            for (l = 0; l < k; l++) {
+                temp = temp + a[i][l] * b[l][j];
+            }
+            c[i][j] = alpha * temp + beta * c[i][j];
+        }
+    }
+}
+
+int main() {
+    // Example usage
+    int m = 3, n = 3, k = 3;
+    double alpha = 1.0, beta = 1.0;
+
+    // Allocate matrices
+    double **a = (double **)malloc(m * sizeof(double *));
+    double **b = (double **)malloc(k * sizeof(double *));
+    double **c = (double **)malloc(m * sizeof(double *));
+    for (int i = 0; i < m; i++) {
+        a[i] = (double *)malloc(k * sizeof(double));
+        c[i] = (double *)malloc(n * sizeof(double));
+    }
+    for (int i = 0; i < k; i++) {
+        b[i] = (double *)malloc(n * sizeof(double));
+    }
+
+    // Initialize matrices (example values)
+    for (int i = 0; i < m; i++) {
+        for (int j = 0; j < k; j++) {
+            a[i][j] = i + j;
+        }
+    }
+    for (int i = 0; i < k; i++) {
+        for (int j = 0; j < n; j++) {
+            b[i][j] = i + j;
+        }
+    }
+    for (int i = 0; i < m; i++) {
+        for (int j = 0; j < n; j++) {
+            c[i][j] = 0.0;
+        }
+    }
+
+    // Perform GEMM
+    gemm_parallel(m, n, k, alpha, a, m, b, k, beta, c, m);
+
+    // Free matrices
+    for (int i = 0; i < m; i++) {
+        free(a[i]);
+        free(c[i]);
+    }
+    for (int i = 0; i < k; i++) {
+        free(b[i]);
+    }
+    free(a);
+    free(b);
+    free(c);
+
+    return 0;
+}
+```
+
+### Explanation:
+1. **Function `gemm_parallel`:** 
+    - The function signature matches the Fortran subroutine's parameters, with additional pointers to represent the 2D array arguments (`a`, `b`, and `c`).
+    - Use `#pragma omp parallel for` to parallelize the outer two loops with the `collapse(2)` directive which collapses the nested loops into a single loop to improve parallelism.
+    - The `private(i, j, l, temp)` clause ensures that each thread has its own instance of these variables.
+
+2. **Matrix Allocation and Initialization in `main`:** 
+    - Dynamically allocate 2D arrays for matrices `a`, `b`, `c`.
+    - Initialize matrices `a`, `b`, and `c` with example values.
+
+3. **Performing GEMM:**
+    - Call the `gemm_parallel` function to perform the matrix multiplication and addition.
+
+4. **Clean Up:**
+    - Free the dynamically allocated memory for the matrices.
+
+This implementation assumes a typical C style where matrices are implemented as arrays of pointers. If your matrices are stored differently (e.g., as a flat array in row-major or column-major order), you should adjust the indexing and allocation accordingly.
+
+Output 7:
+Certainly! Below is the equivalent C function with OpenMP that performs the Generalized Matrix Multiplication (GEMM) operation as described in your Fortran subroutine:
+
+```c
+#include <omp.h>
+
+void gemm_parallel(int m, int n, int k, double alpha, double* a, int lda, double* b, int ldb, double beta, double* c, int ldc) {
+    int i, j, l;
+    double temp;
+
+    #pragma omp parallel for collapse(2) private(i, j, l, temp)
+    for (j = 0; j < n; j++) {
+        for (i = 0; i < m; i++) {
+            temp = 0.0;
+            for (l = 0; l < k; l++) {
+                temp += a[i * lda + l] * b[l * ldb + j];
+            }
+            c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+        }
+    }
+}
+```
+
+Here's a brief explanation:
+
+- `#pragma omp parallel for collapse(2) private(i, j, l, temp)`: This directive tells OpenMP to parallelize the outer two loops (`for (j = 0; j < n; j++)` and `for (i = 0; i < m; i++)`) and ensures that the variables `i`, `j`, `l`, and `temp` are private to each thread.
+- Matrix indexing in C is zero-based, while in Fortran it is one-based, so the loops run from `0` to `n-1` and `0` to `m-1`.
+- Matrix `a` and `b` are accessed using the leading dimension `lda` and `ldb` respectively.
+- Similarly, matrix `c` is accessed using its leading dimension `ldc`.
+
+This code enables parallel computation of the GEMM operation, which should help speed up the matrix multiplication using multiple threads. Ensure you compile with an OpenMP-enabled compiler option, for example, `-fopenmp` with `gcc`.
+
+Output 8:
+Certainly! Below is a C function with OpenMP that performs the Generalized Matrix Multiplication (GEMM) similarly to the provided Fortran subroutine with OpenACC.
+
+```c
+#include <stdio.h>
+#include <omp.h>
+
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+    int i, j, l;
+    double temp;
+
+    #pragma omp parallel for collapse(2) private(i, j, l, temp)
+    for (j = 0; j < n; j++) {
+        for (i = 0; i < m; i++) {
+            temp = 0.0;
+            for (l = 0; l < k; l++) {
+                temp += a[i + l * lda] * b[l + j * ldb];
+            }
+            c[i + j * ldc] = alpha * temp + beta * c[i + j * ldc];
+        }
+    }
+}
+
+int main() {
+    // Example usage
+    int m = 2, n = 3, k = 2;
+    double alpha = 1.0, beta = 1.0;
+    double a[4] = {1.0, 2.0, 
+                   3.0, 4.0}; // 2x2 matrix
+    double b[6] = {5.0, 6.0, 
+                   7.0, 8.0,
+                   9.0, 10.0}; // 2x3 matrix
+    double c[6] = {11.0, 12.0, 
+                   13.0, 14.0,
+                   15.0, 16.0}; // 2x3 matrix
+
+    gemm_parallel(m, n, k, alpha, a, m, b, k, beta, c, m);
+
+    for (int i = 0; i < m; i++) {
+        for (int j = 0; j < n; j++) {
+            printf("%f ", c[i + j * m]);
+        }
+        printf("\n");
+    }
+
+    return 0;
+}
+```
+
+### Explanation:
+
+1. **Function Signature**:
+    - `gemm_parallel`: Corresponds to the GEMM subroutine in Fortran.
+    - Parameters: 
+        - `m, n, k`: Matrix dimensions.
+        - `alpha, beta`: Scalars.
+        - `a, b, c`: Matrices in C (as 1D arrays).
+        - `lda, ldb, ldc`: Leading dimensions.
+
+2. **Nested Loops**:
+    - Outer loops iterate over the result matrix `c` dimensions (`m` by `n`).
+
+3. **Privatization**:
+    - Variables `i, j, l`, and `temp` are declared as `private` to avoid race conditions.
+
+4. **Parallel Region**:
+    - `#pragma omp parallel for collapse(2)`: Parallelizes over both outer loops.
+
+5. **Matrix Indexing**:
+    - C uses 0-based indexing, so `i`, `j`, and `l` vary from 0 to `m-1`, `n-1`, and `k-1`, respectively.
+    - Memory layout in C is row-major, but the simulation of column-major indexing (used in Fortran) is achieved by adjusting the index calculations.
+
+### Example Usage:
+- An example matrix multiplication is provided in the `main` function, where:
+    - `a` is a `2x2` matrix.
+    - `b` is a `2x3` matrix.
+    - `c` is a `2x3` matrix to store the result.
+
+
+Output 9:
+To achieve a similar result using OpenMP in C, you can use the `#pragma omp parallel for` directive to parallelize the nested loops in the GEMM (Generalized Matrix Multiplication) operation. Below is the corresponding C function:
+
+```c
+#include <omp.h>
+
+void gemm_parallel(int m, int n, int k, double alpha, double* a, int lda, double* b, int ldb, double beta, double* c, int ldc) {
+    int i, j, l;
+    double temp;
+
+    #pragma omp parallel for collapse(2) private(i, j, l, temp)
+    for (j = 0; j < n; ++j) {
+        for (i = 0; i < m; ++i) {
+            temp = 0.0;
+            for (l = 0; l < k; ++l) {
+                temp += a[i * lda + l] * b[l * ldb + j];
+            }
+            c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+        }
+    }
+}
+```
+
+### Explanation
+1. **Function parameters:**
+   - `m`, `n`, `k`: Dimensions of the matrices.
+   - `alpha`: Scalar multiplier for the product of `A` and `B`.
+   - `a`, `lda`: The first matrix `A` and its leading dimension (stride).
+   - `b`, `ldb`: The second matrix `B` and its leading dimension.
+   - `beta`: Scalar multiplier for matrix `C`.
+   - `c`, `ldc`: The result matrix `C` and its leading dimension.
+
+2. **Loop parallelization:**
+   - The `#pragma omp parallel for collapse(2) private(i, j, l, temp)` directive initiates parallel execution of the nested loops over `j` and `i` with `collapse(2)` collapsing the two loops into a single loop, allowing the OpenMP runtime to distribute the iterations more evenly across threads.
+   - The `private` clause declares loop index variables `i`, `j`, `l`, and temporary variables `temp` as private to each thread to avoid race conditions.
+
+3. **Matrix indexing:**
+   - Note that C uses row-major order while Fortran generally uses column-major order. Ensure matrix indexing aligns with the correct memory layout expectations:
+     - `a[i * lda + l]`: Accessing elements of matrix `A`.
+     - `b[l * ldb + j]`: Accessing elements of matrix `B`.
+     - `c[i * ldc + j]`: Accessing elements of matrix `C`.
+
+4. **Mathematics:**
+   - The nested loops and internal calculations perform the matrix-matrix multiplication and scaling by `alpha` and `beta`, analogous to the Fortran subroutine.
+
+### Compilation
+To compile the code with OpenMP support, use a C compiler with OpenMP, such as `gcc`:
+```sh
+gcc -fopenmp -o gemm gemm.c
+```
+
+By structuring the function in this way, it leverages the parallel processing capabilities of OpenMP to perform matrix multiplications efficiently, similar to the OpenACC approach in Fortran.
+
+Output 10:
+Certainly! Below is a C version of the provided Fortran subroutine using OpenMP for parallelization to perform the generalized matrix multiplication (GEMM) operation.
+
+```c
+#include <omp.h>
+
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+    int i, j, l;
+    double temp;
+
+    #pragma omp parallel for collapse(2) private(i, j, l, temp) shared(a, b, c)
+    for (j = 0; j < n; j++) {
+        for (i = 0; i < m; i++) {
+            temp = 0.0;
+            for (l = 0; l < k; l++) {
+                temp += a[i*lda + l] * b[l*ldb + j];
+            }
+            c[i*ldc + j] = alpha * temp + beta * c[i*ldc + j];
+        }
+    }
+}
+```
+
+### Explanation:
+1. **Parameters**:
+   - `m`, `n`, `k`: Dimensions of the matrices involved.
+   - `alpha`, `beta`: Scalars used in the computation.
+   - `a`: Pointer to matrix A of size `lda` by `k`.
+   - `b`: Pointer to matrix B of size `ldb` by `n`.
+   - `c`: Pointer to matrix C of size `ldc` by `n`.
+   - `lda`, `ldb`, `ldc`: Leading dimensions of matrices A, B, and C respectively.
+
+2. **Parallelization with OpenMP**:
+   - **Directive**: `#pragma omp parallel for collapse(2) private(i, j, l, temp) shared(a, b, c)`
+     - `collapse(2)`: Combine the two outer loops (`i` and `j` loops) for parallel processing. This helps distribute the work more evenly across threads.
+     - `private(i, j, l, temp)`: Each thread will have its own private copies of these variables.
+     - `shared(a, b, c)`: Matrices `a`, `b`, and `c` are shared among all threads.
+
+3. **Loop structure**:
+   - The outer loops iterate over `j` and `i`.
+   - `temp` accumulator is initialized to 0.0 before each computation.
+   - Inner loop accumulates the product of `a[i*lda + l]` and `b[l*ldb + j]` into `temp`.
+   - `c[i*ldc + j]` is updated with `alpha * temp + beta * c[i*ldc + j]`.
+
+### Usage:
+Ensure you compile the C code with OpenMP support. For example, if you are using `gcc`, you can compile with:
+```sh
+gcc -fopenmp -o gemm_parallel gemm_parallel.c
+```
+This will enable OpenMP and the parallel loops in the function.
+

@@ -1,0 +1,331 @@
+Output 1:
+```c
+#include <omp.h>
+
+void jacobi_parallel(double* u, double* unew, int n, int niter, int nthreads) {
+    int i, j, k, iter;
+
+    #pragma omp parallel num_threads(nthreads) private(i, j, k, iter)
+    {
+        for (iter = 0; iter < niter; iter++) {
+            #pragma omp for schedule(static)
+            for (k = 1; k < n - 1; k++) {
+                for (j = 1; j < n - 1; j++) {
+                    for (i = 1; i < n - 1; i++) {
+                        int index = i + j*n + k*n*n;
+                        unew[index] = 0.125 * (u[index - n] + u[index + n] + u[index - n*n] +
+                                               u[index + n*n] + u[index - n*n*n] + u[index + n*n*n] +
+                                               u[index]);
+                    }
+                }
+            }
+            #pragma omp barrier
+            #pragma omp for schedule(static)
+            for (i = 0; i < n*n*n; i++) {
+                u[i] = unew[i];
+            }
+        }
+    }
+}
+```
+
+Output 2:
+```c
+void jacobi_parallel(double ***u, double ***unew, int n, int niter, int nthreads) {
+    int i, j, k, iter;
+
+    #pragma omp parallel num_threads(nthreads) private(i, j, k, iter)
+    {
+        for(iter = 0; iter < niter; iter++) {
+            #pragma omp for schedule(static)
+            for(k = 1; k < n-1; k++) {
+                for(j = 1; j < n-1; j++) {
+                    for(i = 1; i < n-1; i++) {
+                        unew[k][j][i] = 0.125 * (u[k][j][i-1] + u[k][j][i+1] + u[k][j-1][i] +
+                                                u[k][j+1][i] + u[k-1][j][i] + u[k+1][j][i] + u[k][j][i]);
+                    }
+                }
+            }
+            
+            #pragma omp barrier
+            
+            #pragma omp for schedule(static)
+            for(k = 1; k < n-1; k++) {
+                for(j = 1; j < n-1; j++) {
+                    for(i = 1; i < n-1; i++) {
+                        u[k][j][i] = unew[k][j][i];
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+Output 3:
+```c
+void jacobi_parallel(double u[n][n][n], double unew[n][n][n], int n, int niter, int nthreads) {
+    int i, j, k, iter;
+
+    #pragma omp parallel num_threads(nthreads) private(i, j, k, iter)
+    {
+        #pragma omp for schedule(static)
+        for (iter = 1; iter <= niter; iter++) {
+            for (k = 1; k < n - 1; k++) {
+                for (j = 1; j < n - 1; j++) {
+                    for (i = 1; i < n - 1; i++) {
+                        unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] + u[i][j-1][k] +
+                            u[i][j+1][k] + u[i][j][k-1] + u[i][j][k+1] + u[i][j][k]);
+                    }
+                }
+            }
+
+            #pragma omp barrier
+
+            #pragma omp for schedule(static)
+            for (k = 1; k < n - 1; k++) {
+                for (j = 1; j < n - 1; j++) {
+                    for (i = 1; i < n - 1; i++) {
+                        u[i][j][k] = unew[i][j][k];
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+Output 4:
+Here is the equivalent function implemented in C with OpenMP:
+
+```c
+#include <omp.h>
+
+void jacobi_parallel(double u[n][n][n], double unew[n][n][n], int n, int niter, int nthreads) {
+    int i, j, k, iter;
+    
+    #pragma omp parallel num_threads(nthreads) private(i, j, k, iter)
+    {
+        for(iter = 0; iter < niter; iter++) {
+            #pragma omp for schedule(static)
+            for(k = 1; k < n-1; k++) {
+                for(j = 1; j < n-1; j++) {
+                    for(i = 1; i < n-1; i++) {
+                        unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] + u[i][j-1][k] +
+                            u[i][j+1][k] + u[i][j][k-1] + u[i][j][k+1] + u[i][j][k]);
+                    }
+                }
+            }
+            #pragma omp barrier
+            #pragma omp for schedule(static)
+            for(k = 1; k < n-1; k++) {
+                for(j = 1; j < n-1; j++) {
+                    for(i = 1; i < n-1; i++) {
+                        u[i][j][k] = unew[i][j][k];
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+In this C implementation, the Jacobi operation is calculated using OpenMP parallelization with the specified number of threads. The nested loops iterate over the elements of the 3D array to update the `unew` values, followed by updating the original `u` array with the new values. The `#pragma omp for` directive is used to distribute the loop iterations among the available threads, and the `#pragma omp barrier` ensures synchronization before updating the original array.
+
+Output 5:
+```c
+#include <stdio.h>
+#include <omp.h>
+
+void jacobi_parallel(double *u, double *unew, int n, int niter, int nthreads) {
+    int i, j, k, iter;
+    
+    #pragma omp parallel num_threads(nthreads) private(i, j, k, iter)
+    {
+        for (iter = 0; iter < niter; iter++) {
+            #pragma omp for schedule(static)
+            for (k = 1; k < n - 1; k++) {
+                for (j = 1; j < n - 1; j++) {
+                    for (i = 1; i < n - 1; i++) {
+                        unew[i + n*(j + n*k)] = 0.125 * (u[i-1 + n*(j + n*k)] + u[i+1 + n*(j + n*k)] +
+                                                          u[i + n*(j-1 + n*k)] + u[i + n*(j+1 + n*k)] +
+                                                          u[i + n*(j + n*(k-1))] + u[i + n*(j + n*(k+1))] +
+                                                          u[i + n*(j + n*k)]);
+                    }
+                }
+            }
+            
+            #pragma omp barrier
+            
+            #pragma omp for
+            for (int m = 0; m < n*n*n; m++) {
+                u[m] = unew[m];
+            }
+        }
+    }
+}
+```
+
+Output 6:
+```c
+void jacobi_parallel(double ***u, double ***unew, int n, int niter, int nthreads) {
+    int i, j, k, iter;
+    #pragma omp parallel num_threads(nthreads) private(i, j, k, iter)
+    {
+        for (iter = 0; iter < niter; iter++) {
+            #pragma omp for schedule(static)
+            for (k = 1; k < n - 1; k++) {
+                for (j = 1; j < n - 1; j++) {
+                    for (i = 1; i < n - 1; i++) {
+                        unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] + u[i][j-1][k] + 
+                                                 u[i][j+1][k] + u[i][j][k-1] + u[i][j][k+1] + u[i][j][k]);
+                    }
+                }
+            }
+            #pragma omp barrier
+            #pragma omp for
+            for (k = 1; k < n - 1; k++) {
+                for (j = 1; j < n - 1; j++) {
+                    for (i = 1; i < n - 1; i++) {
+                        u[i][j][k] = unew[i][j][k];
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+Output 7:
+Here is the C function implemented with OpenMP that computes the Jacobi operation:
+
+```c
+#include <omp.h>
+
+void jacobi_parallel(double* u, double* unew, int n, int niter, int nthreads) {
+    #pragma omp parallel num_threads(nthreads) private(i, j, k, iter)
+    {
+        int i, j, k, iter;
+        for(iter = 0; iter < niter; iter++) {
+            #pragma omp for schedule(static)
+            for(k = 1; k < n - 1; k++) {
+                for(j = 1; j < n - 1; j++) {
+                    for(i = 1; i < n - 1; i++) {
+                        unew[i + n*(j + n*k)] = 0.125 * (u[i-1 + n*(j + n*k)] + u[i+1 + n*(j + n*k)] + u[i + n*(j-1 + n*k)] 
+                            + u[i + n*(j+1 + n*k)] + u[i + n*(j + n*(k-1))] + u[i + n*(j + n*(k+1))] + u[i + n*(j + n*k)]);
+                    }
+                }
+            }
+            #pragma omp barrier
+            #pragma omp for
+            for(int idx = 0; idx < n*n*n; idx++) {
+                u[idx] = unew[idx];
+            }
+        }
+    }
+}
+```
+
+In this function, `u` and `unew` are flattened arrays of dimension `n x n x n`, where `u` contains the input data and `unew` will contain the updated values after the Jacobi iterations. The function performs the Jacobi iteration `niter` times using OpenMP parallelization with `nthreads` number of threads.
+
+Note that the indexing of the elements in the flattened arrays is adjusted in the C implementation to match the Fortran indexing used in the original subroutine.
+
+Output 8:
+```c
+#include <omp.h>
+
+void jacobi_parallel(double u[n][n][n], double unew[n][n][n], int n, int niter, int nthreads) {
+    int i, j, k, iter;
+
+    #pragma omp parallel num_threads(nthreads) private(i, j, k, iter)
+    {
+        for (iter = 0; iter < niter; iter++) {
+            #pragma omp for schedule(static)
+            for (k = 1; k < n - 1; k++) {
+                for (j = 1; j < n - 1; j++) {
+                    for (i = 1; i < n - 1; i++) {
+                        unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] + u[i][j-1][k] +
+                                                u[i][j+1][k] + u[i][j][k-1] + u[i][j][k+1] + u[i][j][k]);
+                    }
+                }
+            }
+            #pragma omp barrier
+            #pragma omp for
+            for (k = 0; k < n; k++) {
+                for (j = 0; j < n; j++) {
+                    for (i = 0; i < n; i++) {
+                        u[i][j][k] = unew[i][j][k];
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+Output 9:
+```c
+#include <stdio.h>
+#include <omp.h>
+
+void jacobi_parallel(double u[n][n][n], double unew[n][n][n], int n, int niter, int nthreads) {
+    int i, j, k, iter;
+    #pragma omp parallel num_threads(nthreads) private(i, j, k, iter)
+    {
+        for (iter = 0; iter < niter; iter++) {
+            #pragma omp for schedule(static)
+            for (k = 1; k < n - 1; k++) {
+                for (j = 1; j < n - 1; j++) {
+                    for (i = 1; i < n - 1; i++) {
+                        unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] + u[i][j-1][k] +
+                                                 u[i][j+1][k] + u[i][j][k-1] + u[i][j][k+1] + u[i][j][k]);
+                    }
+                }
+            }
+            #pragma omp barrier
+            #pragma omp for
+            for (k = 0; k < n; k++) {
+                for (j = 0; j < n; j++) {
+                    for (i = 0; i < n; i++) {
+                        u[i][j][k] = unew[i][j][k];
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+Output 10:
+```c
+void jacobi_parallel(double ***u, double ***unew, int n, int niter, int nthreads) {
+    int i, j, k, iter;
+    
+    #pragma omp parallel num_threads(nthreads) private(i, j, k, iter)
+    {
+        for (iter = 0; iter < niter; iter++) {
+            #pragma omp for schedule(static)
+            for (k = 1; k < n - 1; k++) {
+                for (j = 1; j < n - 1; j++) {
+                    for (i = 1; i < n - 1; i++) {
+                        unew[i][j][k] = 0.125 * (u[i-1][j][k] + u[i+1][j][k] + u[i][j-1][k] +
+                                                 u[i][j+1][k] + u[i][j][k-1] + u[i][j][k+1] + u[i][j][k]);
+                    }
+                }
+            }
+            
+            #pragma omp barrier
+            
+            #pragma omp for schedule(static)
+            for (k = 1; k < n - 1; k++) {
+                for (j = 1; j < n - 1; j++) {
+                    for (i = 1; i < n - 1; i++) {
+                        u[i][j][k] = unew[i][j][k];
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
