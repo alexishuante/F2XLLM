@@ -1,0 +1,745 @@
+Output 1:
+To implement a GEMV operation using Kokkos in C++, you'll first need to ensure that Kokkos is correctly installed and configured in your development environment.
+
+Here is the equivalent function in C++ with Kokkos:
+
+```cpp
+#include <Kokkos_Core.hpp>
+
+void gemv_parallel(const int n, const Kokkos::View<float**> A, const Kokkos::View<float*> x, Kokkos::View<float*> y) {
+    // Ensure the default execution space used by Kokkos is initialized and finalized properly
+    Kokkos::parallel_for("gemv_parallel", Kokkos::RangePolicy<>(0, n), KOKKOS_LAMBDA(const int i) {
+        float sum = 0.0;
+        for (int j = 0; j < n; ++j) {
+            sum += A(i, j) * x(j);
+        }
+        y(i) = sum;
+    });
+}
+
+int main(int argc, char* argv[]) {
+    Kokkos::initialize(argc, argv);
+
+    {
+        int n = 100; // Example size
+        Kokkos::View<float**> A("A", n, n);
+        Kokkos::View<float*> x("x", n);
+        Kokkos::View<float*> y("y", n);
+
+        // Initialize A and x with some values, for demonstration purposes let's use random values
+        Kokkos::parallel_for("init_A_x", Kokkos::RangePolicy<>(0, n), KOKKOS_LAMBDA(const int i) {
+            x(i) = static_cast<float>(i);
+            for (int j = 0; j < n; ++j) {
+                A(i, j) = static_cast<float>(i + j);
+            }
+        });
+
+        // Perform the matrix-vector multiplication
+        gemv_parallel(n, A, x, y);
+
+        // Optionally, you can check the result by copying the data back to host and printing it
+        auto y_host = Kokkos::create_mirror_view(y);
+        Kokkos::deep_copy(y_host, y);
+
+        for (int i = 0; i < n; ++i) {
+            std::cout << "y(" << i << ") = " << y_host(i) << std::endl;
+        }
+    }
+
+    Kokkos::finalize();
+    return 0;
+}
+```
+
+Explanation of the C++ code:
+1. **Initialization and Finalization**: Kokkos requires explicit initialization and finalization which is done using `Kokkos::initialize(argc, argv)` and `Kokkos::finalize()`.
+2. **Kokkos::View**: Views are multi-dimensional arrays managed by Kokkos. Here, we define views for the matrix `A`, and vectors `x` and `y`.
+3. **Parallel Initialization**: We initialize the matrix `A` and vector `x` with dummy values using `Kokkos::parallel_for`.
+4. **Matrix-Vector Multiplication**: The `gemv_parallel` function computes the matrix-vector multiplication using Kokkos' parallel for-loop.
+5. **Result Verification**: After executing the GEMV operation, the result is optionally copied back to the host and printed.
+
+Make sure to link your program against the Kokkos library and include the necessary compilation flags for Kokkos. This usually involves linking with the `-lkokkos` flag and specifying the right include directories. This code snippet assumes familiarity with basic C++ and Kokkos concepts.
+
+Output 2:
+Certainly! Here is the equivalent function implemented in C++ using the Kokkos library, which allows for parallel execution similar to OpenACC in Fortran. 
+
+Make sure you have Kokkos installed and properly configured in your environment to compile and run this code.
+
+```cpp
+#include <Kokkos_Core.hpp>
+#include <iostream>
+
+// Kernel function for GEMV operation
+struct GEMV {
+  int n;
+  Kokkos::View<const double**> A;
+  Kokkos::View<const double*> x;
+  Kokkos::View<double*> y;
+
+  GEMV(int n_, Kokkos::View<const double**> A_, Kokkos::View<const double*> x_, Kokkos::View<double*> y_)
+    : n(n_), A(A_), x(x_), y(y_) {}
+
+  KOKKOS_INLINE_FUNCTION
+  void operator()(const int i) const {
+    double sum = 0.0;
+    for (int j = 0; j < n; ++j) {
+      sum += A(i, j) * x(j);
+    }
+    y(i) = sum;
+  }
+};
+
+void gemv_parallel(int n, Kokkos::View<const double**> A, Kokkos::View<const double*> x, Kokkos::View<double*> y) {
+  Kokkos::parallel_for("GEMV_kernel", Kokkos::RangePolicy<>(0, n), GEMV(n, A, x, y));
+}
+
+int main() {
+  Kokkos::initialize();
+
+  {
+    int n = 3;
+    double A_host[3][3] = { {1.0, 2.0, 3.0}, 
+                            {4.0, 5.0, 6.0}, 
+                            {7.0, 8.0, 9.0} };
+    double x_host[3] = {1.0, 2.0, 3.0};
+    double y_host[3] = {0.0, 0.0, 0.0};
+
+    // Create Kokkos Views for the matrices and vectors
+    Kokkos::View<double**> A("A", n, n);
+    Kokkos::View<double*> x("x", n);
+    Kokkos::View<double*> y("y", n);
+
+    // Copy data from host to device
+    Kokkos::deep_copy(A, Kokkos::View<double**, Kokkos::HostSpace>((double*)A_host, n, n));
+    Kokkos::deep_copy(x, Kokkos::View<double*, Kokkos::HostSpace>(x_host, n));
+
+    // Call the GEMV function
+    gemv_parallel(n, A, x, y);
+
+    // Copy result back to host
+    Kokkos::deep_copy(Kokkos::View<double*, Kokkos::HostSpace>(y_host, n), y);
+
+    // Print result
+    for (int i = 0; i < n; ++i) {
+      std::cout << "y[" << i << "] = " << y_host[i] << std::endl;
+    }
+  }
+
+  Kokkos::finalize();
+
+  return 0;
+}
+```
+
+### Explanation:
+1. **Kokkos Initialization**: The `Kokkos::initialize()` and `Kokkos::finalize()` functions are used to initialize and finalize the Kokkos runtime.
+
+2. **View Definitions**: `Kokkos::View` is used to manage memory both on the host and on the device. The data from the Fortran program (the matrix `A` and vectors `x` and `y`) are copied to these views.
+
+3. **Kernel Definition**: The `GEMV` struct is defined to encapsulate the operation of the kernel. The `KOKKOS_INLINE_FUNCTION` decorator is used to indicate that this function can be inlined and run on the device.
+
+4. **Parallel Execution**: The `Kokkos::parallel_for` is used to execute the GEMV kernel in parallel across the range `[0, n)`.
+
+5. **Data Transfer**: Data is copied from the host to device and back using `Kokkos::deep_copy`.
+
+Compile and run this C++ code ensuring you link it against Kokkos and any required backends (e.g., OpenMP, CUDA) supported in your environment.
+
+Output 3:
+Sure! Here is the equivalent C++ function using Kokkos to perform a Generalized matrix-vector multiplication (GEMV) operation. This implementation initializes Kokkos and parallelizes the computation over the rows of the matrix \( A \):
+
+```cpp
+#include <Kokkos_Core.hpp>
+
+void gemv_parallel(int n, const Kokkos::View<double**> A, const Kokkos::View<double*> x, Kokkos::View<double*> y) {
+    Kokkos::parallel_for("GEMV", n, KOKKOS_LAMBDA(int i) {
+        double sum = 0.0;
+        for (int j = 0; j < n; ++j) {
+            sum += A(i, j) * x(j);
+        }
+        y(i) = sum;
+    });
+}
+
+int main(int argc, char* argv[]) {
+    // Initialize Kokkos
+    Kokkos::initialize(argc, argv);
+
+    {
+        const int n = 4; // Example matrix size
+
+        // Define and initialize matrices and vectors as Kokkos Views
+        Kokkos::View<double**> A("A", n, n);
+        Kokkos::View<double*> x("x", n);
+        Kokkos::View<double*> y("y", n);
+
+        // Filling A and x with example values
+        Kokkos::parallel_for("Initialize A and x", n, KOKKOS_LAMBDA(int i) {
+            x(i) = 1.0 * (i + 1); // example x values
+            for (int j = 0; j < n; ++j) {
+                A(i, j) = 1.0 * (i + j + 1); // example A values
+            }
+        });
+
+        // Call the parallel GEMV function
+        gemv_parallel(n, A, x, y);
+
+        // Print the result
+        Kokkos::parallel_for("Print y", n, KOKKOS_LAMBDA(int i) {
+            printf("y[%d] = %f\n", i, y(i));
+        });
+
+    }
+
+    // Finalize Kokkos
+    Kokkos::finalize();
+
+    return 0;
+}
+```
+
+This function initializes Kokkos and then creates a parallel `for` loop over the rows of the matrix \( A \). The computation `sum += A(i, j) * x(j)` is performed in parallel, and the result is stored in the output vector \( y \).
+
+### Explanation:
+1. **Kokkos::parallel_for**: This is used to launch parallel execution. The lambda function inside `parallel_for` specifies the work to be done by each thread. 
+2. **Kokkos::View**: This is a multidimensional array type provided by Kokkos to manage data space. It can be used for the matrix `A`, vector `x`, and vector `y`.
+3. **Main Function**: Initializes Kokkos, sets up the matrix and vectors, performs the GEMV operation, prints the result, and finalizes Kokkos.
+
+Before compiling this code, make sure Kokkos is properly installed and linked. You need to compile it with Kokkos enabled in the respective compiler settings.
+
+Output 4:
+Certainly! Below is the C++ implementation of the given Fortran subroutine using Kokkos. Kokkos is a C++ library designed for performance portability of HPC applications to different hardware backends.
+
+First, make sure you have Kokkos installed and set up correctly in your environment.
+
+Here is the Kokkos implementation of the GEMV operation:
+
+```cpp
+#include <Kokkos_Core.hpp>
+
+// Define a GEMV function using Kokkos
+void gemv_parallel(int n, Kokkos::View<double**> A, Kokkos::View<double*> x, Kokkos::View<double*> y) {
+    // Perform a GEMV operation
+    Kokkos::parallel_for("GEMV", Kokkos::RangePolicy<>(0, n), KOKKOS_LAMBDA(int i) {
+        double sum = 0.0;
+        for (int j = 0; j < n; ++j) {
+            sum += A(i, j) * x(j);
+        }
+        y(i) = sum;
+    });
+}
+
+int main(int argc, char* argv[]) {
+    Kokkos::initialize(argc, argv);
+
+    {
+        int n = 1000; // Example size
+
+        // Allocate and initialize A, x, and y
+        Kokkos::View<double**> A("A", n, n);
+        Kokkos::View<double*> x("x", n);
+        Kokkos::View<double*> y("y", n);
+
+        // Initialize the input matrix A and vector x (Optional: You can initialize as per your requirement)
+        Kokkos::parallel_for("InitA", Kokkos::RangePolicy<>(0, n*n), KOKKOS_LAMBDA(int index) {
+            int i = index / n;
+            int j = index % n;
+            A(i, j) = 1.0; // Example initialization
+        });
+
+        Kokkos::parallel_for("InitX", Kokkos::RangePolicy<>(0, n), KOKKOS_LAMBDA(int i) {
+            x(i) = 1.0; // Example initialization
+        });
+
+        // Call the GEMV function
+        gemv_parallel(n, A, x, y);
+
+        // Optionally, we could print or check the results after completion
+        Kokkos::parallel_for("PrintY", Kokkos::RangePolicy<>(0, n), KOKKOS_LAMBDA(int i) {
+            printf("y(%d) = %lf\n", i, y(i));
+        });
+
+    }
+
+    Kokkos::finalize();
+    return 0;
+}
+```
+
+### Explanation:
+1. **Kokkos Initialization and Finalization:** `Kokkos::initialize(argc, argv);` and `Kokkos::finalize();` are used to initialize and finalize the Kokkos runtime environment.
+
+2. **View Allocation:** Kokkos::View is used to create multi-dimensional arrays much like Fortran arrays. In this case, `A` is a 2D array, and `x` and `y` are 1D arrays.
+
+3. **Parallel Loop Using Kokkos:** The GEMV operation is parallelized using `Kokkos::parallel_for` with a lambda function. This lambda function performs the matrix-vector multiplication for each row of the matrix `A`.
+
+4. **Initialization and Validation (Optional):** The provided example initializes the arrays `A` and `x` with some example values and optionally prints the result for verification.
+
+You can adapt the initialization part according to your specific needs or input data. This example assumes a matrix and vector size of 1000 for demonstration purposes.
+
+Output 5:
+Here is an implementation of the given Fortran subroutine in C++ using Kokkos for parallelization. 
+
+Before running the code, ensure that you have Kokkos installed and properly configured in your environment.
+
+```cpp
+#include <Kokkos_Core.hpp>
+#include <vector>
+
+// Define the generalized matrix-vector multiplication function
+void gemv_parallel(int n, const std::vector<double>& A, const std::vector<double>& x, std::vector<double>& y) {
+    // Wrap raw pointers around Kokkos Views
+    auto A_view = Kokkos::View<const double**>("A", n, n);
+    auto x_view = Kokkos::View<const double*>("x", n);
+    auto y_view = Kokkos::View<double*>("y", n);
+  
+    // Populate the Kokkos Views with host data
+    Kokkos::parallel_for("fill_A", n, KOKKOS_LAMBDA(const int i){
+        for(int j = 0; j < n; ++j){
+            A_view(i, j) = A[i * n + j];
+        }
+    });
+    Kokkos::parallel_for("fill_x", n, KOKKOS_LAMBDA(const int i){
+        x_view(i) = x[i];
+    });
+  
+    // Perform the GEMV operation
+    Kokkos::parallel_for("gemv_parallel", n, KOKKOS_LAMBDA(const int i) {
+        double sum = 0.0;
+        for (int j = 0; j < n; ++j) {
+            sum += A_view(i, j) * x_view(j);
+        }
+        y_view(i) = sum;
+    });
+  
+    // Copy the results back to the host data
+    Kokkos::parallel_for("copy_y", n, KOKKOS_LAMBDA(const int i){
+        y[i] = y_view(i);
+    });
+}
+
+int main(int argc, char *argv[]) {
+    Kokkos::initialize(argc, argv);
+  
+    int n = 4;
+    std::vector<double> A = {
+        1.0, 2.0, 3.0, 4.0,
+        5.0, 6.0, 7.0, 8.0,
+        9.0, 10.0, 11.0, 12.0,
+        13.0, 14.0, 15.0, 16.0
+    };
+    std::vector<double> x = {1.0, 0.5, 0.25, 0.125};
+    std::vector<double> y(n, 0);
+
+    gemv_parallel(n, A, x, y);
+  
+    // Print the result
+    std::cout << "y = [";
+    for (int i = 0; i < n; ++i) {
+        std::cout << y[i] << " ";
+    }
+    std::cout << "]\n";
+
+    Kokkos::finalize();
+    return 0;
+}
+```
+
+### Explanation:
+1. **Kokkos Initialization**: Kokkos is initialized at the beginning of the `main` function and finalized before the program ends.
+2. **Data Wrapping**: The function wraps the input vectors and matrix with Kokkos Views to leverage the parallel capabilities of Kokkos.
+3. **Populating Views**: The host data is copied into device views using simple Kokkos parallel kernels.
+4. **GEMV Operation**: The primary computation runs in a parallel-for loop, similar to the structure of the original Fortran code. Each thread computes one element of the resulting vector `y`.
+5. **Result Copying**: The results from the device view are copied back to the host `y` vector for output.
+
+### Prerequisites:
+- Ensure you have Kokkos installed and available to your C++ compiler.
+- Compile with appropriate Kokkos flags, typically something like `-lkokkos` depending on your setup.
+
+Make sure to refer to the Kokkos documentation for detailed instructions regarding setup and compilation for your specific environment and hardware.
+
+Output 6:
+Certainly! You can achieve the equivalent functionality in C++ using Kokkos to parallelize the matrix-vector multiplication operation. Below is the C++ implementation of the given Fortran subroutine, utilizing Kokkos for parallelization:
+
+```cpp
+#include <Kokkos_Core.hpp>
+
+// Define a functor for the GEMV operation
+struct GEMV {
+    int n;
+    Kokkos::View<const float**> A;
+    Kokkos::View<const float*> x;
+    Kokkos::View<float*> y;
+
+    GEMV(int n_, Kokkos::View<const float**> A_, Kokkos::View<const float*> x_, Kokkos::View<float*> y_)
+        : n(n_), A(A_), x(x_), y(y_) {}
+
+    KOKKOS_INLINE_FUNCTION void operator()(const int i) const {
+        float sum = 0.0f;
+        for (int j = 0; j < n; ++j) {
+            sum += A(i, j) * x(j);
+        }
+        y(i) = sum;
+    }
+};
+
+void gemv_parallel(int n, const float* A_data, const float* x_data, float* y_data) {
+    // Initialize Kokkos (If not already initialized)
+    Kokkos::initialize();
+    {
+        // Create Kokkos views
+        Kokkos::View<const float**> A(A_data, n, n);
+        Kokkos::View<const float*> x(x_data, n);
+        Kokkos::View<float*> y(y_data, n);
+
+        // Run the GEMV operation in parallel
+        Kokkos::parallel_for("gemv_parallel", n, GEMV(n, A, x, y));
+    }
+    // Finalize Kokkos (If not finalized elsewhere in your program)
+    Kokkos::finalize();
+}
+
+int main() {
+    const int n = 4;
+    float A[4][4] = { 
+        {1.0, 2.0, 3.0, 4.0}, 
+        {5.0, 6.0, 7.0, 8.0}, 
+        {9.0, 10.0, 11.0, 12.0}, 
+        {13.0, 14.0, 15.0, 16.0} 
+    };
+    float x[4] = {1.0, 1.0, 1.0, 1.0};
+    float y[4] = {0.0, 0.0, 0.0, 0.0};
+
+    gemv_parallel(n, &A[0][0], x, y);
+
+    // Output the result
+    for (int i = 0; i < n; ++i) {
+        std::cout << "y[" << i << "] = " << y[i] << std::endl;
+    }
+
+    return 0;
+}
+```
+
+### Explanation:
+1. **Kokkos::View**:
+   - `Kokkos::View` is designed to work with multi-dimensional arrays and manage data in a way that can be efficiently used on various hardware architectures (CPUs, GPUs).
+   - In this implementation, views are created for the matrix `A`, and vectors `x` and `y`.
+
+2. **Parallel Execution**:
+   - `Kokkos::parallel_for` is used to parallelize the loop where the matrix-vector multiplication is performed. This is equivalent to the `!$ACC PARALLEL LOOP` in OpenACC.
+   - A functor (`GEMV`) is defined to specify the operations performed in each iteration of the parallel loop.
+
+3. **Initialization/Finalization**:
+   - `Kokkos::initialize()` and `Kokkos::finalize()` are used to initialize and clean up Kokkos runtime. These calls should be made at the beginning and end of the program, but ensure they are not called multiple times if Kokkos is used elsewhere in the larger codebase.
+
+4. **Memory Management**:
+   - The C++ arrays `A_data`, `x_data`, and `y_data` are wrapped in `Kokkos::View` to manage their memory efficiently across different hardware architectures.
+  
+Make sure to link your application with the Kokkos library and include the necessary headers. If you use CMake, you can refer to Kokkos CMake example configurations for linking properly.
+
+Output 7:
+Sure! To accomplish this transformation from Fortran with OpenACC to C++ with Kokkos for the Generalized Matrix-Vector Multiplication (GEMV), let's first understand the main components:
+
+1. **Fortran/OpenACC code:** The original Fortran subroutine uses OpenACC directives to parallelize the outer loop for the GEMV operation.
+2. **C++/Kokkos code:** We will rewrite this operation using Kokkos, a C++ library designed for portability across many parallel computing architectures.
+
+Given below is the C++ version of the subroutine using Kokkos:
+
+```cpp
+#include <Kokkos_Core.hpp>
+
+void gemv_parallel(int n, Kokkos::View<double**> A, Kokkos::View<double*> x, Kokkos::View<double*> y) {
+    Kokkos::parallel_for("GEMV", n, KOKKOS_LAMBDA(int i) {
+        double sum = 0.0;
+        for (int j = 0; j < n; ++j) {
+            sum += A(i, j) * x(j);
+        }
+        y(i) = sum;
+    });
+}
+
+int main(int argc, char* argv[]) {
+    Kokkos::initialize(argc, argv);
+    {
+        int n = 1000; // Example size
+
+        Kokkos::View<double**> A("A", n, n);
+        Kokkos::View<double*> x("x", n);
+        Kokkos::View<double*> y("y", n);
+
+        // Initialize A and x with some values, for example:
+        Kokkos::parallel_for("Init A", n, KOKKOS_LAMBDA(int i) {
+            for (int j = 0; j < n; ++j) {
+                A(i, j) = static_cast<double>(i + j);
+            }
+        });
+
+        Kokkos::parallel_for("Init x", n, KOKKOS_LAMBDA(int i) {
+            x(i) = static_cast<double>(i);
+        });
+
+        gemv_parallel(n, A, x, y);
+
+        // Optionally, you might want to check the result.
+        // For example, we can print one value from y:
+        double y_value;
+        Kokkos::deep_copy(y_value, y(0));
+        std::cout << "y[0] = " << y_value << std::endl;
+    }
+    Kokkos::finalize();
+
+    return 0;
+}
+```
+
+### Explanation:
+
+1. **Kokkos Initialization and Finalization:**
+   - `Kokkos::initialize(argc, argv);` and `Kokkos::finalize();` wrap around the main code. This ensures Kokkos is properly set up and torn down.
+
+2. **Kokkos Views:**
+   - `Kokkos::View<double**> A("A", n, n);` defines a 2D view for the matrix \( A \).
+   - `Kokkos::View<double*> x("x", n);` and `Kokkos::View<double*> y("y", n);` define 1D views for the vectors \( x \) and \( y \).
+
+3. **Parallel Initialization:**
+   - Before performing the GEMV operation, the matrix `A` and vector `x` are initialized with some values using `Kokkos::parallel_for`.
+
+4. **GEMV Operation:**
+   - The `gemv_parallel` function is responsible for performing the actual matrix-vector multiplication.
+   - It uses a Kokkos lambda function to parallelize the outer loop (`i`). The lambda function captures the views `A`, `x`, and `y` and implements the inner loop.
+
+5. **Deep Copy:**
+   - If necessary, you can use `Kokkos::deep_copy` to transfer data back to the host for checking or printing, as demonstrated with the variable `y_value`.
+
+This should give you a working implementation that mirrors the functionality of the given Fortran subroutine using Kokkos in C++.
+
+Output 8:
+To implement the Generalized Matrix-Vector Multiplication (GEMV) operation using Kokkos in C++, follow these steps:
+
+1. Ensure you have installed Kokkos and have included the necessary headers.
+2. Use the `Kokkos::parallel_for` to parallelize the loop. 
+
+Below is the corresponding C++ function using Kokkos:
+
+```cpp
+#include <Kokkos_Core.hpp>
+#include <iostream>
+
+void gemv_parallel(int n, const Kokkos::View<const float**> A, const Kokkos::View<const float*> x, Kokkos::View<float*> y) {
+    Kokkos::parallel_for("gemv", n, KOKKOS_LAMBDA(int i) {
+        float sum = 0.0f;
+        for (int j = 0; j < n; ++j) {
+            sum += A(i, j) * x(j);
+        }
+        y(i) = sum;
+    });
+}
+
+int main(int argc, char *argv[]) {
+    Kokkos::initialize(argc, argv);
+
+    {
+        const int n = 4;
+
+        Kokkos::View<float**> A("A", n, n);
+        Kokkos::View<float*> x("x", n);
+        Kokkos::View<float*> y("y", n);
+
+        // Initializing matrix A and vector x with some values for demonstration
+        Kokkos::parallel_for("init_Ax", n, KOKKOS_LAMBDA(int i) {
+            x(i) = 1.0f;  // Example initialization, x = [1, 1, 1, 1]
+            for (int j = 0; j < n; ++j) {
+                A(i, j) = i + j; // Example initialization, A[i][j] = i + j
+            }
+        });
+
+        // Call the gemv function
+        gemv_parallel(n, A, x, y);
+
+        // Copying result back to host to print
+        auto h_y = Kokkos::create_mirror_view(y);
+        Kokkos::deep_copy(h_y, y);
+
+        // Output the result
+        std::cout << "Result y:" << std::endl;
+        for (int i = 0; i < n; ++i) {
+            std::cout << h_y(i) << std::endl;
+        }
+    }
+
+    Kokkos::finalize();
+}
+```
+
+### Explanation:
+- **Initialization**: 
+  - The `Kokkos::View` constructs A, x, and y with the given sizes.
+  - Views are used to manage and access the memory in Kokkos.
+- **Matrix and Vector Initialization**: 
+  - The `Kokkos::parallel_for` with "init_Ax" parallelizes the initialization of matrix A and vector x.
+  - This is an example setup and can be adjusted as needed.
+- **Kernel Function**:
+  - `gemv_parallel` performs the generalized matrix-vector multiplication. It parallels the outer loop (`i` loop) with `Kokkos::parallel_for`.
+  - Each thread computes the dot product of a row of A with vector x and stores the result in y.
+- **Result Printing**:
+  - `Kokkos::create_mirror_view` and `Kokkos::deep_copy` are used to copy the results from device to host for printing.
+  
+To compile and run this program, ensure you have the Kokkos library properly installed and linked during compilation. For example:
+
+```sh
+g++ -o gemv_kokkos -fopenmp -I/path/to/kokkos/include -L/path/to/kokkos/lib -lkokkos main.cpp
+./gemv_kokkos
+```
+Remember to adjust the include path and library path to where Kokkos is installed on your system.
+
+Output 9:
+Sure, to implement the same Generalized matrix-vector multiplication (GEMV) operation in C++ using Kokkos, you'll need to use Kokkos' parallel mechanics. Below is an example implementation of the `gemv_parallel` function in C++ using Kokkos:
+
+```cpp
+#include <Kokkos_Core.hpp>
+
+void gemv_parallel(const int n, const Kokkos::View<const double**> A, const Kokkos::View<const double*> x, Kokkos::View<double*> y) {
+    // Parallel for loop over the rows
+    Kokkos::parallel_for("gemv_parallel", n, KOKKOS_LAMBDA(const int i) {
+        double sum = 0.0;
+        for (int j = 0; j < n; ++j) {
+            sum += A(i, j) * x(j);
+        }
+        y(i) = sum;
+    });
+}
+
+int main(int argc, char* argv[]) {
+    // Initialize Kokkos
+    Kokkos::initialize(argc, argv);
+
+    {
+        // Define the dimensions
+        const int n = 4; // Example size, replace with desired size
+
+        // Create the Kokkos views
+        Kokkos::View<double**> A("A", n, n);
+        Kokkos::View<double*> x("x", n);
+        Kokkos::View<double*> y("y", n);
+
+        // Initialize the contents of A and x
+        // Example initialization; replace with actual data initialization
+        Kokkos::parallel_for(n, KOKKOS_LAMBDA(const int i) {
+            x(i) = 1.0; // Example value, replace with desired values
+            for (int j = 0; j < n; ++j) {
+                A(i, j) = 1.0; // Example value, replace with desired values
+            }
+        });
+
+        // Perform the GEMV operation
+        gemv_parallel(n, A, x, y);
+
+        // Print the result
+        Kokkos::parallel_for(n, KOKKOS_LAMBDA(const int i) {
+            printf("y(%d) = %f\n", i, y(i));
+        });
+    }
+
+    // Finalize Kokkos
+    Kokkos::finalize();
+
+    return 0;
+}
+```
+
+### Explanation:
+1. **Initialization**: The `main` function initializes Kokkos.
+2. **View Declarations**: Kokkos views (`A`, `x`, and `y`) are declared with appropriate dimensions. Views are analogous to multi-dimensional arrays.
+3. **Parallel Initialization**:
+    - Fill the matrix `A` and vector `x` with values (both are set to 1.0 in this example).
+4. **GEMV Operation**: 
+    - The `gemv_parallel` function performs the matrix-vector multiplication.
+    - The outer loop over rows is parallelized using `Kokkos::parallel_for`. The element-wise operations within each row are performed using a standard for loop.
+5. **Results Printing**: After the GEMV operation, the result vector `y` is printed to verify the results.
+6. **Finalization**: Kokkos is finalized to clean up resources.
+
+### Notes:
+- Replace the example initialization values with the actual data you need for `A` and `x`.
+- Modify the size `n` appropriately to suit your application.
+- This basic example assumes that the matrix `A` and vector `x` are square and have the same dimensions as specified by `n`. Adjust as needed for different dimensions and complexity.
+
+Remember, it's essential to tune Kokkos execution spaces (e.g., CUDA, OpenMP) based on your target architecture when running on different hardware platforms.
+
+Output 10:
+Certainly! Below is a function implemented in C++ using the Kokkos library that mimics the functionality of the given Fortran subroutine using OpenACC. It performs a Generalized Matrix-Vector Multiplication (GEMV) operation in parallel.
+
+To use this code, you need to have Kokkos installed and properly set up in your C++ development environment.
+
+```cpp
+#include <Kokkos_Core.hpp>
+#include <iostream>
+
+void gemv_parallel(const int n, const Kokkos::View<double**>& A, const Kokkos::View<double*>& x, Kokkos::View<double*>& y) {
+    // Ensure the dimensions match
+    assert(A.extent(0) == n && A.extent(1) == n);
+    assert(x.extent(0) == n);
+    assert(y.extent(0) == n);
+
+    Kokkos::parallel_for("GEMV", Kokkos::RangePolicy<>(0, n), KOKKOS_LAMBDA(const int i) {
+        double sum = 0.0;
+        for (int j = 0; j < n; ++j) {
+            sum += A(i, j) * x(j);
+        }
+        y(i) = sum;
+    });
+}
+
+int main(int argc, char* argv[]) {
+    Kokkos::initialize(argc, argv);
+
+    {
+        const int n = 5;
+
+        // Create and initialize the matrix A and vectors x, y
+        Kokkos::View<double**> A("A", n, n);
+        Kokkos::View<double*> x("x", n);
+        Kokkos::View<double*> y("y", n);
+
+        // Fill A and x with example values
+        Kokkos::parallel_for("Initialize A and x", n, KOKKOS_LAMBDA(const int i) {
+            x(i) = 1.0; // Example initialization: x = [1, 1, ..., 1]
+            for (int j = 0; j < n; ++j) {
+                A(i, j) = 1.0; // Example initialization: A = all 1s
+            }
+        });
+
+        // Perform the matrix-vector multiplication
+        gemv_parallel(n, A, x, y);
+
+        // Output the result (to the host)
+        auto y_host = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), y);
+        std::cout << "Result vector y:" << std::endl;
+        for (int i = 0; i < n; ++i) {
+            std::cout << y_host(i) << " ";
+        }
+        std::cout << std::endl;
+    }
+
+    Kokkos::finalize();
+
+    return 0;
+}
+```
+
+### Key Points:
+
+1. **Kokkos Views**: We use `Kokkos::View` for multidimensional arrays and vectors. Views manage memory allocation and provide efficient access on multi-threaded parallel devices.
+2. **Parallel Execution**: The `Kokkos::parallel_for` with a `RangePolicy` is used to parallelize the outer loop over `i`, similar to the `!$ACC PARALLEL LOOP` directive in OpenACC.
+3. **Example Initialization**: The example initializes `x` and `A` with the value `1.0`. However, you can modify these initializations to suit your specific use case.
+4. **Mirroring for Display**: We use `Kokkos::create_mirror_view_and_copy` to copy the results back to the host for displaying.
+
+### To Compile and Run:
+Make sure Kokkos is correctly installed and set up. You would typically compile this with a script similar to:
+
+```sh
+g++ -o gemv_parallel gemv_parallel.cpp -lkokkoscore -fopenmp
+./gemv_parallel
+```
+
+Adjust the compile options based on your host compiler and the available Kokkos backend (e.g., OpenMP, CUDA). Ensure that the Kokkos library path is included as necessary.
+

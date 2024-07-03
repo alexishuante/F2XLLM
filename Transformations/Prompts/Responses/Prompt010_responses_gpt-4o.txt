@@ -1,0 +1,618 @@
+Output 1:
+Below is the equivalent function in C using OpenMP for the given Fortran subroutine with OpenACC that performs Sparse Matrix-Vector Multiplication (SpMV).
+
+```C
+#include <stdio.h>
+#include <stdlib.h>
+#include <omp.h>
+
+void spmv_parallel(int n, int nnz, const float *val, const int *row, const int *col, const float *x, float *y) {
+    int i, j;
+
+    // Parallel region with OpenMP
+    #pragma omp parallel for private(i, j)
+    for (i = 0; i < n; i++) {
+        y[i] = 0.0f;
+        for (j = row[i]; j < row[i+1]; j++) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+
+int main() {
+    // Example usage of spmv_parallel (to be filled with actual values in real use)
+    int n = 5;   // Example number of rows
+    int nnz = 13; // Example number of non-zeros
+
+    // Example sparse matrix in compressed row storage (CRS) format
+    float val[13] = {10, 20, 30, 40, 50, 60, 10, 30, 40, 20, 40, 50, 60};
+    int col[13] = {0, 1, 2, 1, 4, 2, 0, 3, 4, 2, 3, 1, 4};
+    int row[6] = {0, 3, 5, 7, 10, 13};
+
+    float x[5] = {1, 2, 3, 4, 5}; // Example input vector
+    float y[5]; // Result vector
+
+    spmv_parallel(n, nnz, val, row, col, x, y);
+
+    // Print output vector
+    for (int i = 0; i < n; i++) {
+        printf("y[%d] = %f\n", i, y[i]);
+    }
+
+    return 0;
+}
+```
+
+### Explanation:
+1. **Arrays and Input Parameters:** The function `spmv_parallel()` takes the same inputs as the Fortran subroutine, namely:
+   - `n`: the number of rows (length of `y` and `x`).
+   - `nnz`: the number of non-zero elements in the sparse matrix.
+   - `val[]`: array of the non-zero values.
+   - `row[]`: array that points to the start of each row in `val[]`.
+   - `col[]`: array that contains the column indices corresponding to `val[]`.
+   - `x[]`: input vector to be multiplied with the matrix.
+   - `y[]`: output vector (initialized to zero).
+
+2. **Parallelization with OpenMP:** The outer loop (`for (i = 0; i < n; i++)`) is parallelized with OpenMP using the `#pragma omp parallel for` directive. The `private(i, j)` clause specifies that each thread should have its own private copies of the loop variables `i` and `j`.
+
+3. **Sparse Matrix-Vector Multiplication:** The inner loop iterates through the non-zero elements corresponding to the current row and performs the SpMV operation.
+
+4. **Initialization of Output Vector:** The output vector `y` is set to zero before accumulating the matrix-vector product for each row. 
+
+### Note:
+- Ensure your system supports OpenMP and is properly configured (`-fopenmp` flag with gcc/g++).
+- The example usage in the `main()` function, as well as the matrix elements and vectors, are only for demonstration purposes. Replace these with actual values as necessary for your specific application.
+
+Output 2:
+Below is an equivalent C function using OpenMP for parallelizing the sparse matrix-vector multiplication (SpMV) operation described in the given Fortran subroutine with OpenACC. The Fortran subroutine is converted to a C function, and the OpenMP directives are used for parallelism.
+
+```c
+#include <omp.h>
+
+void spmv_parallel(int n, int nnz, const float *val, const int *row, const int *col, const float *x, float *y) {
+    int i, j;
+
+    // Parallelize the outer loop using OpenMP
+    #pragma omp parallel for default(none) shared(val, row, col, x, y, n) private(i, j)
+    for (i = 0; i < n; i++) {
+        y[i] = 0.0;
+        for (j = row[i]; j < row[i + 1]; j++) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+```
+
+### Explanation
+1. **Function Signature**: The C function `spmv_parallel` has similar parameters to the Fortran subroutine:
+    - `n`: Number of rows in the sparse matrix.
+    - `nnz`: Number of non-zero elements in the sparse matrix.
+    - `val`: Array containing the non-zero elements of the sparse matrix.
+    - `row`: Row pointers such that `row[i]` indicates the start index of row `i` in `val` and `col`.
+    - `col`: Column indices corresponding to elements in `val`.
+    - `x`: The input vector to be multiplied by the sparse matrix.
+    - `y`: The output vector that will hold the result.
+
+2. **OpenMP Parallelization**:
+    - The `#pragma omp parallel for` directive is used to parallelize the outer loop with OpenMP. 
+    - `default(none)` ensures all variables must be explicitly shared or private, promoting safer parallel code.
+    - `shared(val, row, col, x, y, n)` specifies the variables that are shared among all threads.
+    - `private(i, j)` specifies that each thread should have its own instance of `i` and `j`.
+
+3. **Loop Transformation**:
+    - The outer loop (over `i`) is parallelized directly.
+    - The inner loop (over `j`) accumulates the product of matrix elements and vector elements into `y[i]`, similar to the original subroutine.
+
+### Usage
+To use this function, ensure that your environment supports OpenMP and that you compile your program with the `-fopenmp` flag (for GCC). For example:
+
+```sh
+gcc -fopenmp -o spmv spmv.c
+```
+
+This will compile the C file `spmv.c` with OpenMP support.
+
+Output 3:
+Sure! Below is the C function implementation of the same sparse matrix-vector multiplication (SpMV) operation using OpenMP:
+
+```c
+#include <omp.h>
+
+void spmv_parallel(int n, int nnz, const float* val, const int* row, const int* col, const float* x, float* y) {
+    int i, j;
+
+    #pragma omp parallel for private(j) shared(val, row, col, x, y)
+    for (i = 0; i < n; i++) {
+        y[i] = 0.0;
+        for (j = row[i]; j < row[i + 1]; j++) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+```
+
+### Description:
+- **Parameters:**
+    - `n`: The number of rows (or columns) in the matrix.
+    - `nnz`: The number of non-zero elements in the matrix.
+    - `val`: Array that contains the non-zero values of the matrix.
+    - `row`: Array containing the index in `val` where each row starts. It has `n+1` elements.
+    - `col`: Column indices corresponding to each value in `val`.
+    - `x`: Input vector to be multiplied with the matrix.
+    - `y`: Output vector resulting from the multiplication.
+
+### OpenMP Directive:
+- `#pragma omp parallel for`: Parallelizes the outer loop over rows to compute the matrix-vector product in parallel.
+
+### Notes:
+- Ensure that OpenMP is enabled in your compiler by adding the appropriate flags (e.g., `-fopenmp` for GCC).
+- Both `val`, `row`, `col`, `x`, and `y` are shared among threads. The variable `j` is private to each thread to prevent race conditions.
+- The `i` loop is parallelized to divide the work of computing each row's dot product among the available threads.
+
+You can compile this function using an appropriate flag for your compiler, like so:
+
+```sh
+gcc -fopenmp -o spmv_parallel spmv_parallel.c
+```
+
+Output 4:
+Certainly! Here is the equivalent C function that performs the Sparse matrix–vector multiplication (SpMV) using OpenMP, based on the provided Fortran subroutine with OpenACC:
+
+```c
+#include <omp.h>
+
+void spmv_parallel(int n, int nnz, const float *val, const int *row, const int *col, const float *x, float *y) {
+    int i, j;
+    
+    #pragma omp parallel for private(i, j) shared(val, row, col, x, y)
+    for (i = 0; i < n; i++) {
+        y[i] = 0.0;
+        for (j = row[i]; j < row[i + 1]; j++) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+```
+
+This function, `spmv_parallel`, takes the same inputs as the Fortran subroutine:
+- `n`: number of rows in the sparse matrix.
+- `nnz`: number of non-zero elements in the sparse matrix.
+- `val`: array containing non-zero values of the sparse matrix.
+- `row`: array indicating the start of each row in the `val` and `col` arrays.
+- `col`: array containing the column indices corresponding to the elements in `val`.
+- `x`: input vector to be multiplied by the sparse matrix.
+- `y`: output vector resulting from the multiplication.
+
+The function uses OpenMP for parallel execution. The `#pragma omp parallel for` directive parallelizes the outer loop, with each thread computing a part of the result vector `y`. The `private(i, j)` clause ensures that the loop indices `i` and `j` are private to each thread, while the `shared(val, row, col, x, y)` clause makes the arrays shared among all threads.
+
+Output 5:
+Certainly! Below is the equivalent C function for the given Fortran subroutine that computes the Sparse Matrix-Vector Multiplication (SpMV) using OpenMP for parallelization:
+
+```c
+#include <stdio.h>
+#include <omp.h>
+
+// Function to perform Sparse Matrix-Vector Multiplication (SpMV)
+void spmv_parallel(int n, int nnz, const float *val, const int *row, const int *col, const float *x, float *y) {
+    int i, j;
+
+    // Initialize the result vector y with 0
+    #pragma omp parallel for
+    for (i = 0; i < n; i++) {
+        y[i] = 0.0;
+    }
+
+    // Perform the matrix-vector multiplication in parallel
+    #pragma omp parallel for private(j)
+    for (i = 0; i < n; i++) {
+        for (j = row[i]; j < row[i + 1]; j++) {
+            #pragma omp atomic
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+
+int main() {
+    // Example data for testing
+    int n = 4;  // Number of rows/columns of the sparse matrix
+    int nnz = 6;  // Number of non-zero elements
+
+    // Sparse matrix in Compressed Sparse Row (CSR) format
+    float val[6] = {1, 2, 3, 4, 5, 6};  // Non-zero values
+    int row[5] = {0, 2, 3, 4, 6};  // Index of row start
+    int col[6] = {0, 1, 2, 1, 1, 3};  // Column index of each value
+
+    float x[4] = {1, 2, 3, 4};  // Input vector
+    float y[4];  // Output vector
+
+    // Perform Sparse Matrix-Vector Multiplication
+    spmv_parallel(n, nnz, val, row, col, x, y);
+
+    // Print the result
+    printf("Result vector y:\n");
+    for (int i = 0; i < n; i++) {
+        printf("%f\n", y[i]);
+    }
+
+    return 0;
+}
+```
+
+### Explanation:
+1. **Initialization of Result Vector `y`:**
+   - The result vector `y` is initialized to zero using a parallel for loop.
+   
+2. **Matrix-Vector Multiplication:**
+   - A parallel for loop processes each row of the sparse matrix.
+   - `#pragma omp parallel for private(j)`:
+     - The outer loop is parallelized.
+     - Each iteration of the loop processes one row of the sparse matrix.
+   - The inner loop traverses through the non-zero elements of the current row.
+   - `#pragma omp atomic` ensures that updates to `y[i]` are atomic, thus preventing race conditions where multiple threads attempt to update `y[i]` concurrently.
+
+3. **Testing:**
+   - An example testing case is provided in the `main` function to demonstrate the usage of the `spmv_parallel` function.
+
+Make sure to compile this program with an OpenMP-enabled compiler, for example:
+
+```sh
+gcc -fopenmp spmv_parallel.c -o spmv_parallel
+```
+
+By running the executable, you can observe the results of the sparse matrix-vector multiplication.
+
+Output 6:
+Here is the equivalent function implemented in C with OpenMP:
+
+```c
+#include <omp.h>
+
+void spmv_parallel(int n, int nnz, const float *val, const int *row, const int *col, const float *x, float *y) {
+    // Parallelize the outer loop with OpenMP
+    #pragma omp parallel for
+    for (int i = 0; i < n; ++i) {
+        y[i] = 0.0;
+        for (int j = row[i]; j < row[i + 1]; ++j) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+```
+
+### Explanation:
+
+1. **Parallelization with OpenMP**: The Fortran subroutine uses OpenACC to parallelize the outer loop. In the C version, OpenMP is used with the `#pragma omp parallel for` directive to achieve parallelism of the outer loop, which iterates over the rows of the sparse matrix.
+
+2. **Loop Bounds Adjustment**: Fortran array indexing starts from 1, whereas C array indexing starts from 0. Therefore, when handling array bounds and indices in C, ensure the indexing is 0-based (the Fortran loop runs from 1 to `n`, so the C loop runs from 0 to `n-1`).
+
+3. **Data Copies**: OpenACC directives handle data movement between the CPU and GPU. In this OpenMP translation, memory management is naturally handled by the CPU, so explicit data copy directives are not required.
+
+4. **Function Signature**: The parameters follow C conventions (`const` is used for input-only arrays to indicate they should not be modified). The types are set to match C conventions (`int` and `float`).
+
+### Compilation:
+
+To compile the above code with OpenMP enabled, you can use:
+```sh
+gcc -fopenmp -o spmv_parallel spmv_parallel.c
+```
+
+### Usage Example:
+```c
+#include <stdio.h>
+
+int main() {
+    int n = 5;
+    int nnz = 8;
+
+    // Example of compressed row storage (CSR) representation.
+    float val[8] = {10, 20, 30, 40, 50, 60, 70, 80};
+    int row[6] = {0, 2, 3, 5, 7, 8}; // n+1 = 6 elements
+    int col[8] = {0, 2, 1, 0, 2, 3, 4, 4}; // nnz = 8 elements
+    float x[5] = {1, 2, 3, 4, 5}; 
+
+    float y[5];
+
+    spmv_parallel(n, nnz, val, row, col, x, y);
+
+    // Print the result
+    for (int i = 0; i < n; i++) {
+        printf("y[%d] = %f\n", i, y[i]);
+    }
+
+    return 0;
+}
+```
+
+The usage example demonstrates allocating arrays for a sparse matrix in compressed row storage (CSR) format and computing the matrix-vector product, then printing the result.
+
+Output 7:
+Below is an equivalent C function that implements the Sparse matrix-vector multiplication (SpMV) operation using OpenMP for parallelization. This function follows the same logic as the provided Fortran subroutine.
+
+```c
+#include <omp.h>
+
+// Function to perform Sparse matrix-vector multiplication (SpMV)
+void spmv_parallel(int n, int nnz, const float* val, const int* row, const int* col, const float* x, float* y) {
+    // Parallelize the outer loop using OpenMP
+    #pragma omp parallel for
+    for (int i = 0; i < n; ++i) {
+        y[i] = 0.0;
+        for (int j = row[i]; j < row[i+1]; ++j) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+
+int main() {
+    // Example usage of the spmv_parallel function
+
+    // Define the size of the matrix and number of non-zero elements
+    int n = 4;
+    int nnz = 9;
+
+    // Define the non-zero values, row pointers, column indices, input vector x, and output vector y
+    float val[] = {2.0, 3.0, 4.0, 6.0, 5.0, 7.0, 8.0, 9.0, 1.0};
+    int row[] = {0, 2, 4, 7, 9}; // row pointers
+    int col[] = {0, 1, 0, 2, 1, 2, 3, 2, 3}; // column indices
+    float x[] = {1.0, 2.0, 3.0, 4.0}; // input vector
+    float y[4] = {0.0, 0.0, 0.0, 0.0}; // output vector
+
+    // Call the spmv_parallel function
+    spmv_parallel(n, nnz, val, row, col, x, y);
+
+    // Print the result
+    for (int i = 0; i < n; ++i) {
+        printf("y[%d] = %f\n", i, y[i]);
+    }
+
+    return 0;
+}
+```
+
+### Explanation:
+1. **Function Prototype:**
+    - `spmv_parallel` is the function performing the SpMV operation.
+    - It takes the following arguments:
+        - `n` – the size of the matrix/vector.
+        - `nnz` – number of non-zero elements in the matrix.
+        - `val` – array to store the non-zero values of the matrix.
+        - `row` – array to store the row pointers for the compressed row storage.
+        - `col` – array to store the column indices for the non-zero values.
+        - `x` – input vector.
+        - `y` – output vector, which will store the result.
+
+2. **Parallelization:**
+    - The loop is parallelized using the OpenMP directive `#pragma omp parallel for`, which divides the loop iterations among different threads.
+
+3. **Matrix-Vector Multiplication:**
+    - For each row `i`, the result `y[i]` is initialized to `0.0`.
+    - A nested loop iterates over the non-zero elements in the row, determined by the row pointers `row[i]` to `row[i+1]`.
+    - The result is accumulatively computed as `y[i] += val[j] * x[col[j]]`.
+
+4. **Example Usage:**
+    - A sample main function initializes the matrices and vectors and calls the `spmv_parallel` function.
+    - It prints the resulting output vector `y` after the computation.
+
+Compile the program with `gcc` and the `-fopenmp` flag to enable OpenMP:
+```sh
+gcc -fopenmp -o spmv_parallel spmv_parallel.c
+```
+
+Run the executable to observe the output.
+
+Output 8:
+To convert the given Fortran subroutine that computes a Sparse Matrix-Vector Multiplication (SpMV) operation with OpenACC to a C function using OpenMP, you need to follow a few key steps. Below is a C function implementation that uses OpenMP for parallelization:
+
+```c
+#include <stdio.h>
+#include <omp.h>
+
+void spmv_parallel(int n, int nnz, const float *val, const int *row, const int *col, const float *x, float *y) {
+    int i, j;
+
+    // Initialize the result vector y to zero
+    #pragma omp parallel for
+    for (i = 0; i < n; ++i) {
+        y[i] = 0.0f;
+    }
+
+    // Sparse matrix-vector multiplication
+    #pragma omp parallel for private(j)
+    for (i = 0; i < n; ++i) {
+        for (j = row[i]; j < row[i + 1]; ++j) {
+            #pragma omp atomic
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+
+int main() {
+    // Example usage
+    int n = 4;
+    int nnz = 9;
+    
+    float val[] = {10, 20, 30, 40, 50, 60, 70, 80, 90};
+    int row[] = {0, 2, 4, 7, 9};
+    int col[] = {0, 1, 1, 2, 0, 1, 2, 1, 3};
+    float x[] = {1, 2, 3, 4};
+    float y[4]; 
+
+    spmv_parallel(n, nnz, val, row, col, x, y);
+
+    // Print the result y
+    for (int i = 0; i < n; ++i) {
+        printf("y[%d] = %f\n", i, y[i]);
+    }
+
+    return 0;
+}
+```
+
+### Explanation:
+
+1. **Initialization**: The `y` vector is initialized to zero in an OpenMP parallel for loop.
+2. **SpMV Operation**: The outer loop over rows is parallelized using OpenMP. 
+3. **Critical Section**: The inner operations where `y[i]` is being updated are marked as a critical section to avoid race conditions. The `#pragma omp atomic` directive is used to ensure atomic updates to `y[i]`.
+
+### Notes:
+
+- **Loop Indexing Adjustments**: In Fortran, array indices are 1-based, while in C, they are 0-based. Adjustments are made accordingly.
+- **OpenMP Directives**: `#pragma omp parallel for` is used to parallelize both the initialization of `y` and the actual matrix-vector multiplication loop.
+- **Atomic Update**: Since multiple threads might attempt to update the same entry in `y`, the `#pragma omp atomic` directive is used to ensure correctness.
+
+Compile the code with the OpenMP library using the `-fopenmp` flag on GCC:
+```sh
+gcc -fopenmp -o spmv spmv.c
+./spmv
+```
+
+This will parallelize the matrix-vector multiplication using OpenMP, similar to how the original Fortran subroutine used OpenACC for parallelism.
+
+Output 9:
+Sure! Here’s a C function using OpenMP that performs the same Sparse Matrix-Vector Multiplication (SpMV) as the given Fortran subroutine with OpenACC. 
+
+The OpenMP pragmas will be used to parallelize the outer loop, which iterates over the rows of the sparse matrix. The inner loop performs the actual computation for each non-zero element.
+
+Here is the implementation:
+
+```c
+#include <omp.h>
+
+void spmv_parallel(int n, int nnz, const float* val, const int* row, const int* col, const float* x, float* y) {
+    int i, j;
+
+    #pragma omp parallel for default(none) shared(n, row, val, col, x, y) private(i, j)
+    for (i = 0; i < n; i++) {
+        y[i] = 0.0;
+        for (j = row[i]; j < row[i+1]; j++) {
+            y[i] += val[j] * x[col[j]];
+        }
+    }
+}
+```
+
+### Explanation:
+1. **Function Signature:**
+   - `n`: Number of rows/columns in the matrix.
+   - `nnz`: Number of non-zero elements.
+   - `val`: Array containing the non-zero values of the matrix.
+   - `row`: Array where `row[i]` indicates the start of the row `i` in `val`.
+   - `col`: Array containing the column indices for each non-zero element in `val`.
+   - `x`: Input vector to be multiplied with the sparse matrix.
+   - `y`: Output vector to store the result of the SpMV.
+
+2. **OpenMP Pragmas:**
+   - `#pragma omp parallel for` is used to parallelize the outer loop.
+   - `default(none)` is used to enforce explicit specification of all variables, improving code clarity and reducing potential bugs.
+   - `shared()` lists variables that are shared among threads.
+   - `private()` lists loop indices that are private to each thread.
+
+3. **Loop Details:**
+   - The outer loop iterates over each row, initializing `y[i]` to `0.0`.
+   - The inner loop performs the accumulation of the product of non-zero values and the corresponding x vector values. 
+
+This C function should provide equivalent functionality to the given Fortran subroutine using OpenACC for SpMV. Make sure you compile the program with OpenMP support enabled (e.g., with `-fopenmp` flag in GCC).
+
+### Usage:
+To use this function, ensure you include OpenMP in your compile process:
+
+```sh
+gcc -fopenmp -o spmv_example spmv_example.c
+```
+Example of using this function in a program:
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <omp.h>
+
+void spmv_parallel(int n, int nnz, const float* val, const int* row, const int* col, const float* x, float* y);
+
+int main() {
+    int n = 5; // For example, a 5x5 sparse matrix
+    int nnz = 13; // Number of non-zero values
+
+    float val[] = {10, 20, 30, 5, 7, 8, 1, 3, 2, 9, 6, 4, 3};
+    int row[] = {0, 3, 5, 7, 10, 13};
+    int col[] = {0, 1, 2, 0, 2, 1, 3, 2, 4, 0, 1, 2, 4};
+    float x[] = {1, 2, 3, 4, 5};
+    float y[5];
+
+    spmv_parallel(n, nnz, val, row, col, x, y);
+
+    for (int i = 0; i < n; i++) {
+        printf("y[%d] = %f\n", i, y[i]);
+    }
+
+    return 0;
+}
+
+```
+This will correctly execute the sparse matrix-vector multiplication in parallel using OpenMP.
+
+Output 10:
+Here's an equivalent implementation of the `spmv_parallel` subroutine in C using OpenMP for parallel processing. The function performs Sparse Matrix-Vector Multiplication (SpMV).
+
+```c
+#include <stdio.h>
+#include <omp.h>
+
+void spmv_parallel(int n, int nnz, const float *val, const int *row, const int *col, const float *x, float *y) {
+    #pragma omp parallel for
+    for (int i = 0; i < n; i++) {
+        y[i] = 0.0f;  // Initialize the result vector element to zero
+        for (int j = row[i]; j < row[i + 1]; j++) {
+            y[i] += val[j] * x[col[j]];  // Perform the SpMV operation
+        }
+    }
+}
+
+int main() {
+    // Example usage for demonstration
+    int n = 5;  // Number of rows/columns in the matrix
+    int nnz = 9;  // Number of non-zero elements in the matrix
+
+    // These arrays represent a sparse matrix in CSR (Compressed Sparse Row) format
+    float val[] = { 10, 20, 30, 40, 50, 60, 70, 80, 90 };
+    int row[] = { 0, 3, 3, 5, 7, 9 };  // Length is n+1
+    int col[] = { 0, 1, 4, 2, 3, 1, 4, 0, 3 };
+
+    float x[] = { 1, 2, 3, 4, 5 };  // Input vector
+    float y[n];  // Output vector, result of SpMV
+
+    // Perform the sparse matrix-vector multiplication
+    spmv_parallel(n, nnz, val, row, col, x, y);
+
+    // Output the result vector y
+    printf("Result vector y:\n");
+    for (int i = 0; i < n; i++) {
+        printf("%f\n", y[i]);
+    }
+
+    return 0;
+}
+```
+
+### Explanation:
+
+1. **Function Definition**:
+    - `void spmv_parallel(int n, int nnz, const float *val, const int *row, const int *col, const float *x, float *y)`: This function is the C equivalent of the Fortran subroutine `spmv_parallel`.
+
+2. **OpenMP Directive**:
+    - `#pragma omp parallel for`: This directive tells OpenMP to parallelize the following `for` loop. Each iteration of the loop will be executed in parallel.
+
+3. **Loop Initialization**:
+    - Initialize `y[i]` to `0.0f` at the beginning of each iteration of the outer loop.
+
+4. **Inner Loop**:
+    - The inner loop iterates over the range defined by `row[i]` to `row[i+1]-1`, effectively traversing the non-zero elements of the i-th row of the sparse matrix.
+    - The computation `y[i] += val[j] * x[col[j]]` executes the SpMV operation by multiplying the value `val[j]` with the corresponding element from vector `x` indexed by `col[j]` and accumulating the result in `y[i]`.
+
+5. **Main Function**:
+    - An example set of CSR-formatted matrix, vector `x`, and output vector `y`. The `spmv_parallel` function is called to compute the result, and then the resulting vector `y` is printed.
+
+### Notes:
+- **OpenMP Environment**: Ensure that the compiler supports OpenMP (`gcc` with the `-fopenmp` flag).
+- **Memory Management**: For large matrices, consider dynamic allocation for the `val`, `row`, `col`, `x`, and `y` arrays.
+
+
