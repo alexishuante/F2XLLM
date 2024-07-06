@@ -1,0 +1,496 @@
+--------------- Code Block 1 ---------------
+__global__ void jacobi_kernel(double *u, double *unew, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x + 1;
+    int j = blockIdx.y * blockDim.y + threadIdx.y + 1;
+    int k = blockIdx.z * blockDim.z + threadIdx.z + 1;
+
+    if(i < n-1 && j < n-1 && k < n-1) {
+        int idx = i + j*n + k*n*n;
+        unew[idx] = 0.125 * (u[idx - 1] + u[idx + 1] +
+                             u[idx - n] + u[idx + n] +
+                             u[idx - n*n] + u[idx + n*n] +
+                             u[idx]);
+    }
+}
+
+extern "C" void jacobi_parallel(double *u, double *unew, int n, int niter) {
+    double *d_u, *d_unew;
+    size_t size = n * n * n * sizeof(double);
+    cudaMalloc((void**)&d_u, size);
+    cudaMalloc((void**)&d_unew, size);
+
+    cudaMemcpy(d_u, u, size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_unew, unew, size, cudaMemcpyHostToDevice);
+
+    dim3 threadsPerBlock(8, 8, 8);
+    dim3 numBlocks((n + threadsPerBlock.x - 1)/threadsPerBlock.x,
+                   (n + threadsPerBlock.y - 1)/threadsPerBlock.y,
+                   (n + threadsPerBlock.z - 1)/threadsPerBlock.z);
+
+    for(int iter = 0; iter < niter; iter++) {
+        jacobi_kernel<<<numBlocks, threadsPerBlock>>>(d_u, d_unew, n);
+        cudaMemcpy(d_u, d_unew, size, cudaMemcpyDeviceToDevice);
+    }
+
+    cudaMemcpy(u, d_u, size, cudaMemcpyDeviceToHost);
+
+    cudaFree(d_u);
+    cudaFree(d_unew);
+}
+
+--------------- Code Block 2 ---------------
+__global__ void jacobi_kernel(double* u, double* unew, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x + 1;
+    int j = blockIdx.y * blockDim.y + threadIdx.y + 1;
+    int k = blockIdx.z * blockDim.z + threadIdx.z + 1;
+
+    if(i < n-1 && j < n-1 && k < n-1) {
+        unew[i*n*n + j*n + k] = 0.125 * (u[(i-1)*n*n + j*n + k] + u[(i+1)*n*n + j*n + k] +
+                                         u[i*n*n + (j-1)*n + k] + u[i*n*n + (j+1)*n + k] +
+                                         u[i*n*n + j*n + (k-1)] + u[i*n*n + j*n + (k+1)] +
+                                         u[i*n*n + j*n + k]);
+    }
+}
+
+extern "C" void jacobi_parallel(double* u, double* unew, int n, int niter) {
+    double *d_u, *d_unew;
+    size_t size = n * n * n * sizeof(double);
+
+    // Allocate device memory
+    cudaMalloc((void**)&d_u, size);
+    cudaMalloc((void**)&d_unew, size);
+
+    // Copy data from host to device
+    cudaMemcpy(d_u, u, size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_unew, unew, size, cudaMemcpyHostToDevice);
+
+    dim3 threadsPerBlock(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+    dim3 numBlocks((n + BLOCK_SIZE - 2) / BLOCK_SIZE, 
+                   (n + BLOCK_SIZE - 2) / BLOCK_SIZE, 
+                   (n + BLOCK_SIZE - 2) / BLOCK_SIZE);
+
+    for(int iter = 0; iter < niter; iter++) {
+        jacobi_kernel<<<numBlocks, threadsPerBlock>>>(d_u, d_unew, n);
+        cudaDeviceSynchronize();
+
+        // Swap pointers
+        double* temp = d_u;
+        d_u = d_unew;
+        d_unew = temp;
+    }
+
+    // Copy data back from device to host
+    cudaMemcpy(u, d_u, size, cudaMemcpyDeviceToHost);
+    cudaMemcpy(unew, d_unew, size, cudaMemcpyDeviceToHost);
+
+    // Free device memory
+    cudaFree(d_u);
+    cudaFree(d_unew);
+}
+
+--------------- Code Block 3 ---------------
+__global__ void jacobi_kernel(double *u, double *unew, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x + 1;
+    int j = blockIdx.y * blockDim.y + threadIdx.y + 1;
+    int k = blockIdx.z * blockDim.z + threadIdx.z + 1;
+
+    if (i < n - 1 && j < n - 1 && k < n - 1) {
+        unew[IDX(i, j, k, n)] = 0.125 * (
+            u[IDX(i-1, j, k, n)] + u[IDX(i+1, j, k, n)] +
+            u[IDX(i, j-1, k, n)] + u[IDX(i, j+1, k, n)] +
+            u[IDX(i, j, k-1, n)] + u[IDX(i, j, k+1, n)] +
+            u[IDX(i, j, k, n)]
+        );
+    }
+}
+
+void jacobi_parallel(double *u, double *unew, int n, int niter, int threads_per_block) {
+    double *d_u, *d_unew;
+    int size = n * n * n * sizeof(double);
+
+    cudaMalloc(&d_u, size);
+    cudaMalloc(&d_unew, size);
+
+    cudaMemcpy(d_u, u, size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_unew, unew, size, cudaMemcpyHostToDevice);
+
+    dim3 threads(threads_per_block, threads_per_block, threads_per_block);
+    dim3 blocks((n + threads.x - 1) / threads.x, 
+                (n + threads.y - 1) / threads.y, 
+                (n + threads.z - 1) / threads.z);
+
+    for (int iter = 0; iter < niter; iter++) {
+        jacobi_kernel<<<blocks, threads>>>(d_u, d_unew, n);
+        cudaDeviceSynchronize();
+
+        // Swap pointers
+        double *temp = d_u;
+        d_u = d_unew;
+        d_unew = temp;
+    }
+
+    cudaMemcpy(u, d_u, size, cudaMemcpyDeviceToHost);
+
+    cudaFree(d_u);
+    cudaFree(d_unew);
+}
+
+--------------- Code Block 4 ---------------
+__global__ void jacobi_kernel(double *u, double *unew, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x + 1;
+    int j = blockIdx.y * blockDim.y + threadIdx.y + 1;
+    int k = blockIdx.z * blockDim.z + threadIdx.z + 1;
+
+    if (i < n - 1 && j < n - 1 && k < n - 1) {
+        unew[(i * n + j) * n + k] = 0.125 * (u[((i-1) * n + j) * n + k] +
+                                             u[((i+1) * n + j) * n + k] +
+                                             u[(i * n + (j-1)) * n + k] +
+                                             u[(i * n + (j+1)) * n + k] +
+                                             u[(i * n + j) * n + (k-1)] +
+                                             u[(i * n + j) * n + (k+1)] +
+                                             u[(i * n + j) * n + k]);
+    }
+}
+
+void jacobi_parallel(double *u_host, double *unew_host, int n, int niter) {
+    double *u_dev, *unew_dev;
+    size_t size = n * n * n * sizeof(double);
+    
+    // Allocate device memory
+    cudaMalloc((void **)&u_dev, size);
+    cudaMalloc((void **)&unew_dev, size);
+
+    // Copy host memory to device
+    cudaMemcpy(u_dev, u_host, size, cudaMemcpyHostToDevice);
+    cudaMemcpy(unew_dev, unew_host, size, cudaMemcpyHostToDevice);
+
+    // Define block and grid dimensions
+    dim3 threadsPerBlock(8, 8, 8);
+    dim3 numBlocks((n + threadsPerBlock.x - 3) / threadsPerBlock.x,
+                   (n + threadsPerBlock.y - 3) / threadsPerBlock.y,
+                   (n + threadsPerBlock.z - 3) / threadsPerBlock.z);
+
+    // Perform Jacobi iteration
+    for (int iter = 0; iter < niter; iter++) {
+        jacobi_kernel<<<numBlocks, threadsPerBlock>>>(u_dev, unew_dev, n);
+        cudaDeviceSynchronize(); // Ensure kernel execution is complete before proceeding
+
+        // Swap u and unew pointers
+        double *temp = u_dev;
+        u_dev = unew_dev;
+        unew_dev = temp;
+    }
+
+    // Copy device memory to host
+    cudaMemcpy(u_host, u_dev, size, cudaMemcpyDeviceToHost);
+
+    // Free device memory
+    cudaFree(u_dev);
+    cudaFree(unew_dev);
+}
+
+--------------- Code Block 5 ---------------
+__global__ void jacobi_kernel(double *u, double *unew, int n) {
+    int i = blockDim.x * blockIdx.x + threadIdx.x + 1;
+    int j = blockDim.y * blockIdx.y + threadIdx.y + 1;
+    int k = blockDim.z * blockIdx.z + threadIdx.z + 1;
+
+    if (i < n - 1 && j < n - 1 && k < n - 1) {
+        int idx = i + j * n + k * n * n;
+        unew[idx] = 0.125 * (u[idx - 1] + u[idx + 1]
+                           + u[idx - n] + u[idx + n]
+                           + u[idx - n * n] + u[idx + n * n]
+                           + u[idx]);
+    }
+}
+
+extern "C" void jacobi_parallel(double *h_u, double *h_unew, int n, int niter, int nthreads) {
+    double *d_u, *d_unew;
+    size_t size = n * n * n * sizeof(double);
+
+    // Allocate device memory
+    cudaMalloc((void **)&d_u, size);
+    cudaMalloc((void **)&d_unew, size);
+
+    // Copy host memory to device memory
+    cudaMemcpy(d_u, h_u, size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_unew, h_unew, size, cudaMemcpyHostToDevice);
+
+    // Define block and grid dimensions
+    dim3 threadsPerBlock(8, 8, 8);
+    dim3 numBlocks((n + threadsPerBlock.x - 1) / threadsPerBlock.x,
+                   (n + threadsPerBlock.y - 1) / threadsPerBlock.y,
+                   (n + threadsPerBlock.z - 1) / threadsPerBlock.z);
+
+    // Perform Jacobi iterations
+    for (int iter = 0; iter < niter; iter++) {
+        jacobi_kernel<<<numBlocks, threadsPerBlock>>>(d_u, d_unew, n);
+
+        // Swap pointers
+        double *tmp = d_u;
+        d_u = d_unew;
+        d_unew = tmp;
+    }
+
+    // Copy device memory back to host memory
+    cudaMemcpy(h_u, d_u, size, cudaMemcpyDeviceToHost);
+
+    // Free device memory
+    cudaFree(d_u);
+    cudaFree(d_unew);
+}
+
+--------------- Code Block 6 ---------------
+__global__ void jacobi_kernel(const double* __restrict__ u, double* __restrict__ unew, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x + 1;
+    int j = blockIdx.y * blockDim.y + threadIdx.y + 1;
+    int k = blockIdx.z * blockDim.z + threadIdx.z + 1;
+
+    if (i < n-1 && j < n-1 && k < n-1) {
+        unew[(k*n + j)*n + i] = 0.125 * (u[((k-1)*n + j)*n + i] + u[((k+1)*n + j)*n + i] + 
+                                         u[(k*n + (j-1))*n + i] + u[(k*n + (j+1))*n + i] + 
+                                         u[(k*n + j)*n + (i-1)] + u[(k*n + j)*n + (i+1)] + 
+                                         u[(k*n + j)*n + i]);
+    }
+}
+
+void jacobi_parallel(double* u, double* unew, int n, int niter) {
+    double *d_u, *d_unew;
+    size_t size = n * n * n * sizeof(double);
+
+    cudaMalloc((void**)&d_u, size);
+    cudaMalloc((void**)&d_unew, size);
+
+    cudaMemcpy(d_u, u, size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_unew, unew, size, cudaMemcpyHostToDevice);
+
+    dim3 threadsPerBlock(8, 8, 8);
+    dim3 numBlocks((n + threadsPerBlock.x - 1) / threadsPerBlock.x,
+                   (n + threadsPerBlock.y - 1) / threadsPerBlock.y,
+                   (n + threadsPerBlock.z - 1) / threadsPerBlock.z);
+
+    for (int iter = 0; iter < niter; iter++) {
+        jacobi_kernel<<<numBlocks, threadsPerBlock>>>(d_u, d_unew, n);
+        cudaDeviceSynchronize();
+        std::swap(d_u, d_unew);
+    }
+
+    cudaMemcpy(u, d_u, size, cudaMemcpyDeviceToHost);
+
+    cudaFree(d_u);
+    cudaFree(d_unew);
+}
+
+--------------- Code Block 7 ---------------
+__global__ void jacobi_kernel(double *u, double *unew, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x + 1;
+    int j = blockIdx.y * blockDim.y + threadIdx.y + 1;
+    int k = blockIdx.z * blockDim.z + threadIdx.z + 1;
+
+    if (i < n-1 && j < n-1 && k < n-1) {
+        int idx = i + n * (j + n * k);
+        int idx_xm = idx - 1;
+        int idx_xp = idx + 1;
+        int idx_ym = idx - n;
+        int idx_yp = idx + n;
+        int idx_zm = idx - n * n;
+        int idx_zp = idx + n * n;
+
+        unew[idx] = 0.125 * (u[idx_xm] + u[idx_xp] + u[idx_ym] + u[idx_yp] +
+                             u[idx_zm] + u[idx_zp] + u[idx]);
+    }
+}
+
+void jacobi_parallel(double *u, double *unew, int n, int niter) {
+    int size = n * n * n * sizeof(double);
+
+    double *d_u, *d_unew;
+    cudaMalloc(&d_u, size);
+    cudaMalloc(&d_unew, size);
+
+    cudaMemcpy(d_u, u, size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_unew, unew, size, cudaMemcpyHostToDevice);
+
+    dim3 threadsPerBlock(8, 8, 8);
+    dim3 numBlocks((n + threadsPerBlock.x - 1) / threadsPerBlock.x,
+                   (n + threadsPerBlock.y - 1) / threadsPerBlock.y,
+                   (n + threadsPerBlock.z - 1) / threadsPerBlock.z);
+
+    for (int iter = 0; iter < niter; iter++) {
+        jacobi_kernel<<<numBlocks, threadsPerBlock>>>(d_u, d_unew, n);
+
+        // Swap pointers
+        double *temp = d_u;
+        d_u = d_unew;
+        d_unew = temp;
+    }
+
+    cudaMemcpy(u, d_u, size, cudaMemcpyDeviceToHost);
+    cudaFree(d_u);
+    cudaFree(d_unew);
+}
+
+--------------- Code Block 8 ---------------
+__global__
+void jacobi_kernel(double* u, double* unew, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x + 1;
+    int j = blockIdx.y * blockDim.y + threadIdx.y + 1;
+    int k = blockIdx.z * blockDim.z + threadIdx.z + 1;
+
+    if (i < n - 1 && j < n - 1 && k < n - 1) {
+        unew[IDX(i, j, k, n)] = 0.125 * (u[IDX(i-1, j, k, n)]
+                                          + u[IDX(i+1, j, k, n)]
+                                          + u[IDX(i, j-1, k, n)]
+                                          + u[IDX(i, j+1, k, n)]
+                                          + u[IDX(i, j, k-1, n)]
+                                          + u[IDX(i, j, k+1, n)]
+                                          + u[IDX(i, j, k, n)]);
+    }
+}
+
+extern "C" void jacobi_parallel(double* u, double* unew, int n, int niter, dim3 threadsPerBlock) {
+    double *d_u, *d_unew, *temp;
+
+    // Allocate device memory
+    cudaMalloc((void**)&d_u, n * n * n * sizeof(double));
+    cudaMalloc((void**)&d_unew, n * n * n * sizeof(double));
+
+    // Copy data from host to device
+    cudaMemcpy(d_u, u, n * n * n * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_unew, unew, n * n * n * sizeof(double), cudaMemcpyHostToDevice);
+
+    // Define number of blocks in the grid
+    dim3 numBlocks((n + threadsPerBlock.x - 1) / threadsPerBlock.x,
+                   (n + threadsPerBlock.y - 1) / threadsPerBlock.y,
+                   (n + threadsPerBlock.z - 1) / threadsPerBlock.z);
+
+    for (int iter = 0; iter < niter; iter++) {
+        // Launch the kernel
+        jacobi_kernel<<<numBlocks, threadsPerBlock>>>(d_u, d_unew, n);
+
+        // Synchronize device
+        cudaDeviceSynchronize();
+
+        // Swap pointers
+        temp = d_u;
+        d_u = d_unew;
+        d_unew = temp;
+    }
+
+    // Copy the result back to host
+    cudaMemcpy(u, d_u, n * n * n * sizeof(double), cudaMemcpyDeviceToHost);
+
+    // Free device memory
+    cudaFree(d_u);
+    cudaFree(d_unew);
+}
+
+--------------- Code Block 9 ---------------
+__global__ void jacobiKernel(double* u, double* unew, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x + 1;
+    int j = blockIdx.y * blockDim.y + threadIdx.y + 1;
+    int k = blockIdx.z * blockDim.z + threadIdx.z + 1;
+
+    if (i < n - 1 && j < n - 1 && k < n - 1) {
+        unew[IDX(i, j, k, n)] = 0.125 * (u[IDX(i - 1, j, k, n)] + u[IDX(i + 1, j, k, n)] +
+                                         u[IDX(i, j - 1, k, n)] + u[IDX(i, j + 1, k, n)] +
+                                         u[IDX(i, j, k - 1, n)] + u[IDX(i, j, k + 1, n)]);
+    }
+}
+
+void jacobi_parallel(double* u, double* unew, int n, int niter, int nthreads) {
+    double *d_u, *d_unew;
+
+    size_t size = n * n * n * sizeof(double);
+    
+    // Allocate memory on the device
+    cudaMalloc((void**)&d_u, size);
+    cudaMalloc((void**)&d_unew, size);
+
+    // Copy initial values to the device
+    cudaMemcpy(d_u, u, size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_unew, unew, size, cudaMemcpyHostToDevice);
+
+    // Define block and grid sizes
+    dim3 threads_per_block(nthreads, nthreads, nthreads);
+    dim3 number_of_blocks((n + nthreads - 1) / nthreads,
+                          (n + nthreads - 1) / nthreads,
+                          (n + nthreads - 1) / nthreads);
+
+    // Perform Jacobi iterations
+    for (int iter = 0; iter < niter; iter++) {
+        // Launch the kernel
+        jacobiKernel<<<number_of_blocks, threads_per_block>>>(d_u, d_unew, n);
+        
+        // Check for errors during kernel execution
+        cudaError_t err = cudaGetLastError();
+        if (err != cudaSuccess) {
+            fprintf(stderr, "Failed to launch jacobiKernel: %s\n", cudaGetErrorString(err));
+            exit(EXIT_FAILURE);
+        }
+
+        // Synchronize threads
+        cudaDeviceSynchronize();
+
+        // Swap pointers u and unew for next iteration
+        double* temp = d_u;
+        d_u = d_unew;
+        d_unew = temp;
+    }
+
+    // Copy result back to host
+    cudaMemcpy(u, d_u, size, cudaMemcpyDeviceToHost);
+
+    // Free device memory
+    cudaFree(d_u);
+    cudaFree(d_unew);
+}
+
+--------------- Code Block 10 ---------------
+__global__ void jacobi_kernel(double* u, double* unew, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x + 1;
+    int j = blockIdx.y * blockDim.y + threadIdx.y + 1;
+    int k = blockIdx.z * blockDim.z + threadIdx.z + 1;
+
+    if (i < n-1 && j < n-1 && k < n-1) {
+        int idx = i * n * n + j * n + k;
+        unew[idx] = 0.125 * (u[(i-1)*n*n + j*n + k] + u[(i+1)*n*n + j*n + k] +
+                             u[i*n*n + (j-1)*n + k] + u[i*n*n + (j+1)*n + k] +
+                             u[i*n*n + j*n + (k-1)] + u[i*n*n + j*n + (k+1)] +
+                             u[idx]);
+    }
+}
+
+void jacobi_parallel(double* u, double* unew, int n, int niter) {
+    double *d_u, *d_unew;
+    size_t size = n * n * n * sizeof(double);
+
+    // Allocate device memory
+    cudaMalloc((void**)&d_u, size);
+    cudaMalloc((void**)&d_unew, size);
+
+    // Copy data from host to device
+    cudaMemcpy(d_u, u, size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_unew, unew, size, cudaMemcpyHostToDevice);
+
+    dim3 block(8, 8, 8);  // Adjust block size if needed
+    dim3 grid((n + block.x - 1) / block.x, (n + block.y - 1) / block.y, (n + block.z - 1) / block.z);
+
+    for (int iter = 0; iter < niter; iter++) {
+        // Launch the kernel
+        jacobi_kernel<<<grid, block>>>(d_u, d_unew, n);
+
+        // Swap pointers
+        double* temp = d_u;
+        d_u = d_unew;
+        d_unew = temp;
+    }
+
+    // Copy result back to host
+    cudaMemcpy(u, d_u, size, cudaMemcpyDeviceToHost);
+
+    // Free device memory
+    cudaFree(d_u);
+    cudaFree(d_unew);
+}
+
