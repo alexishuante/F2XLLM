@@ -1,0 +1,315 @@
+--------------- Code Block 1 ---------------
+__global__ void jacobi_kernel(double *u, double *unew, int n) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+  int k = blockIdx.z * blockDim.z + threadIdx.z;
+  
+  if (i > 1 && i < n - 1 && j > 1 && j < n - 1 && k > 1 && k < n - 1) {
+    unew[i * n * n + j * n + k] = 0.125 * (
+      u[(i-1) * n * n + j * n + k] + u[(i+1) * n * n + j * n + k] +
+      u[i * n * n + (j-1) * n + k] + u[i * n * n + (j+1) * n + k] +
+      u[i * n * n + j * n + (k-1)] + u[i * n * n + j * n + (k+1)] +
+      u[i * n * n + j * n + k]
+    );
+  }
+}
+
+void jacobi_parallel(double *u, double *unew, int n, int niter) {
+  int blockSize = 8;
+  int numBlocks = (n + blockSize - 1) / blockSize;
+  dim3 blockDim(blockSize, blockSize, blockSize);
+  dim3 gridDim(numBlocks, numBlocks, numBlocks);
+  
+  for (int iter = 0; iter < niter; iter++) {
+    jacobi_kernel<<<gridDim, blockDim>>>(u, unew, n);
+    cudaDeviceSynchronize();
+    double *tmp = u; u = unew; unew = tmp;
+  }
+}
+
+--------------- Code Block 2 ---------------
+__global__ void jacobi_kernel(double *u, double *unew, int n) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+  int k = blockIdx.z * blockDim.z + threadIdx.z;
+
+  if (i > 1 && i < n - 1 && j > 1 && j < n - 1 && k > 1 && k < n - 1) {
+    unew[i * n * n + j * n + k] = 0.125 * (u[(i - 1) * n * n + j * n + k] +
+                                             u[(i + 1) * n * n + j * n + k] +
+                                             u[i * n * n + (j - 1) * n + k] +
+                                             u[i * n * n + (j + 1) * n + k] +
+                                             u[i * n * n + j * n + (k - 1)] +
+                                             u[i * n * n + j * n + (k + 1)] +
+                                             u[i * n * n + j * n + k]);
+  }
+}
+
+void jacobi_parallel(double *u, double *unew, int n, int niter) {
+  int blockSize = 8;
+  int numBlocks = (n + blockSize - 1) / blockSize;
+
+  dim3 blockDim(blockSize, blockSize, blockSize);
+  dim3 gridDim(numBlocks, numBlocks, numBlocks);
+
+  for (int iter = 0; iter < niter; iter++) {
+    jacobi_kernel<<<gridDim, blockDim>>>(u, unew, n);
+    cudaDeviceSynchronize();
+    double *tmp = u;
+    u = unew;
+    unew = tmp;
+  }
+}
+
+--------------- Code Block 3 ---------------
+__global__ void jacobi_kernel(double *u, double *unew, int n) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+  int k = blockIdx.z * blockDim.z + threadIdx.z;
+
+  if (i >= 2 && i < n - 1 && j >= 2 && j < n - 1 && k >= 2 && k < n - 1) {
+    unew[i * n * n + j * n + k] = 0.125 * (
+      u[(i - 1) * n * n + j * n + k] +
+      u[(i + 1) * n * n + j * n + k] +
+      u[i * n * n + (j - 1) * n + k] +
+      u[i * n * n + (j + 1) * n + k] +
+      u[i * n * n + j * n + (k - 1)] +
+      u[i * n * n + j * n + (k + 1)] +
+      u[i * n * n + j * n + k]
+    );
+  }
+}
+
+void jacobi_parallel(double *u, double *unew, int n, int niter) {
+  int blockSize = 16;
+  int numBlocks = (n + blockSize - 1) / blockSize;
+
+  for (int iter = 0; iter < niter; iter++) {
+    jacobi_kernel<<<dim3(numBlocks, numBlocks, numBlocks), dim3(blockSize, blockSize, blockSize)>>>(
+      u, unew, n
+    );
+    cudaDeviceSynchronize();
+    double *tmp = u;
+    u = unew;
+    unew = tmp;
+  }
+}
+
+--------------- Code Block 4 ---------------
+__global__ void jacobi_kernel(double *u, double *unew, int n) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+  int k = blockIdx.z * blockDim.z + threadIdx.z;
+  
+  if (i >= 2 && i < n - 1 && j >= 2 && j < n - 1 && k >= 2 && k < n - 1) {
+    unew[i * n * n + j * n + k] = 0.125 * (u[(i-1) * n * n + j * n + k] + 
+                                            u[(i+1) * n * n + j * n + k] + 
+                                            u[i * n * n + (j-1) * n + k] + 
+                                            u[i * n * n + (j+1) * n + k] + 
+                                            u[i * n * n + j * n + (k-1)] + 
+                                            u[i * n * n + j * n + (k+1)] + 
+                                            u[i * n * n + j * n + k]);
+  }
+}
+
+void jacobi_parallel(double *u, double *unew, int n, int niter) {
+  int blockSize = 256;
+  int numBlocks = (n + blockSize - 1) / blockSize;
+  
+  dim3 dimBlock(blockSize, blockSize, blockSize);
+  dim3 dimGrid(numBlocks, numBlocks, numBlocks);
+  
+  for (int iter = 0; iter < niter; iter++) {
+    jacobi_kernel<<<dimGrid, dimBlock>>>(u, unew, n);
+    cudaDeviceSynchronize();
+    double *temp = u;
+    u = unew;
+    unew = temp;
+  }
+}
+
+--------------- Code Block 5 ---------------
+__global__ void jacobi_kernel(double *u, double *unew, int n) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+  int k = blockIdx.z * blockDim.z + threadIdx.z;
+
+  if (i > 1 && i < n - 1 && j > 1 && j < n - 1 && k > 1 && k < n - 1) {
+    unew[i * n * n + j * n + k] = 0.125 * (
+      u[(i - 1) * n * n + j * n + k] + u[(i + 1) * n * n + j * n + k] +
+      u[i * n * n + (j - 1) * n + k] + u[i * n * n + (j + 1) * n + k] +
+      u[i * n * n + j * n + (k - 1)] + u[i * n * n + j * n + (k + 1)] +
+      u[i * n * n + j * n + k]);
+  }
+}
+
+void jacobi_parallel(double *u, double *unew, int n, int niter) {
+  int blockSize = 8;
+  int numBlocks = (n + blockSize - 1) / blockSize;
+
+  dim3 blockDim(blockSize, blockSize, blockSize);
+  dim3 gridDim(numBlocks, numBlocks, numBlocks);
+
+  for (int iter = 0; iter < niter; iter++) {
+    jacobi_kernel<<<gridDim, blockDim>>>(u, unew, n);
+    cudaDeviceSynchronize();
+    double *tmp = u; u = unew; unew = tmp;
+  }
+}
+
+--------------- Code Block 6 ---------------
+__global__ void jacobi_kernel(double *u, double *unew, int n) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+  int k = blockIdx.z * blockDim.z + threadIdx.z;
+  
+  if (i > 1 && i < n - 1 && j > 1 && j < n - 1 && k > 1 && k < n - 1) {
+    unew[i * n * n + j * n + k] = 0.125 * (u[(i - 1) * n * n + j * n + k] +
+                                            u[(i + 1) * n * n + j * n + k] +
+                                            u[i * n * n + (j - 1) * n + k] +
+                                            u[i * n * n + (j + 1) * n + k] +
+                                            u[i * n * n + j * n + (k - 1)] +
+                                            u[i * n * n + j * n + (k + 1)] +
+                                            u[i * n * n + j * n + k]);
+  }
+}
+
+void jacobi_parallel(double *u, double *unew, int n, int niter) {
+  int blockSize = 8;
+  int numBlocks = (n + blockSize - 1) / blockSize;
+  dim3 dimBlock(blockSize, blockSize, blockSize);
+  dim3 dimGrid(numBlocks, numBlocks, numBlocks);
+  
+  for (int iter = 0; iter < niter; iter++) {
+    jacobi_kernel<<<dimGrid, dimBlock>>>(u, unew, n);
+    cudaDeviceSynchronize();
+    double *temp = u;
+    u = unew;
+    unew = temp;
+  }
+}
+
+--------------- Code Block 7 ---------------
+__global__ void jacobi_kernel(float *u, float *unew, int n, int niter) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+  int k = blockIdx.z * blockDim.z + threadIdx.z;
+
+  if (i >= 2 && i < n - 1 && j >= 2 && j < n - 1 && k >= 2 && k < n - 1) {
+    for (int iter = 0; iter < niter; iter++) {
+      unew[i * n * n + j * n + k] = 0.125f * (
+        u[(i - 1) * n * n + j * n + k] +
+        u[(i + 1) * n * n + j * n + k] +
+        u[i * n * n + (j - 1) * n + k] +
+        u[i * n * n + (j + 1) * n + k] +
+        u[i * n * n + j * n + (k - 1)] +
+        u[i * n * n + j * n + (k + 1)] +
+        u[i * n * n + j * n + k]
+      );
+    }
+    u[i * n * n + j * n + k] = unew[i * n * n + j * n + k];
+  }
+}
+
+void jacobi_parallel(float *u, float *unew, int n, int niter) {
+  int blockSize = 16;
+  int numBlocks = (n + blockSize - 1) / blockSize;
+
+  dim3 block(blockSize, blockSize, blockSize);
+  dim3 grid(numBlocks, numBlocks, numBlocks);
+
+  jacobi_kernel<<<grid, block>>>(u, unew, n, niter);
+  cudaDeviceSynchronize();
+}
+
+--------------- Code Block 8 ---------------
+__global__ void jacobi_kernel(double *u, double *unew, int n) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+  int k = blockIdx.z * blockDim.z + threadIdx.z;
+  
+  if (i > 1 && i < n - 1 && j > 1 && j < n - 1 && k > 1 && k < n - 1) {
+    unew[i * n * n + j * n + k] = 0.125 * (u[(i-1) * n * n + j * n + k] + 
+                                            u[(i+1) * n * n + j * n + k] + 
+                                            u[i * n * n + (j-1) * n + k] + 
+                                            u[i * n * n + (j+1) * n + k] + 
+                                            u[i * n * n + j * n + (k-1)] + 
+                                            u[i * n * n + j * n + (k+1)] + 
+                                            u[i * n * n + j * n + k]);
+  }
+}
+
+void jacobi_parallel(double *u, double *unew, int n, int niter) {
+  int blockSize = 8;
+  int numBlocks = (n + blockSize - 1) / blockSize;
+  dim3 block(blockSize, blockSize, blockSize);
+  dim3 grid(numBlocks, numBlocks, numBlocks);
+  
+  for (int iter = 0; iter < niter; iter++) {
+    jacobi_kernel<<<grid, block>>>(u, unew, n);
+    cudaDeviceSynchronize();
+    double *tmp = u;
+    u = unew;
+    unew = tmp;
+  }
+}
+
+--------------- Code Block 9 ---------------
+__global__ void jacobi_kernel(double *u, double *unew, int n) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+  int k = blockIdx.z * blockDim.z + threadIdx.z;
+  
+  if (i > 1 && i < n - 1 && j > 1 && j < n - 1 && k > 1 && k < n - 1) {
+    unew[i * n * n + j * n + k] = 0.125 * (
+      u[(i-1) * n * n + j * n + k] + u[(i+1) * n * n + j * n + k] +
+      u[i * n * n + (j-1) * n + k] + u[i * n * n + (j+1) * n + k] +
+      u[i * n * n + j * n + (k-1)] + u[i * n * n + j * n + (k+1)] +
+      u[i * n * n + j * n + k]
+    );
+  }
+}
+
+void jacobi_parallel(double *u, double *unew, int n, int niter) {
+  int blockSize = 8;
+  int numBlocks = (n + blockSize - 1) / blockSize;
+  dim3 block(blockSize, blockSize, blockSize);
+  dim3 grid(numBlocks, numBlocks, numBlocks);
+  
+  for (int iter = 0; iter < niter; iter++) {
+    jacobi_kernel<<<grid, block>>>(u, unew, n);
+    cudaDeviceSynchronize();
+    double *tmp = u;
+    u = unew;
+    unew = tmp;
+  }
+}
+
+--------------- Code Block 10 ---------------
+__global__ void jacobi_kernel(double *u, double *unew, int n) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+  int k = blockIdx.z * blockDim.z + threadIdx.z;
+
+  if (i >= 2 && i < n - 1 && j >= 2 && j < n - 1 && k >= 2 && k < n - 1) {
+    unew[i * n * n + j * n + k] = 0.125 * (
+      u[(i - 1) * n * n + j * n + k] + u[(i + 1) * n * n + j * n + k] +
+      u[i * n * n + (j - 1) * n + k] + u[i * n * n + (j + 1) * n + k] +
+      u[i * n * n + j * n + (k - 1)] + u[i * n * n + j * n + (k + 1)] +
+      u[i * n * n + j * n + k]
+    );
+  }
+}
+
+void jacobi_parallel(double *u, double *unew, int n, int niter) {
+  int blockSize = 8;
+  int numBlocks = (n + blockSize - 1) / blockSize;
+
+  dim3 block(blockSize, blockSize, blockSize);
+  dim3 grid(numBlocks, numBlocks, numBlocks);
+
+  for (int iter = 0; iter < niter; iter++) {
+    jacobi_kernel<<<grid, block>>>(u, unew, n);
+    cudaMemcpy(u, unew, n * n * n * sizeof(double), cudaMemcpyDeviceToDevice);
+  }
+}
+

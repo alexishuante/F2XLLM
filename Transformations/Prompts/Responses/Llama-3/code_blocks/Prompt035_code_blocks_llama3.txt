@@ -1,0 +1,399 @@
+--------------- Code Block 1 ---------------
+__global__ void gemm_kernel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int j = blockIdx.x * blockDim.x + threadIdx.x;
+  int i = blockIdx.y * blockDim.y + threadIdx.y;
+
+  if (i < m && j < n) {
+    double temp = 0.0;
+    for (int l = 0; l < k; l++) {
+      temp += a[i * lda + l] * b[l * ldb + j];
+    }
+    c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+  }
+}
+
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int blockSize = 16;
+  int numBlocks = (m + blockSize - 1) / blockSize;
+
+  dim3 dimBlock(blockSize, blockSize);
+  dim3 dimGrid(numBlocks, numBlocks);
+
+  double *a_d, *b_d, *c_d;
+
+  cudaMalloc((void **)&a_d, lda * k * sizeof(double));
+  cudaMalloc((void **)&b_d, ldb * n * sizeof(double));
+  cudaMalloc((void **)&c_d, ldc * n * sizeof(double));
+
+  cudaMemcpy(a_d, a, lda * k * sizeof(double), cudaMemcpyHostToDevice);
+  cudaMemcpy(b_d, b, ldb * n * sizeof(double), cudaMemcpyHostToDevice);
+  cudaMemcpy(c_d, c, ldc * n * sizeof(double), cudaMemcpyHostToDevice);
+
+  gemm_kernel<<<dimGrid, dimBlock>>>(m, n, k, alpha, a_d, lda, b_d, ldb, beta, c_d, ldc);
+
+  cudaMemcpy(c, c_d, ldc * n * sizeof(double), cudaMemcpyDeviceToHost);
+
+  cudaFree(a_d);
+  cudaFree(b_d);
+  cudaFree(c_d);
+}
+
+--------------- Code Block 2 ---------------
+__global__ void gemm_kernel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int j = blockIdx.x * blockDim.x + threadIdx.x;
+  int i = blockIdx.y * blockDim.y + threadIdx.y;
+
+  if (i < m && j < n) {
+    double temp = 0.0;
+    for (int l = 0; l < k; l++) {
+      temp += a[i * lda + l] * b[l * ldb + j];
+    }
+    c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+  }
+}
+
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int blockSize = 16;
+  int numBlocks = ceil(m / (double)blockSize);
+
+  dim3 dimBlock(blockSize, blockSize);
+  dim3 dimGrid(numBlocks, numBlocks);
+
+  double *a_d, *b_d, *c_d;
+
+  cudaMalloc((void **)&a_d, lda * k * sizeof(double));
+  cudaMalloc((void **)&b_d, ldb * n * sizeof(double));
+  cudaMalloc((void **)&c_d, ldc * n * sizeof(double));
+
+  cudaMemcpy(a_d, a, lda * k * sizeof(double), cudaMemcpyHostToDevice);
+  cudaMemcpy(b_d, b, ldb * n * sizeof(double), cudaMemcpyHostToDevice);
+  cudaMemcpy(c_d, c, ldc * n * sizeof(double), cudaMemcpyHostToDevice);
+
+  gemm_kernel<<<dimGrid, dimBlock>>>(m, n, k, alpha, a_d, lda, b_d, ldb, beta, c_d, ldc);
+
+  cudaMemcpy(c, c_d, ldc * n * sizeof(double), cudaMemcpyDeviceToHost);
+
+  cudaFree(a_d);
+  cudaFree(b_d);
+  cudaFree(c_d);
+}
+
+--------------- Code Block 3 ---------------
+__global__ void gemm_kernel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int j = blockIdx.x * blockDim.x + threadIdx.x;
+  int i = blockIdx.y * blockDim.y + threadIdx.y;
+  double temp = 0.0;
+
+  if (i < m && j < n) {
+    for (int l = 0; l < k; l++) {
+      temp += a[i * lda + l] * b[l * ldb + j];
+    }
+    c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+  }
+}
+
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int blockSize = 16;
+  int numBlocks = ceil(m / (float)blockSize) * ceil(n / (float)blockSize);
+
+  dim3 dimBlock(blockSize, blockSize);
+  dim3 dimGrid(numBlocks, numBlocks);
+
+  double *a_gpu, *b_gpu, *c_gpu;
+  cudaMalloc((void **)&a_gpu, lda * k * sizeof(double));
+  cudaMalloc((void **)&b_gpu, ldb * n * sizeof(double));
+  cudaMalloc((void **)&c_gpu, ldc * n * sizeof(double));
+
+  cudaMemcpy(a_gpu, a, lda * k * sizeof(double), cudaMemcpyHostToDevice);
+  cudaMemcpy(b_gpu, b, ldb * n * sizeof(double), cudaMemcpyHostToDevice);
+  cudaMemcpy(c_gpu, c, ldc * n * sizeof(double), cudaMemcpyHostToDevice);
+
+  gemm_kernel<<<dimGrid, dimBlock>>>(m, n, k, alpha, a_gpu, lda, b_gpu, ldb, beta, c_gpu, ldc);
+
+  cudaMemcpy(c, c_gpu, ldc * n * sizeof(double), cudaMemcpyDeviceToHost);
+
+  cudaFree(a_gpu);
+  cudaFree(b_gpu);
+  cudaFree(c_gpu);
+}
+
+--------------- Code Block 4 ---------------
+__global__ void gemm_kernel(int m, int n, int k, double alpha, double *A, int lda, double *B, int ldb, double beta, double *C, int ldc) {
+  int j = blockIdx.x * blockDim.x + threadIdx.x;
+  int i = blockIdx.y * blockDim.y + threadIdx.y;
+
+  if (i < m && j < n) {
+    double temp = 0.0;
+    for (int l = 0; l < k; l++) {
+      temp += A[i * lda + l] * B[l * ldb + j];
+    }
+    C[i * ldc + j] = alpha * temp + beta * C[i * ldc + j];
+  }
+}
+
+void gemm_parallel(int m, int n, int k, double alpha, double *A, int lda, double *B, int ldb, double beta, double *C, int ldc) {
+  int blockSize = 16;
+  int numBlocks = ceil(std::max(m, n) / (double)blockSize);
+
+  dim3 dimBlock(blockSize, blockSize);
+  dim3 dimGrid(numBlocks, numBlocks);
+
+  double *A_d, *B_d, *C_d;
+
+  cudaMalloc((void **)&A_d, lda * k * sizeof(double));
+  cudaMalloc((void **)&B_d, ldb * n * sizeof(double));
+  cudaMalloc((void **)&C_d, ldc * n * sizeof(double));
+
+  cudaMemcpy(A_d, A, lda * k * sizeof(double), cudaMemcpyHostToDevice);
+  cudaMemcpy(B_d, B, ldb * n * sizeof(double), cudaMemcpyHostToDevice);
+  cudaMemcpy(C_d, C, ldc * n * sizeof(double), cudaMemcpyHostToDevice);
+
+  gemm_kernel<<<dimGrid, dimBlock>>>(m, n, k, alpha, A_d, lda, B_d, ldb, beta, C_d, ldc);
+
+  cudaMemcpy(C, C_d, ldc * n * sizeof(double), cudaMemcpyDeviceToHost);
+
+  cudaFree(A_d);
+  cudaFree(B_d);
+  cudaFree(C_d);
+}
+
+--------------- Code Block 5 ---------------
+void gemm_parallel(int m, int n, int k, float alpha, float *a, int lda, float *b, int ldb, float beta, float *c, int ldc) {
+  int i, j, l;
+  float temp;
+  cudaError_t err;
+
+  // Allocate memory on the GPU
+  float *a_gpu, *b_gpu, *c_gpu;
+  err = cudaMalloc((void **)&a_gpu, lda * k * sizeof(float));
+  err = cudaMalloc((void **)&b_gpu, ldb * n * sizeof(float));
+  err = cudaMalloc((void **)&c_gpu, ldc * n * sizeof(float));
+
+  // Copy data from host to device
+  err = cudaMemcpy(a_gpu, a, lda * k * sizeof(float), cudaMemcpyHostToDevice);
+  err = cudaMemcpy(b_gpu, b, ldb * n * sizeof(float), cudaMemcpyHostToDevice);
+  err = cudaMemcpy(c_gpu, c, ldc * n * sizeof(float), cudaMemcpyHostToDevice);
+
+  // Define the CUDA kernel
+  __global__ void gemm_kernel(int m, int n, int k, float alpha, float *a, int lda, float *b, int ldb, float beta, float *c, int ldc) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    if (i < m && j < n) {
+      float temp = 0.0;
+      for (int l = 0; l < k; l++) {
+        temp += a[i * lda + l] * b[l * ldb + j];
+      }
+      c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+    }
+  }
+
+  // Launch the CUDA kernel
+  int blockSize = 16;
+  int numBlocks = (m + blockSize - 1) / blockSize;
+  gemm_kernel<<<dim3(numBlocks, numBlocks), dim3(blockSize, blockSize)>>>(m, n, k, alpha, a_gpu, lda, b_gpu, ldb, beta, c_gpu, ldc);
+
+  // Copy result from device to host
+  err = cudaMemcpy(c, c_gpu, ldc * n * sizeof(float), cudaMemcpyDeviceToHost);
+
+  // Free GPU memory
+  err = cudaFree(a_gpu);
+  err = cudaFree(b_gpu);
+  err = cudaFree(c_gpu);
+}
+
+--------------- Code Block 6 ---------------
+__global__ void gemm_kernel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int j = blockIdx.x * blockDim.x + threadIdx.x;
+  int i = blockIdx.y * blockDim.y + threadIdx.y;
+
+  if (i < m && j < n) {
+    double temp = 0.0;
+    for (int l = 0; l < k; l++) {
+      temp += a[i * lda + l] * b[l * ldb + j];
+    }
+    c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+  }
+}
+
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int blockSize = 16;
+  int numBlocks = (m + blockSize - 1) / blockSize;
+
+  dim3 dimBlock(blockSize, blockSize);
+  dim3 dimGrid(numBlocks, numBlocks);
+
+  double *a_d, *b_d, *c_d;
+
+  cudaMalloc((void **)&a_d, lda * k * sizeof(double));
+  cudaMalloc((void **)&b_d, ldb * n * sizeof(double));
+  cudaMalloc((void **)&c_d, ldc * n * sizeof(double));
+
+  cudaMemcpy(a_d, a, lda * k * sizeof(double), cudaMemcpyHostToDevice);
+  cudaMemcpy(b_d, b, ldb * n * sizeof(double), cudaMemcpyHostToDevice);
+  cudaMemcpy(c_d, c, ldc * n * sizeof(double), cudaMemcpyHostToDevice);
+
+  gemm_kernel<<<dimGrid, dimBlock>>>(m, n, k, alpha, a_d, lda, b_d, ldb, beta, c_d, ldc);
+
+  cudaMemcpy(c, c_d, ldc * n * sizeof(double), cudaMemcpyDeviceToHost);
+
+  cudaFree(a_d);
+  cudaFree(b_d);
+  cudaFree(c_d);
+}
+
+--------------- Code Block 7 ---------------
+__global__ void gemm_kernel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int j = blockIdx.x * blockDim.x + threadIdx.x;
+  int i = blockIdx.y * blockDim.y + threadIdx.y;
+
+  if (i < m && j < n) {
+    double temp = 0.0;
+    for (int l = 0; l < k; l++) {
+      temp += a[i * lda + l] * b[l * ldb + j];
+    }
+    c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+  }
+}
+
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int blockSize = 16;
+  int numBlocks = (m + blockSize - 1) / blockSize;
+
+  dim3 dimBlock(blockSize, blockSize);
+  dim3 dimGrid(numBlocks, numBlocks);
+
+  double *a_d, *b_d, *c_d;
+
+  cudaMalloc((void **)&a_d, lda * k * sizeof(double));
+  cudaMalloc((void **)&b_d, ldb * n * sizeof(double));
+  cudaMalloc((void **)&c_d, ldc * n * sizeof(double));
+
+  cudaMemcpy(a_d, a, lda * k * sizeof(double), cudaMemcpyHostToDevice);
+  cudaMemcpy(b_d, b, ldb * n * sizeof(double), cudaMemcpyHostToDevice);
+  cudaMemcpy(c_d, c, ldc * n * sizeof(double), cudaMemcpyHostToDevice);
+
+  gemm_kernel<<<dimGrid, dimBlock>>>(m, n, k, alpha, a_d, lda, b_d, ldb, beta, c_d, ldc);
+
+  cudaMemcpy(c, c_d, ldc * n * sizeof(double), cudaMemcpyDeviceToHost);
+
+  cudaFree(a_d);
+  cudaFree(b_d);
+  cudaFree(c_d);
+}
+
+--------------- Code Block 8 ---------------
+__global__ void gemm_kernel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int j = blockIdx.x * blockDim.x + threadIdx.x;
+  int i = blockIdx.y * blockDim.y + threadIdx.y;
+
+  if (i < m && j < n) {
+    double temp = 0.0;
+    for (int l = 0; l < k; l++) {
+      temp += a[i * lda + l] * b[l * ldb + j];
+    }
+    c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+  }
+}
+
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int blockSize = 16;
+  int numBlocks = ceil(sqrt(m * n) / blockSize);
+
+  dim3 dimBlock(blockSize, blockSize);
+  dim3 dimGrid(numBlocks, numBlocks);
+
+  double *a_d, *b_d, *c_d;
+
+  cudaMalloc((void **)&a_d, lda * k * sizeof(double));
+  cudaMalloc((void **)&b_d, ldb * n * sizeof(double));
+  cudaMalloc((void **)&c_d, ldc * n * sizeof(double));
+
+  cudaMemcpy(a_d, a, lda * k * sizeof(double), cudaMemcpyHostToDevice);
+  cudaMemcpy(b_d, b, ldb * n * sizeof(double), cudaMemcpyHostToDevice);
+  cudaMemcpy(c_d, c, ldc * n * sizeof(double), cudaMemcpyHostToDevice);
+
+  gemm_kernel<<<dimGrid, dimBlock>>>(m, n, k, alpha, a_d, lda, b_d, ldb, beta, c_d, ldc);
+
+  cudaMemcpy(c, c_d, ldc * n * sizeof(double), cudaMemcpyDeviceToHost);
+
+  cudaFree(a_d);
+  cudaFree(b_d);
+  cudaFree(c_d);
+}
+
+--------------- Code Block 9 ---------------
+__global__ void gemm_kernel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int j = blockIdx.x * blockDim.x + threadIdx.x;
+  int i = blockIdx.y * blockDim.y + threadIdx.y;
+  double temp = 0.0;
+
+  if (i < m && j < n) {
+    for (int l = 0; l < k; l++) {
+      temp += a[i * lda + l] * b[l * ldb + j];
+    }
+    c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+  }
+}
+
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int blockSize = 16;
+  int numBlocks = (m + blockSize - 1) / blockSize;
+  dim3 dimBlock(blockSize, blockSize);
+  dim3 dimGrid(numBlocks, numBlocks);
+
+  double *a_d, *b_d, *c_d;
+  cudaMalloc((void **)&a_d, lda * k * sizeof(double));
+  cudaMalloc((void **)&b_d, ldb * n * sizeof(double));
+  cudaMalloc((void **)&c_d, ldc * n * sizeof(double));
+
+  cudaMemcpy(a_d, a, lda * k * sizeof(double), cudaMemcpyHostToDevice);
+  cudaMemcpy(b_d, b, ldb * n * sizeof(double), cudaMemcpyHostToDevice);
+  cudaMemcpy(c_d, c, ldc * n * sizeof(double), cudaMemcpyHostToDevice);
+
+  gemm_kernel<<<dimGrid, dimBlock>>>(m, n, k, alpha, a_d, lda, b_d, ldb, beta, c_d, ldc);
+
+  cudaMemcpy(c, c_d, ldc * n * sizeof(double), cudaMemcpyDeviceToHost);
+
+  cudaFree(a_d);
+  cudaFree(b_d);
+  cudaFree(c_d);
+}
+
+--------------- Code Block 10 ---------------
+__global__ void gemm_kernel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int j = blockIdx.x * blockDim.x + threadIdx.x;
+  int i = blockIdx.y * blockDim.y + threadIdx.y;
+  double temp = 0.0;
+
+  if (i < m && j < n) {
+    for (int l = 0; l < k; l++) {
+      temp += a[i * lda + l] * b[l * ldb + j];
+    }
+    c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+  }
+}
+
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  int blockSize = 16;
+  int numBlocks = (m + blockSize - 1) / blockSize;
+  dim3 dimBlock(blockSize, blockSize);
+  dim3 dimGrid(numBlocks, numBlocks);
+
+  double *a_d, *b_d, *c_d;
+  cudaMalloc((void **)&a_d, lda * k * sizeof(double));
+  cudaMalloc((void **)&b_d, ldb * n * sizeof(double));
+  cudaMalloc((void **)&c_d, ldc * n * sizeof(double));
+
+  cudaMemcpy(a_d, a, lda * k * sizeof(double), cudaMemcpyHostToDevice);
+  cudaMemcpy(b_d, b, ldb * n * sizeof(double), cudaMemcpyHostToDevice);
+  cudaMemcpy(c_d, c, ldc * n * sizeof(double), cudaMemcpyHostToDevice);
+
+  gemm_kernel<<<dimGrid, dimBlock>>>(m, n, k, alpha, a_d, lda, b_d, ldb, beta, c_d, ldc);
+
+  cudaMemcpy(c, c_d, ldc * n * sizeof(double), cudaMemcpyDeviceToHost);
+
+  cudaFree(a_d);
+  cudaFree(b_d);
+  cudaFree(c_d);
+}
+
