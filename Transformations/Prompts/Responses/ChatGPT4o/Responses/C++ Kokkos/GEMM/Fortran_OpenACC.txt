@@ -1,0 +1,794 @@
+------------- Output 1 ---------------
+To implement the Generalized Matrix Multiplication (GEMM) function in C++ using Kokkos, we will follow a similar structure as provided in the Fortran subroutine using OpenACC. Kokkos is a library designed for performance portability, and we will use its parallel execution capabilities to achieve the desired parallelism. 
+
+Here is the equivalent C++ function:
+
+```cpp
+#include <Kokkos_Core.hpp>
+
+template <typename ViewType>
+void gemm_parallel(int m, int n, int k, 
+                   typename ViewType::value_type alpha, 
+                   const ViewType& a, int lda, 
+                   const ViewType& b, int ldb, 
+                   typename ViewType::value_type beta, 
+                   ViewType& c, int ldc) {
+  
+  using value_type = typename ViewType::value_type;
+  Kokkos::parallel_for(
+    "GEMM", 
+    Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {m, n}), 
+    KOKKOS_LAMBDA(const int i, const int j) {
+      value_type temp = 0.0;
+      for (int l = 0; l < k; ++l) {
+        temp += a(i, l) * b(l, j);
+      }
+      c(i, j) = alpha * temp + beta * c(i, j);
+    });
+}
+
+int main(int argc, char *argv[]) {
+  Kokkos::initialize(argc, argv);
+
+  // Example usage
+  {
+    const int m = 3, n = 3, k = 3;
+    const double alpha = 1.0, beta = 0.0;
+
+    Kokkos::View<double**> a("A", m, k);
+    Kokkos::View<double**> b("B", k, n);
+    Kokkos::View<double**> c("C", m, n);
+
+    // Initialize matrices a, b, and c with some values here for example
+    Kokkos::deep_copy(a, 1.0); // for simplicity, fill 'a' with 1.0
+    Kokkos::deep_copy(b, 1.0); // for simplicity, fill 'b' with 1.0
+    Kokkos::deep_copy(c, 0.0); // for simplicity, fill 'c' with 0.0
+
+    gemm_parallel(a.extent(0), c.extent(1), a.extent(1), alpha, a, a.extent(0), b, b.extent(0), beta, c, c.extent(0));
+
+    // Output the matrix 'c'
+    Kokkos::fence();
+    auto c_h = Kokkos::create_mirror_view(c);
+    Kokkos::deep_copy(c_h, c);
+    for (int i = 0; i < m; ++i) {
+      for (int j = 0; j < n; ++j) {
+        std::cout << c_h(i, j) << " ";
+      }
+      std::cout << std::endl;
+    }
+  }
+
+  Kokkos::finalize();
+  return 0;
+}
+```
+
+In this implementation:
+1. **ViewType**: Templates for Kokkos::View to handle the matrices.
+2. **Kokkos::parallel_for with Kokkos::MDRangePolicy**: Provides the parallelization over a 2D range corresponding to the dimensions of the output matrix `c`.
+3. **KOKKOS_LAMBDA**: Used to define the kernel function that will be executed in parallel.
+4. **Deep copy**: Initializes and copies the data to and from the device views.
+
+This code initializes Kokkos, defines matrices \(a\), \(b\), and \(c\), and then invokes the `gemm_parallel` function. Finally, it outputs the resultant matrix \(c\). Adjust the initialization of matrices \(a\) and \(b\) to fit your specific use case.
+
+------------- Output 2 ---------------
+Certainly! Below is the equivalent function implemented in C++ using Kokkos, which is a programming model in C++ for writing performance-portable applications for parallel architectures. It mirrors the Generalized Matrix Multiplication (GEMM) operation from your provided Fortran subroutine.
+
+First, ensure you have Kokkos installed. If you don’t have it yet, refer to the [Kokkos documentation](https://github.com/kokkos/kokkos/wiki/Building-Kokkos).
+
+The following code snippet demonstrates the GEMM operation with the Kokkos library:
+
+```cpp
+#include <Kokkos_Core.hpp>
+
+// Function to perform GEMM operation
+void gemm_parallel(int m, int n, int k, double alpha, const Kokkos::View<double**>& a, int lda, 
+                   const Kokkos::View<double**>& b, int ldb, double beta, Kokkos::View<double**>& c, int ldc) {
+
+    Kokkos::parallel_for("gemm_parallel", Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {n, m}), KOKKOS_LAMBDA(const int j, const int i) {
+        double temp = 0.0;
+        for (int l = 0; l < k; ++l) {
+            temp += a(i, l) * b(l, j);
+        }
+        c(i, j) = alpha * temp + beta * c(i, j);
+    });
+}
+
+int main(int argc, char* argv[]) {
+    Kokkos::initialize(argc, argv);
+    {
+        // Define dimensions
+        int m = 1000; // Number of rows of matrix A and C
+        int n = 1000; // Number of columns of matrix B and C
+        int k = 1000; // Number of columns of matrix A and rows of matrix B
+        double alpha = 1.0, beta = 1.0;
+
+        // Allocate Kokkos Views
+        Kokkos::View<double**> a("A", m, k);
+        Kokkos::View<double**> b("B", k, n);
+        Kokkos::View<double**> c("C", m, n);
+
+        // Initialize matrices A, B, and C (e.g., with random numbers)
+        // ...
+
+        // Perform GEMM operation
+        gemm_parallel(m, n, k, alpha, a, k, b, n, beta, c, n);
+
+        // Print or check the result matrix C
+        // ...
+    }
+    Kokkos::finalize();
+    return 0;
+}
+```
+
+### Explanation:
+
+1. **Headers and Initialization:**
+   - Include the Kokkos header file.
+   - Initialize Kokkos at the start of the `main` function and finalize it at the end.
+
+2. **Function Definition:**
+   - Define the `gemm_parallel` function.
+   - Use `Kokkos::View` for multi-dimensional arrays, which are analogous to Fortran arrays and provide memory management.
+
+3. **Parallel For Loop:**
+   - The `Kokkos::parallel_for` with `Kokkos::MDRangePolicy<Kokkos::Rank<2>>` is used to create a parallel two-dimensional loop similar to the nested loops in the Fortran subroutine.
+   - Inside the parallel loop, perform the matrix multiplication and accumulation.
+
+4. **Main Function:**
+   - Define matrix dimensions and coefficients `alpha` and `beta`.
+   - Create `Kokkos::View` objects for matrices A, B, and C.
+   - Optionally initialize these matrices (omitted for brevity).
+   - Call the `gemm_parallel` function to perform the matrix multiplication.
+   - Finalization.
+
+This approach ensures that the matrix multiplication is done in parallel using the Kokkos parallel programming model, much like the original Fortran code using OpenACC for GPU acceleration.
+
+------------- Output 3 ---------------
+To translate the given Fortran subroutine into a function using C++ with Kokkos, you will need to follow these steps:
+
+1. Initialize the Kokkos runtime.
+2. Create a parallel kernel using Kokkos parallel structures.
+3. Use appropriate data structures and operations compatible with Kokkos.
+
+Here is the corresponding C++ function using Kokkos:
+
+```cpp
+#include <Kokkos_Core.hpp>
+
+// Define the gemm_parallel function
+void gemm_parallel(int m, int n, int k, double alpha, const Kokkos::View<double**> a, const Kokkos::View<double**> b, double beta, Kokkos::View<double**> c) {
+  Kokkos::parallel_for(
+    "GEMM", 
+    Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {m, n}),
+    KOKKOS_LAMBDA(const int i, const int j) {
+      double temp = 0.0;
+      for (int l = 0; l < k; l++) {
+        temp += a(i, l) * b(l, j);
+      }
+      c(i, j) = alpha * temp + beta * c(i, j);
+    }
+  );
+}
+
+int main(int argc, char* argv[]) {
+  Kokkos::initialize(argc, argv);
+
+  {
+    // Example dimensions
+    int m = 4, n = 4, k = 4;
+    double alpha = 1.0, beta = 1.0;
+
+    // Declare and initialize matrices
+    Kokkos::View<double**> a("a", m, k);
+    Kokkos::View<double**> b("b", k, n);
+    Kokkos::View<double**> c("c", m, n);
+
+    // Initialize matrices a, b, c. (This step is just for the example. In practice, they would contain meaningful data)
+    Kokkos::parallel_for("InitA", m * k, KOKKOS_LAMBDA(const int index) {
+      int i = index / k;
+      int j = index % k;
+      a(i, j) = i + j;
+    });
+
+    Kokkos::parallel_for("InitB", k * n, KOKKOS_LAMBDA(const int index) {
+      int i = index / n;
+      int j = index % n;
+      b(i, j) = i * j;
+    });
+
+    Kokkos::parallel_for("InitC", m * n, KOKKOS_LAMBDA(const int index) {
+      int i = index / n;
+      int j = index % n;
+      c(i, j) = i - j;
+    });
+
+    // Perform GEMM operation
+    gemm_parallel(m, n, k, alpha, a, b, beta, c);
+
+    // Print result (for debugging purposes, can be omitted)
+    Kokkos::parallel_for("PrintC", m * n, KOKKOS_LAMBDA(const int index) {
+      int i = index / n;
+      int j = index % n;
+      Kokkos::single(Kokkos::PerTeam(nullptr), [&]() { printf("c(%d, %d) = %f\n", i, j, c(i, j)); });
+    });
+  }
+
+  Kokkos::finalize();
+
+  return 0;
+}
+```
+
+### Explanation:
+
+1. **Initialization and Policy**: Kokkos is initialized using `Kokkos::initialize` and finalized with `Kokkos::finalize`.
+2. **Data Structures**: `Kokkos::View<double**>` is used for the matrix representation, which supports multi-dimensional arrays.
+3. **Parallel Kernel**: The `gemm_parallel` function uses `Kokkos::parallel_for` with a `Kokkos::MDRangePolicy<Kokkos::Rank<2>>` to define a parallel region over two dimensions.
+4. **Lambda Function**: The lambda function within `Kokkos::parallel_for` computes the GEMM operation.
+5. **Initialization and Printing**: Example initialization and printing are done for illustrative purposes.
+
+Before compiling and running the above code, ensure you have installed Kokkos and linked your program appropriately. This example focuses on providing clarity on converting a Fortran subroutine with OpenACC to a C++ function using Kokkos for parallel processing.
+
+------------- Output 4 ---------------
+To implement the provided Fortran subroutine `gemm_parallel` in C++ using Kokkos, you can follow these steps. Kokkos is a C++ library developed to enable performance portability across various hardware architectures, including multicore CPUs, manycore GPUs, and more. Make sure you have Kokkos installed and properly configured in your development environment.
+
+Here is an equivalent C++ function using Kokkos:
+
+```cpp
+#include <Kokkos_Core.hpp>
+
+template<typename Scalar>
+void gemm_parallel(int m, int n, int k, Scalar alpha, const Kokkos::View<Scalar**> &a, const Kokkos::View<Scalar**> &b, Scalar beta, Kokkos::View<Scalar**> &c) {
+    Kokkos::parallel_for("GEMM", Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {n, m}), KOKKOS_LAMBDA(const int j, const int i) {
+        Scalar temp = 0.0;
+        for (int l = 0; l < k; ++l) {
+            temp += a(i, l) * b(l, j);
+        }
+        c(i, j) = alpha * temp + beta * c(i, j);
+    });
+}
+
+int main(int argc, char* argv[]) {
+    Kokkos::initialize(argc, argv);
+    {
+        // Example usage
+        int m = 1000, n = 1000, k = 1000;
+        using Scalar = double; // Equivalent to real(kind=8) in Fortran
+
+        // Allocate matrices a, b, and c
+        Kokkos::View<Scalar**> a("A", m, k);
+        Kokkos::View<Scalar**> b("B", k, n);
+        Kokkos::View<Scalar**> c("C", m, n);
+
+        // Initialize matrices a, b, and c with some values...
+        // (For example, could use Kokkos::parallel_for to do this)
+
+        Scalar alpha = 1.0;
+        Scalar beta = 1.0;
+        
+        // Perform GEMM operation
+        gemm_parallel(m, n, k, alpha, a, b, beta, c);
+        
+        // Optionally copy data out of the Kokkos views...
+    }
+    Kokkos::finalize();
+    return 0;
+}
+```
+
+### Explanation:
+1. **Function Signature**:
+   - The function `gemm_parallel` takes the matrix dimensions `m`, `n`, `k`, and the scalars `alpha` and `beta`.
+   - `a`, `b`, and `c` are declared as `Kokkos::View<Scalar**>`, which are Kokkos-managed multidimensional arrays.
+   
+2. **Kokkos MDRangePolicy**:
+   - The `Kokkos::MDRangePolicy<Kokkos::Rank<2>>` is used to define a 2D range policy, similar to the loop collapsing in OpenACC.
+   - `Kokkos::parallel_for` with this policy will parallelize the outer two loops.
+
+3. **Kokkos Lambda**:
+   - The lambda function `KOKKOS_LAMBDA` defines the body of the parallel loop.
+   - The computation inside the lambda follows the algorithm defined in the Fortran subroutine.
+
+4. **Initialization of Kokkos Views**:
+   - The matrices `a`, `b`, and `c` are allocated as Kokkos views.
+   - You would typically initialize these matrices with your data before calling `gemm_parallel`.
+
+5. **Example Usage**:
+   - An example `main` function initializes Kokkos and demonstrates how to call `gemm_parallel`.
+   - Remember to provide proper initial values for `a`, `b`, and `c` if you're testing this code.
+
+### Notes:
+- Ensure you have the appropriate Kokkos backend configured when compiling and running your code.
+- Kokkos must be initialized before any Kokkos constructs are used, and finalized after all Kokkos operations are complete.
+- Adapting memory layout (e.g., column-major in Fortran versus row-major in C++) might be necessary based on your specific requirements. By default, Kokkos uses a row-major layout.
+
+------------- Output 5 ---------------
+Certainly! Below is a C++ implementation of the provided Fortran subroutine using Kokkos. The function performs the Generalized Matrix Multiplication (GEMM) based on the given parameters.
+
+First, ensure you have Kokkos installed and properly configured. Below is a C++ implementation of the GEMM operation:
+
+```cpp
+#include <Kokkos_Core.hpp>
+
+// Define the GEMM function in C++ using Kokkos
+void gemm_parallel(int m, int n, int k, double alpha, 
+                   const Kokkos::View<double**> &a, int lda, 
+                   const Kokkos::View<double**> &b, int ldb, 
+                   double beta, Kokkos::View<double**> &c, int ldc) {
+
+  Kokkos::parallel_for("gemm_parallel", Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {m, n}),
+    KOKKOS_LAMBDA(const int i, const int j) {
+      double temp = 0.0;
+      for (int l = 0; l < k; ++l) {
+        temp += a(i, l) * b(l, j);
+      }
+      c(i, j) = alpha * temp + beta * c(i, j);
+  });
+
+}
+
+int main(int argc, char* argv[]) {
+  Kokkos::initialize(argc, argv);
+
+  {
+    // Example sizes (you can change these as needed)
+    int m = 4;
+    int n = 3;
+    int k = 5;
+
+    // Initialize matrices (this is just an example; in practice, you would fill them with meaningful data)
+    Kokkos::View<double**> a("a", m, k);
+    Kokkos::View<double**> b("b", k, n);
+    Kokkos::View<double**> c("c", m, n);
+
+    // Fill a and b with example values
+    Kokkos::parallel_for("init_a", m, KOKKOS_LAMBDA(const int i) {
+      for (int l = 0; l < k; ++l) {
+        a(i, l) = 1.0 * (i + l + 1);  // example initialization
+      }
+    });
+
+    Kokkos::parallel_for("init_b", k, KOKKOS_LAMBDA(const int l) {
+      for (int j = 0; j < n; ++j) {
+        b(l, j) = 2.0 * (l + j + 1);  // example initialization
+      }
+    });
+
+    // Perform the GEMM operation
+    double alpha = 1.0;
+    double beta = 1.0;
+    gemm_parallel(m, n, k, alpha, a, k, b, n, beta, c, n);
+
+    // Optionally, you can output the result
+    Kokkos::parallel_for("print_c", m, KOKKOS_LAMBDA(const int i) {
+      for (int j = 0; j < n; ++j) {
+        printf("c(%d, %d) = %f\n", i, j, c(i, j));
+      }
+    });
+  }
+
+  Kokkos::finalize();
+  return 0;
+}
+```
+
+Make sure that:
+- **Kokkos is properly installed and included in your build environment.**
+- **You link Kokkos libraries during the compilation of your program.**
+
+You can compile this using a typical compilation command like:
+
+```bash
+g++ -o gemm_parallel gemm_parallel.cpp -I/path/to/kokkos/include -L/path/to/kokkos/lib -lkokkos -fopenmp
+```
+
+Remember to replace `/path/to/kokkos/include` and `/path/to/kokkos/lib` with the actual paths to your Kokkos installation.
+
+This C++ function performs the GEMM operation from the provided Fortran subroutine in parallel using Kokkos, leveraging a multidimensional range policy for parallelization.
+
+------------- Output 6 ---------------
+Below is a C++ function using Kokkos to perform the Generalized Matrix Multiplication (GEMM) operation as specified in your Fortran subroutine. First, make sure you have Kokkos properly installed and configured in your environment.
+
+```cpp
+#include <Kokkos_Core.hpp>
+
+void gemm_parallel(int m, int n, int k, double alpha,
+                   const Kokkos::View<double**>& a, int lda,
+                   const Kokkos::View<double**>& b, int ldb,
+                   double beta, Kokkos::View<double**>& c, int ldc) {
+  
+  // Check if the dimensions match
+  assert(lda >= m);
+  assert(ldb >= k);
+  assert(ldc >= m);
+  assert(a.extent(0) == lda);
+  assert(b.extent(0) == ldb);
+  assert(c.extent(0) == ldc);
+  
+  Kokkos::parallel_for("gemm_parallel", Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {m, n}),
+    KOKKOS_LAMBDA(int i, int j) {
+      double temp = 0.0;
+      for (int l = 0; l < k; ++l) {
+        temp += a(i, l) * b(l, j);
+      }
+      c(i, j) = alpha * temp + beta * c(i, j);
+    });
+}
+
+int main(int argc, char* argv[]) {
+  Kokkos::initialize(argc, argv);
+  {
+    // Dimensions
+    int m = 3, n = 4, k = 5;
+    
+    // Scalars
+    double alpha = 1.0, beta = 0.5;
+    
+    // Allocate and assign values to matrices a, b, and c
+    Kokkos::View<double**> a("A", m, k);
+    Kokkos::View<double**> b("B", k, n);
+    Kokkos::View<double**> c("C", m, n);
+
+    // Initialize matrices with example values (real application would initialize with actual data)
+    Kokkos::parallel_for("initialize_matrices", Kokkos::RangePolicy<>(0, m * k), KOKKOS_LAMBDA(int index) {
+      int i = index / k;
+      int l = index % k;
+      a(i, l) = static_cast<double>(i + l);
+    });
+    Kokkos::parallel_for("initialize_matrices", Kokkos::RangePolicy<>(0, k * n), KOKKOS_LAMBDA(int index) {
+      int l = index / n;
+      int j = index % n;
+      b(l, j) = static_cast<double>(l - j);
+    });
+    Kokkos::parallel_for("initialize_matrices", Kokkos::RangePolicy<>(0, m * n), KOKKOS_LAMBDA(int index) {
+      int i = index / n;
+      int j = index % n;
+      c(i, j) = static_cast<double>(i * j);
+    });
+
+    // Perform GEMM
+    gemm_parallel(m, n, k, alpha, a, m, b, k, beta, c, m);
+
+    // Optionally, you can print the result to verify correctness
+    Kokkos::fence();
+    Kokkos::parallel_for("print_result", Kokkos::RangePolicy<>(0, m * n), KOKKOS_LAMBDA(int index) {
+      int i = index / n;
+      int j = index % n;
+      printf("c(%d, %d) = %lf\n", i, j, c(i, j));
+    });
+  }
+  Kokkos::finalize();
+  return 0;
+}
+```
+
+### Explanation:
+1. **Kokkos Initialization and Finalization**:
+   - `Kokkos::initialize(argc, argv);` initializes the Kokkos runtime.
+   - `Kokkos::finalize();` finalizes the Kokkos runtime, released resources.
+
+2. **Kokkos::View Allocation**:
+   - Matrices `a`, `b`, and `c` are allocated using `Kokkos::View`, which are Kokkos’ preferred method for managing multi-dimensional arrays.
+
+3. **Initialization of Matrices**:
+   - The matrices `a`, `b`, and `c` are initialized using parallel loops.
+
+4. **GEMM Operation**:
+   - The `gemm_parallel` function contains the main computation. It uses a 2-dimensional `Kokkos::MDRangePolicy` to apply a parallel loop over dimensions `m` and `n`.
+
+5. **The LAMBDA Expression**:
+   - Inside the lambda, the innermost loop over `l` computes the dot product for each element of the resulting matrix.
+
+6. **Assertions**:
+   - The `assert` statements ensure the dimensions match correctly, preventing out-of-bounds accesses.
+
+This implementation should closely match the functionality of your Fortran `gemm_parallel` subroutine using OpenACC, but using Kokkos for parallel execution in C++.
+
+------------- Output 7 ---------------
+Sure! Below is the equivalent function in C++ using Kokkos for computing a Generalized Matrix Multiplication (GEMM) operation:
+
+```cpp
+#include <Kokkos_Core.hpp>
+
+template<typename Scalar>
+void gemm_parallel(
+        const int m, const int n, const int k,
+        const Scalar alpha, Kokkos::View<Scalar**> a, const int lda,
+        Kokkos::View<Scalar**> b, const int ldb,
+        const Scalar beta, Kokkos::View<Scalar**> c, const int ldc) {
+
+    // Define a Kokkos parallel loop
+    Kokkos::parallel_for("gemm_parallel", Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {m, n}), KOKKOS_LAMBDA (const int i, const int j) {
+        Scalar temp = 0.0;
+        for (int l = 0; l < k; ++l) {
+            temp += a(i, l) * b(l, j);
+        }
+        c(i, j) = alpha * temp + beta * c(i, j);
+    });
+}
+
+int main(int argc, char* argv[]) {
+    Kokkos::initialize(argc, argv);
+
+    // Example usage with double precision
+    {
+        const int m = 4, n = 3, k = 5;
+        double alpha = 1.0, beta = 0.5;
+
+        // Allocate views on the host memory space
+        Kokkos::View<double**> a("A", m, k);
+        Kokkos::View<double**> b("B", k, n);
+        Kokkos::View<double**> c("C", m, n);
+
+        // Initialize matrices with some values (omitted for brevity)
+
+        // Perform GEMM
+        gemm_parallel(m, n, k, alpha, a, m, b, k, beta, c, m);
+    }
+
+    Kokkos::finalize();
+    return 0;
+}
+```
+
+### Explanation:
+
+1. **Headers and Setup:**
+   - `#include <Kokkos_Core.hpp>` is the main header file for Kokkos.
+
+2. **Function Definition:**
+   - The function template `gemm_parallel` takes the dimensions and scalars as well as `Kokkos::View` objects representing matrices `a`, `b`, and `c`.
+   - `Kokkos::View` is a multi-dimensional array that can be accessed from both host and device code.
+
+3. **Parallel Loop:**
+   - `Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {m, n})` is used to define a 2D range policy for the parallel loop.
+   - The lambda function inside `Kokkos::parallel_for` performs the nested loops and computes the GEMM as described in your Fortran/OpenACC code.
+
+4. **Main Function:**
+   - `Kokkos::initialize` and `Kokkos::finalize` manage the lifecycle of the Kokkos runtime.
+   - Views (`a`, `b`, and `c`) are allocated and can be initialized with any desired values.
+   - The `gemm_parallel` function is called with these views and other parameters.
+
+This C++ code with Kokkos should be functionally equivalent to the Fortran subroutine you provided. When running, it will leverage parallelism appropriately depending on the backend enabled (e.g., OpenMP, CUDA) in Kokkos.
+
+------------- Output 8 ---------------
+Certainly! Below is a function implemented in C++ using Kokkos, which performs the same Generalized Matrix multiplication (GEMM) operation as the provided Fortran subroutine. 
+
+Firstly, ensure you have included the Kokkos library and properly initialized it in your main function.
+
+```cpp
+#include <Kokkos_Core.hpp>
+
+template <typename ViewType>
+void gemm_parallel(int m, int n, int k, double alpha, const ViewType &a, const ViewType &b, double beta, ViewType &c) {
+    Kokkos::parallel_for("GEMM Loop", Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {m, n}), KOKKOS_LAMBDA(int i, int j) {
+        double temp = 0.0;
+        for (int l = 0; l < k; ++l) {
+            temp += a(i, l) * b(l, j);
+        }
+        c(i, j) = alpha * temp + beta * c(i, j);
+    });
+}
+
+int main(int argc, char* argv[]) {
+    Kokkos::initialize(argc, argv);
+
+    {
+        // Sizes of the matrices
+        int m = 4;  // Number of rows in matrix A and C
+        int n = 4;  // Number of columns in matrix B and C
+        int k = 4;  // Number of columns in matrix A and rows in matrix B
+
+        double alpha = 1.5, beta = 2.0;
+
+        // Define Kokkos views for matrices A, B, and C
+        Kokkos::View<double**> A("A", m, k);
+        Kokkos::View<double**> B("B", k, n);
+        Kokkos::View<double**> C("C", m, n);
+
+        // Initialize matrices A, B, and C here
+        // For simplicity, set some arbitrary values
+        Kokkos::parallel_for("Initialize A", m, KOKKOS_LAMBDA(int i) {
+            for (int j = 0; j < k; ++j) {
+                A(i, j) = static_cast<double>((i + 1) * (j + 1));
+            }
+        });
+
+        Kokkos::parallel_for("Initialize B", k, KOKKOS_LAMBDA(int i) {
+            for (int j = 0; j < n; ++j) {
+                B(i, j) = static_cast<double>((i + 1) + (j + 1));
+            }
+        });
+
+        Kokkos::parallel_for("Initialize C", m, KOKKOS_LAMBDA(int i) {
+            for (int j = 0; j < n; ++j) {
+                C(i, j) = static_cast<double>(i - j);
+            }
+        });
+
+        // Perform GEMM operation
+        gemm_parallel(m, n, k, alpha, A, B, beta, C);
+
+        // Optionally copy data back to host and print or validate results here
+        // ...
+    }
+
+    Kokkos::finalize();
+    return 0;
+}
+```
+
+#### Notes:
+
+1. **Kokkos::View** is a multi-dimensional array that can be used to represent matrices. The views `A`, `B`, and `C` represent matrices in this example.
+2. **Kokkos::parallel_for** with `Kokkos::MDRangePolicy` allows for parallelization over multi-dimensional indices.
+3. The lambda function inside `parallel_for` performs the GEMM calculation similarly to the Fortran code.
+4. The `Kokkos::initialize` and `Kokkos::finalize` functions are used to manage the Kokkos runtime environment.
+
+Before running this code, make sure to have Kokkos installed and properly set up in your build environment. If using CMake, you can link Kokkos like this:
+
+```cmake
+find_package(Kokkos REQUIRED)
+add_executable(gemm_parallel gemm_parallel.cpp)
+target_link_libraries(gemm_parallel Kokkos::kokkos)
+```
+
+Make sure to replace `gemm_parallel.cpp` with the actual name of your source file.
+
+------------- Output 9 ---------------
+Sure, here's a function implemented in C++ with Kokkos that performs a Generalized Matrix Multiplication (GEMM) operation analogous to the Fortran subroutine you provided with OpenACC:
+
+```cpp
+#include <Kokkos_Core.hpp>
+
+// GEMM function using Kokkos
+void gemm_parallel(int m, int n, int k, double alpha, 
+                   Kokkos::View<double**> a, int lda, 
+                   Kokkos::View<double**> b, int ldb, 
+                   double beta, 
+                   Kokkos::View<double**> c, int ldc) {
+    // Parallelize the outer loops using a Kokkos parallelization pattern
+    Kokkos::parallel_for("GEMM", Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {m, n}), 
+        KOKKOS_LAMBDA (int i, int j) {
+            double temp = 0.0;
+            for (int l = 0; l < k; ++l) {
+                temp += a(i, l) * b(l, j);
+            }
+            c(i, j) = alpha * temp + beta * c(i, j);
+        }
+    );
+}
+
+int main(int argc, char* argv[]) {
+    Kokkos::initialize(argc, argv);
+
+    // Example usage:
+    int m = 100, n = 100, k = 100;
+    double alpha = 1.0, beta = 1.0;
+    
+    // Define the dimensions of the matrices
+    Kokkos::View<double**> a("a", m, k);
+    Kokkos::View<double**> b("b", k, n);
+    Kokkos::View<double**> c("c", m, n);
+    
+    // Assuming a, b, and c are initialized appropriately...
+
+    // Call the gemm_parallel function
+    gemm_parallel(m, n, k, alpha, a, m, b, k, beta, c, m);
+    
+    Kokkos::finalize();
+    return 0;
+}
+```
+
+### Explanation:
+1. **Kokkos::View:** Used to manage multi-dimensional arrays in Kokkos. In this example, it is used to represent matrices `a`, `b`, and `c`.
+2. **Kokkos::parallel_for:** Used to parallelize the outer loops (i and j) using Kokkos MDRangePolicy for a two-dimensional range.
+3. **KOKKOS_LAMBDA:** A macro to define lambda functions that can be executed in parallel by Kokkos.
+4. **Initialization:** `Kokkos::initialize` and `Kokkos::finalize` are used to initialize and finalize the Kokkos library.
+   
+You'll need to compile this code with appropriate flags to link against the Kokkos library. Here's an example using `g++`:
+
+```
+g++ -std=c++11 -I/path/to/kokkos/include -L/path/to/kokkos/lib -o gemm_program gemm_program.cpp -lkokkoscore
+```
+
+Make sure to replace `/path/to/kokkos/include` and `/path/to/kokkos/lib` with the actual paths to your Kokkos installation.
+
+------------- Output 10 ---------------
+Here's an equivalent C++ function using Kokkos to perform a generalized matrix multiplication (GEMM) operation, mirroring the provided Fortran subroutine:
+
+```cpp
+#include <Kokkos_Core.hpp>
+
+template <typename Scalar>
+void gemm_parallel(int m, int n, int k, Scalar alpha, 
+                   const Kokkos::View<Scalar**, Kokkos::LayoutLeft>& A, int lda,
+                   const Kokkos::View<Scalar**, Kokkos::LayoutLeft>& B, int ldb,
+                   Scalar beta, Kokkos::View<Scalar**, Kokkos::LayoutLeft>& C, int ldc) {
+
+  Kokkos::parallel_for("GEMM", Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {m, n}),
+                       KOKKOS_LAMBDA(int i, int j) {
+    Scalar temp = Scalar(0);
+
+    for (int l = 0; l < k; ++l) {
+      temp += A(i, l) * B(l, j);
+    }
+
+    C(i, j) = alpha * temp + beta * C(i, j);
+  });
+}
+
+int main(int argc, char* argv[]) {
+  Kokkos::initialize(argc, argv);
+  {
+    const int m = 4;
+    const int n = 3;
+    const int k = 2;
+
+    double alpha = 1.0;
+    double beta = 2.0;
+
+    Kokkos::View<double**, Kokkos::LayoutLeft> A("A", m, k);
+    Kokkos::View<double**, Kokkos::LayoutLeft> B("B", k, n);
+    Kokkos::View<double**, Kokkos::LayoutLeft> C("C", m, n);
+
+    // Initializing the matrices A, B, and C with some values
+    Kokkos::parallel_for("InitA", m * k, KOKKOS_LAMBDA(int idx) {
+      int i = idx / k;
+      int l = idx % k;
+      A(i, l) = static_cast<double>(i + l + 1);
+    });
+
+    Kokkos::parallel_for("InitB", k * n, KOKKOS_LAMBDA(int idx) {
+      int l = idx / n;
+      int j = idx % n;
+      B(l, j) = static_cast<double>(l + j + 2);
+    });
+
+    Kokkos::parallel_for("InitC", m * n, KOKKOS_LAMBDA(int idx) {
+      int i = idx / n;
+      int j = idx % n;
+      C(i, j) = static_cast<double>(i + j);
+    });
+
+    // Perform GEMM
+    gemm_parallel<double>(m, n, k, alpha, A, m, B, k, beta, C, m);
+
+    // Printing the result (for demonstration purposes)
+    Kokkos::fence();
+    Kokkos::print_configuration(std::cout);
+
+    auto h_C = Kokkos::create_mirror_view(C);
+    Kokkos::deep_copy(h_C, C);
+
+    for (int i = 0; i < m; ++i) {
+      for (int j = 0; j < n; ++j) {
+        std::cout << h_C(i, j) << " ";
+      }
+      std::cout << std::endl;
+    }
+  }
+  Kokkos::finalize();
+  return 0;
+}
+```
+
+Here's a brief explanation:
+1. This function `gemm_parallel` uses Kokkos for parallel execution over 2D loops.
+2. `Kokkos::View` is used to handle multi-dimensional array data similar to the Fortran arrays.
+3. The `Kokkos::MDRangePolicy` is used to specify a 2D range policy for parallel execution.
+4. Inside the parallel kernel, the computation is done using the standard GEMM formula.
+5. The `main` function initializes Kokkos, sets up the data structures, calls the `gemm_parallel` function, and finally prints the results.
+
+Compile and Run:
+You need to compile the code with appropriate Kokkos and backend flags. For instance, with g++, you might use:
+```sh
+g++ -o gemm -I<path_to_kokkos_include> gemm.cpp -L<path_to_kokkos_lib> -lkokkos -std=c++11 -ldl
+./gemm
+```
+
+Replace `<path_to_kokkos_include>` and `<path_to_kokkos_lib>` with the actual paths to your Kokkos installation.
+

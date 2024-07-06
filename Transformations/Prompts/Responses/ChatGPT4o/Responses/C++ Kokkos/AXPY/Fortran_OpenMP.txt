@@ -1,0 +1,734 @@
+------------- Output 1 ---------------
+Sure, you can achieve the AXPY operation using Kokkos in C++. Kokkos is a C++ library designed for parallel execution and memory abstraction, which makes it an excellent choice for performance portability across various hardware architectures.
+
+Below is an equivalent Kokkos implementation of the given Fortran subroutine using C++. This implementation assumes Kokkos is properly installed and initialized in your environment.
+
+```cpp
+#include <Kokkos_Core.hpp>
+
+// Function to perform AXPY operation using Kokkos
+void saxpy_parallel(const int n, const float a, Kokkos::View<const float*> x, Kokkos::View<float*> y) {
+    // Kokkos parallel for loop
+    Kokkos::parallel_for("saxpy", Kokkos::RangePolicy<>(0, n), KOKKOS_LAMBDA(const int i) {
+        y(i) = a * x(i) + y(i);
+    });
+}
+
+int main(int argc, char* argv[]) {
+    // Initialize Kokkos
+    Kokkos::initialize(argc, argv);
+
+    {
+        // Example usage
+        const int n = 1000000;
+        const float a = 2.0f;
+
+        // Allocate memory for x and y using Kokkos view
+        Kokkos::View<float*> x("x", n);
+        Kokkos::View<float*> y("y", n);
+
+        // Initialize x and y with some values
+        Kokkos::parallel_for("init_x", Kokkos::RangePolicy<>(0, n), KOKKOS_LAMBDA(const int i) {
+            x(i) = static_cast<float>(i);
+            y(i) = static_cast<float>(i) * 0.5f;
+        });
+
+        // Perform the AXPY operation
+        saxpy_parallel(n, a, x, y);
+
+        // Optionally, verify the results
+        auto y_host = Kokkos::create_mirror_view(y);
+        Kokkos::deep_copy(y_host, y);
+
+        for(int i = 0; i < n; ++i) {
+            if (y_host(i) != a * x(i) + 0.5f * x(i)) {
+                std::cout << "Error at position " << i << ": " << y_host(i) << std::endl;
+            }
+        }
+
+        std::cout << "AXPY operation completed successfully" << std::endl;
+    }
+
+    // Finalize Kokkos
+    Kokkos::finalize();
+
+    return 0;
+}
+```
+
+This code does the following:
+1. Initializes Kokkos within `main`.
+2. Declares and allocates memory using Kokkos views for `x` and `y`.
+3. Initializes the `x` and `y` arrays.
+4. Executes the `saxpy_parallel` function, which performs the AXPY operation (`y(i) = a * x(i) + y(i)`) using a parallel-for loop.
+5. Optionally verifies the results by copying data back to the host and checking correctness.
+6. Finalizes Kokkos.
+
+Make sure to link your code against Kokkos when compiling. For instance:
+```sh
+g++ -o axpy -I${KOKKOS_DIR}/include -L${KOKKOS_DIR}/lib -lkokkos axpy.cpp
+```
+Replace `${KOKKOS_DIR}` with the path to your Kokkos installation.
+
+------------- Output 2 ---------------
+Sure! Below is a function implemented in C++ using Kokkos that performs the AXPY operation, similar to what your Fortran subroutine does with OpenMP.
+
+To use Kokkos, make sure you have it properly set up and initialized in your project.
+
+Here's the C++ implementation:
+
+```cpp
+#include <Kokkos_Core.hpp>
+
+void saxpy_parallel(int n, float a, const float* x, float* y) {
+    // Create Kokkos views from raw pointers
+    Kokkos::View<const float*> x_view(x, n);
+    Kokkos::View<float*> y_view(y, n);
+
+    Kokkos::parallel_for("SAXPY", n, KOKKOS_LAMBDA(int i) {
+        y_view(i) = a * x_view(i) + y_view(i);
+    });
+}
+
+int main(int argc, char* argv[]) {
+    Kokkos::initialize(argc, argv);
+
+    {
+        const int n = 100;
+        float a = 2.0f;
+        float x[n] = { /* initialize with some values */ };
+        float y[n] = { /* initialize with some values */ };
+
+        saxpy_parallel(n, a, x, y);
+
+        // Optional: Verify results or print y
+    }
+
+    Kokkos::finalize();
+    return 0;
+}
+```
+
+### Breakdown of the Code:
+1. **Initialization and Finalization**: 
+    - `Kokkos::initialize()` and `Kokkos::finalize()` mark the beginning and end of Kokkos parallel region.
+
+2. **Function Definition** (`saxpy_parallel`):
+    - **Kokkos::View**: Kokkos Views are used to manage memory and facilitate parallel operations. Here, `x_view` is a read-only view of the input array `x`, while `y_view` is a readable and writable view of the input/output array `y`.
+    - **Kokkos::parallel_for**: This function launches a parallel kernel. It takes a name (for profiling), the range of indices to loop over, and a lambda function that performs the computation. The lambda function gets executed in parallel by default.
+
+3. **Main Function**:
+    - In the `main` function, the `saxpy_parallel` function is called after initializing Kokkos.
+    - In actual usage, you might initialize `x` and `y` with specific values and potentially print or verify the results after the computation.
+
+This C++ function achieves the same effect as your Fortran subroutine with OpenMP, utilizing the Kokkos library to provide parallel execution.
+
+------------- Output 3 ---------------
+Certainly! Below is an equivalent implementation of the `saxpy_parallel` subroutine in C++ using the Kokkos library. The Kokkos library is designed to provide a single source parallel programming model for performance portability across different hardware backends such as OpenMP, CUDA, etc.
+
+Here's the C++ code for the AXPY operation:
+```cpp
+#include <Kokkos_Core.hpp>
+
+// Function that performs the AXPY operation using Kokkos
+void saxpy_parallel(int n, float a, Kokkos::View<float*> x, Kokkos::View<float*> y) {
+    // Parallel_for with Kokkos to perform the AXPY operation
+    Kokkos::parallel_for("axpy", n, KOKKOS_LAMBDA(int i) {
+        y(i) = a * x(i) + y(i);
+    });
+}
+
+int main(int argc, char* argv[]) {
+    // Initialize Kokkos
+    Kokkos::initialize(argc, argv);
+    
+    {
+        const int n = 1000;
+        const float a = 2.0f;
+
+        // Allocate and initialize Views
+        Kokkos::View<float*> x("x", n);
+        Kokkos::View<float*> y("y", n);
+
+        // Initialize the vectors (x and y)
+        Kokkos::parallel_for("init_x", n, KOKKOS_LAMBDA(int i) {
+            x(i) = static_cast<float>(i);
+        });
+
+        Kokkos::parallel_for("init_y", n, KOKKOS_LAMBDA(int i) {
+            y(i) = static_cast<float>(i * 2);
+        });
+
+        // Perform the AXPY operation
+        saxpy_parallel(n, a, x, y);
+
+        // Optionally, you can verify the results (e.g., print out the first few elements)
+        Kokkos::parallel_for("print_y", 10, KOKKOS_LAMBDA(int i) {
+            printf("y[%d] = %f\n", i, y(i));
+        });
+    }
+
+    // Finalize Kokkos
+    Kokkos::finalize();
+
+    return 0;
+}
+```
+
+To use the above code, you need to have the Kokkos library installed and set up correctly. The `Kokkos::View` is used to define and manage the arrays `x` and `y`. The `Kokkos::parallel_for` executes the given lambda function in parallel, across the specified range.
+
+### Installation and Compilation
+
+1. **Install the Kokkos library**: Follow the instructions provided on the [Kokkos GitHub repository](https://github.com/kokkos/kokkos).
+
+2. **Compile the code**:
+    ```sh
+    g++ -o saxpy_parallel saxpy_parallel.cpp -I<path_to_kokkos_include> -L<path_to_kokkos_library> -lkokkos -fopenmp
+    ```
+
+Replace `<path_to_kokkos_include>` and `<path_to_kokkos_library>` with the actual paths to the Kokkos include directory and library.
+
+### Running the Program
+
+Execute the compiled program:
+```sh
+./saxpy_parallel
+```
+
+This will initialize Kokkos, perform the AXPY operation in parallel, and optionally print the results of the first few elements.
+
+The setup and execution should mirror the OpenMP parallelism of the provided Fortran subroutine in a way that leverages Kokkos' capabilities for parallel operations.
+
+------------- Output 4 ---------------
+Certainly! The fortran subroutine `saxpy_parallel` performs a parallel AXPY operation using OpenMP. Below is a C++ equivalent using Kokkos for parallel execution.
+
+First, ensure you have Kokkos installed and properly configured. The following C++ code will illustrate the `saxpy_parallel` function using Kokkos.
+
+```cpp
+#include <Kokkos_Core.hpp>
+#include <Kokkos_Parallel.hpp>
+
+void axpy_parallel(int n, float a, const Kokkos::View<float*> x, Kokkos::View<float*> y) {
+    Kokkos::parallel_for("AXPY", Kokkos::RangePolicy<>(0, n), KOKKOS_LAMBDA(int i) {
+        y(i) = a * x(i) + y(i);
+    });
+}
+
+int main(int argc, char** argv) {
+    // Initialize Kokkos
+    Kokkos::initialize(argc, argv);
+
+    {
+        int n = 1000000; // example size
+
+        // Create views (similar to arrays)
+        Kokkos::View<float*> x("X", n);
+        Kokkos::View<float*> y("Y", n);
+
+        // Initialize x and y (this can be parallelized too if needed)
+        Kokkos::parallel_for("InitX", n, KOKKOS_LAMBDA(int i) { x(i) = static_cast<float>(i); });
+        Kokkos::parallel_for("InitY", n, KOKKOS_LAMBDA(int i) { y(i) = 1.0f; });
+
+        float a = 2.0f;
+
+        // Perform AXPY
+        axpy_parallel(n, a, x, y);
+
+        // Optional: Create mirror to verify the data on the host
+        auto h_y = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), y);
+
+        // Print first 10 results to verify (you can cross-verify with expected results)
+        for (int i = 0; i < 10; i++) {
+            printf("y[%d] = %f\n", i, h_y(i));
+        }
+    }
+
+    // Finalize Kokkos
+    Kokkos::finalize();
+
+    return 0;
+}
+```
+
+### Step-by-Step Explanation:
+
+1. **Include Kokkos Headers**: Include the necessary headers for Kokkos functionality.
+
+2. **axpy_parallel Function**: Defined a function `axpy_parallel` that mimics the Fortran subroutine. It takes the size `n`, scalar `a`, and the Kokkos `View` vectors `x` and `y`.
+
+3. **Initializing Kokkos**: Kokkos initialization and teardown surround the primary computation to manage parallel execution.
+
+4. **Views Initialization**: Allocate and initialize `x` and `y` Views. Kokkos Views are analogous to arrays or vectors but offer parallel execution capabilities.
+
+5. **AXPY Operation**: Leverage `Kokkos::parallel_for` to perform the AXPY operation in parallel based on `Kokkos::RangePolicy`.
+
+6. **Verification**: Optionally create a host mirror to check the results.
+
+To compile the code, you need to link against Kokkos. An example CMake configuration or manual compilation with appropriate flags for Kokkos should be used.
+
+With this setup, your C++ code utilizing Kokkos will perform an AXPY operation in parallel, as requested.
+
+------------- Output 5 ---------------
+Certainly! The AXPY (a * x + y) operation is a common computational routine in numerical computing. To implement this in C++ with Kokkos, you'll need to follow these steps. The Kokkos library provides parallel execution and data abstraction, so the process is both efficient and portable across different hardware architectures.
+
+Below is a C++ function that achieves the same functionality as the given Fortran subroutine:
+
+```cpp
+#include <Kokkos_Core.hpp>
+
+void saxpy_parallel(int n, float a, const float *x, float *y) {
+    // Define a Kokkos parallel loop, similar to the OpenMP parallel do directive
+    Kokkos::parallel_for("saxpy", n, KOKKOS_LAMBDA(int i) {
+        y[i] = a * x[i] + y[i];
+    });
+}
+
+int main(int argc, char* argv[]) {
+    // Initialize Kokkos
+    Kokkos::initialize(argc, argv);
+
+    {
+        // Example data size
+        int n = 100000;
+        // Scalars
+        float a = 2.5f;
+
+        // Allocate and initialize host arrays using standard C++ arrays
+        std::vector<float> h_x(n, 1.0f); // initialize x with 1.0
+        std::vector<float> h_y(n, 2.0f); // initialize y with 2.0
+
+        // Allocate device views
+        Kokkos::View<float*> d_x("d_x", n);
+        Kokkos::View<float*> d_y("d_y", n);
+
+        // Deep copy from host to device
+        Kokkos::deep_copy(d_x, h_x.data());
+        Kokkos::deep_copy(d_y, h_y.data());
+
+        // Perform saxpy operation on device
+        saxpy_parallel(n, a, d_x.data(), d_y.data());
+
+        // Copy results back to host
+        Kokkos::deep_copy(h_y.data(), d_y);
+
+        // Example verification
+        for (int i = 0; i < 10; ++i) {
+            std::cout << "y[" << i << "] = " << h_y[i] << std::endl;
+        }
+    }
+
+    // Finalize Kokkos
+    Kokkos::finalize();
+    return 0;
+}
+```
+
+Explanation:
+
+1. **Kokkos Initialization and Finalization**: Kokkos is initialized in the main function using `Kokkos::initialize()` and finalized with `Kokkos::finalize()`.
+  
+2. **Memory Allocation**: The host arrays (`h_x` and `h_y`) are created using standard C++ vectors. The device views (`d_x` and `d_y`) are allocated using `Kokkos::View`.
+
+3. **Deep Copy**: Data is copied from the host vectors to device views using `Kokkos::deep_copy()`. Similarly, after performing the computation on the device, the results are copied back to the host.
+
+4. **Parallel Computation**: The `saxpy_parallel` function uses `Kokkos::parallel_for` for parallel execution. The Kokkos lambda function captures the loop index and performs the AXPY operation on the device.
+
+This approach is scalable and takes advantage of Kokkos' ability to handle different hardware backends, such as multicore CPUs and GPUs.
+
+------------- Output 6 ---------------
+Certainly! Below is the equivalent implementation of the `saxpy_parallel` Fortran subroutine using Kokkos in C++.
+
+Assumptions:
+- You have Kokkos installed and properly set up.
+- The input arrays \(x\) and \(y\) along with the scalar \(a\) are provided.
+
+First, make sure to include the necessary Kokkos headers and initialize Kokkos. The function will operate on Kokkos views (which are somewhat equivalent to arrays in Fortran).
+
+Here is how the corresponding C++ code with Kokkos might look:
+
+```cpp
+#include <Kokkos_Core.hpp>
+
+// Equivalent of Fortran's saxpy_parallel subroutine
+void saxpy_parallel(int n, float a, Kokkos::View<float*> x, Kokkos::View<float*> y) {
+    Kokkos::parallel_for("saxpy_parallel", n, KOKKOS_LAMBDA(const int i) {
+        y(i) = a * x(i) + y(i);
+    });
+}
+
+int main(int argc, char* argv[]) {
+    // Initialize Kokkos
+    Kokkos::initialize(argc, argv);
+
+    {
+        // Example usage of saxpy_parallel function
+        int n = 1000000; // Size of the arrays
+        float a = 2.0f;  // Scalar multiplier
+
+        // Create and initialize Kokkos views (x and y arrays)
+        Kokkos::View<float*> x("x", n);
+        Kokkos::View<float*> y("y", n);
+
+        // Initialize x and y values (here, let's use 1.0 for simplicity)
+        Kokkos::parallel_for("init_x", n, KOKKOS_LAMBDA(const int i) {
+            x(i) = 1.0f;
+        });
+
+        Kokkos::parallel_for("init_y", n, KOKKOS_LAMBDA(const int i) {
+            y(i) = 1.0f;
+        });
+
+        // Call the saxpy_parallel function
+        saxpy_parallel(n, a, x, y);
+
+        // To make sure all kernels complete before continuing
+        Kokkos::fence();
+
+        // For demo purposes, you might want to check the values in y
+        // Here we print the first 10 values (optional, for verification)
+        auto y_h = Kokkos::create_mirror_view(y);
+        Kokkos::deep_copy(y_h, y);
+        for (int i = 0; i < 10; ++i) {
+            std::cout << "y[" << i << "] = " << y_h(i) << std::endl;
+        }
+    }
+
+    // Finalize Kokkos
+    Kokkos::finalize();
+
+    return 0;
+}
+```
+
+### Explanation:
+
+1. **Including Kokkos Core Header**: `#include <Kokkos_Core.hpp>` is added to use Kokkos functionalities.
+2. **Function Definition**: `void saxpy_parallel` is defined to replace the Fortran subroutine.
+3. **Parallel Loop**:
+   * Utilizes `Kokkos::parallel_for` for parallel execution.
+   * A lambda function `KOKKOS_LAMBDA` calculates the AXPY operation.
+4. **Main Function**:
+   * Kokkos is initialized.
+   * Views `x` and `y` are created and initialized.
+   * The `saxpy_parallel` function is called.
+   * Kokkos fence ensures all operations are completed.
+5. **Finalizing Kokkos**: `Kokkos::finalize()` is used to clean up resources.
+
+This implementation should fit the Fortran subroutine's intention using parallel computing with Kokkos in C++. Modify initialization or scaling as needed for your specific application or input data.
+
+------------- Output 7 ---------------
+To implement the given Fortran subroutine in C++ using Kokkos, you'll follow a few steps to parallelize the AXPY operation (`y(i) = a * x(i) + y(i)`) using Kokkos' parallel_for construct. The equivalent C++ function with Kokkos would look something like this:
+
+Here's the implementation of the `saxpy_parallel` function in C++ with Kokkos:
+
+```cpp
+#include <Kokkos_Core.hpp>
+
+// Function to perform AXPY operation using Kokkos
+void saxpy_parallel(int n, float a, Kokkos::View<const float*> x, Kokkos::View<float*> y) {
+    Kokkos::parallel_for("saxpy", n, KOKKOS_LAMBDA(int i) {
+        y(i) = a * x(i) + y(i);
+    });
+}
+
+int main(int argc, char* argv[]) {
+    Kokkos::initialize(argc, argv);
+
+    {
+        const int n = 1000; // Size of the vectors
+        const float a = 2.0f; // Scalar multiplier
+
+        // Create views (Kokkos equivalent of arrays)
+        Kokkos::View<float*> x("x", n);
+        Kokkos::View<float*> y("y", n);
+
+        // Initialize x and y for demonstration purposes
+        Kokkos::parallel_for("init_x", n, KOKKOS_LAMBDA(int i) {
+            x(i) = static_cast<float>(i);
+        });
+
+        Kokkos::parallel_for("init_y", n, KOKKOS_LAMBDA(int i) {
+            y(i) = static_cast<float>(i * 2);
+        });
+
+        // Call the saxpy function
+        saxpy_parallel(n, a, x, y);
+
+        // Optionally, we can copy data back to the host for validation/printing
+        auto h_y = Kokkos::create_mirror_view(y);
+        Kokkos::deep_copy(h_y, y);
+
+        // Print the first 10 elements of y for demonstration
+        for (int i = 0; i < 10; ++i) {
+            std::cout << h_y(i) << std::endl;
+        }
+    }
+
+    Kokkos::finalize();
+    return 0;
+}
+```
+
+### Explanation:
+
+1. **Header and Initialization**: 
+   - Include the `Kokkos_Core.hpp` header and initialize Kokkos in the `main` function.
+   
+2. **Kokkos Views**:
+   - Create Kokkos views (`Kokkos::View`) for `x` and `y` which are similar to arrays but optimized for performance on different architectures.
+
+3. **Initialization**:
+   - Initialize the `x` and `y` views using `Kokkos::parallel_for`.
+
+4. **saxpy_parallel Function**:
+   - Define a `saxpy_parallel` function that takes the size of the vectors `n`, the scalar `a`, a read-only view for `x`, and a read-write view for `y`.
+   - Use `Kokkos::parallel_for` to perform the AXPY operation in parallel. 
+
+5. **Finalization**:
+   - Finalize Kokkos in the `main` function to clean up any resources used by Kokkos.
+
+### Compilation:
+
+To compile the code, you need to link against the Kokkos library. Assuming you have Kokkos installed, you might compile the code as follows:
+
+```sh
+g++ -o saxpy -I/path/to/kokkos/include -L/path/to/kokkos/lib saxpy.cpp -lkokkoscore
+```
+
+Replace `/path/to/kokkos/include` and `/path/to/kokkos/lib` with the appropriate paths where Kokkos is installed on your system.
+
+This example provides a starting point for parallelizing the AXPY operation using Kokkos in C++. You can adapt it as needed for different array sizes, data types, or computing environments.
+
+------------- Output 8 ---------------
+Certainly! Below is an equivalent implementation of the `saxpy_parallel` subroutine in C++ using Kokkos, a parallel programming model in C++ designed to provide performance portability across different hardware architectures.
+
+To execute the AXPY operation \( y = a \cdot x + y \), we will use Kokkos to parallelize the loop. Below is the C++ implementation:
+
+```cpp
+#include <Kokkos_Core.hpp>
+
+// Define the AXPY operation as a functor
+struct SaxpyFunctor {
+    const float a;
+    const Kokkos::View<const float*> x;
+    Kokkos::View<float*> y;
+
+    SaxpyFunctor(float a_, Kokkos::View<const float*> x_, Kokkos::View<float*> y_)
+        : a(a_), x(x_), y(y_) {}
+
+    KOKKOS_INLINE_FUNCTION
+    void operator()(const int i) const {
+        y(i) = a * x(i) + y(i);
+    }
+};
+
+// Saxpy function using Kokkos
+void saxpy_parallel(int n, float a, const float* x, float* y) {
+    // Create Kokkos views from raw pointers
+    Kokkos::View<const float*> d_x(x, n);
+    Kokkos::View<float*> d_y(y, n);
+
+    // Run the parallel loop using Kokkos
+    Kokkos::parallel_for("SaxpyParallel", n, SaxpyFunctor(a, d_x, d_y));
+}
+
+int main(int argc, char* argv[]) {
+    Kokkos::initialize(argc, argv);
+
+    // Example use case
+    int n = 10000;
+    float a = 2.0f;
+
+    std::vector<float> x(n, 1.0f); // Initialize x with 1.0
+    std::vector<float> y(n, 3.0f); // Initialize y with 3.0
+
+    saxpy_parallel(n, a, x.data(), y.data());
+
+    Kokkos::finalize();
+    return 0;
+}
+```
+
+### Step-by-Step Explanation:
+1. **Header Inclusion:** 
+   - `#include <Kokkos_Core.hpp>`: This is necessary to use Kokkos functionalities.
+
+2. **AXPY Functor:**
+   - We define a struct `SaxpyFunctor` representing the operation \( y(i) = a \cdot x(i) + y(i) \). The functor takes `a`, `x`, and `y` as members, and the `operator()` method performs the element-wise AXPY computation.
+   - The `KOKKOS_INLINE_FUNCTION` macro ensures that the method can be inlined and run on both host and device.
+
+3. **SAXPY Function:**
+   - The `saxpy_parallel` function sets up Kokkos views for the input arrays and calls `Kokkos::parallel_for` to execute the functor in parallel across `n` iterations.
+
+4. **Main Function:**
+   - `Kokkos::initialize(argc, argv)`: Initializes the Kokkos runtime.
+   - Setup of the example arrays `x` and `y`, and calling `saxpy_parallel` with them.
+   - `Kokkos::finalize()`: Finalizes the Kokkos runtime.
+
+To compile and run this code, you will need a C++ compiler with Kokkos installed and properly configured. Typically, you would compile with a command like:
+
+```bash
+g++ -std=c++11 -o saxpy -I/path/to/kokkos/include -L/path/to/kokkos/lib -lkokkos serial saxpy.cpp
+```
+
+Replace `/path/to/kokkos` with the actual path where Kokkos is installed on your system.
+
+This example shows how you can get the performance benefits of parallelism using Kokkos, analogous to OpenMP in the original Fortran code.
+
+------------- Output 9 ---------------
+Here is a C++ function using Kokkos to achieve the same AXPY operation (Y = a * X + Y) as your Fortran subroutine with OpenMP. Kokkos is a performance portability library for parallel programming in C++, enabling efficient use of modern multicore, manycore, and GPU devices.
+
+First, make sure you have Kokkos installed and properly set up in your build environment. You can follow Kokkos's installation guide for this purpose.
+
+Below is the C++ implementation using Kokkos:
+
+```cpp
+#include <Kokkos_Core.hpp>
+
+// Function template for AXPY operation
+void saxpy_parallel(const int n, const float a, const Kokkos::View<const float *> x, Kokkos::View<float *> y) {
+    // Parallel loop using Kokkos
+    Kokkos::parallel_for("saxpy_parallel", n, KOKKOS_LAMBDA(const int i) {
+        y(i) = a * x(i) + y(i);
+    });
+}
+
+int main(int argc, char* argv[]) {
+    // Initialize Kokkos
+    Kokkos::initialize(argc, argv);
+
+    {
+        const int n = 1000000; // Example size
+        const float a = 2.5f; // Example scalar
+
+        // Allocate and initialize Kokkos views
+        Kokkos::View<float*> x("x", n);
+        Kokkos::View<float*> y("y", n);
+
+        // Initialize x and y with some values, for example
+        Kokkos::parallel_for("initialize_x", n, KOKKOS_LAMBDA(const int i) {
+            x(i) = static_cast<float>(i);
+        });
+        Kokkos::parallel_for("initialize_y", n, KOKKOS_LAMBDA(const int i) {
+            y(i) = static_cast<float>(2 * i);
+        });
+
+        // Perform the AXPY operation
+        saxpy_parallel(n, a, x, y);
+
+        // Optionally: Copy result back to host and print first few values for verification
+        auto y_host = Kokkos::create_mirror_view(y);
+        Kokkos::deep_copy(y_host, y);
+
+        for (int i = 0; i < 10; ++i) {
+            std::cout << "y[" << i << "] = " << y_host(i) << "\n";
+        }
+    }
+
+    // Finalize Kokkos
+    Kokkos::finalize();
+
+    return 0;
+}
+```
+
+**Explanation:**
+
+1. **Kokkos Initialization and Finalization:** `Kokkos::initialize` is called at the start, and `Kokkos::finalize` is called at the end of the program to handle resource management.
+
+2. **Kokkos Views:** `Kokkos::View` is used to manage data similar to arrays, which can be executed on various devices (CPU, GPU). Here, we create `x` and `y` views.
+
+3. **Parallel Initialization:** For completeness, x and y arrays are initialized in parallel using `Kokkos::parallel_for`.
+
+4. **AXPY Operation:** The `saxpy_parallel` function performs the AXPY operation. `Kokkos::parallel_for` is used to execute the loop in parallel, similar to `!$OMP PARALLEL DO`.
+
+This example assumes an understanding of CMake or Makefiles to compile and link Kokkos. You may need to adapt it to your specific setup and ensure that Kokkos is correctly linked against your project.
+
+------------- Output 10 ---------------
+Sure, here's how you can implement the given Fortran subroutine `saxpy_parallel` using C++ with Kokkos. The Kokkos library is a C++ library designed for high-performance parallel applications. It provides abstractions for parallel execution and data management, enabling applications to run efficiently on different backend architectures such as CPUs and GPUs.
+
+First, make sure Kokkos is installed on your system. You can obtain it from GitHub or through a package manager that supports it.
+
+Here is a C++ function with Kokkos that performs the same AXPY operation (y = a * x + y):
+
+```cpp
+#include <Kokkos_Core.hpp>
+
+// Define a Kokkos kernel for the AXPY operation
+struct SaxpyFunctor {
+    int n;
+    float a;
+    Kokkos::View<const float*> x;
+    Kokkos::View<float*> y;
+
+    SaxpyFunctor(int n_, float a_, Kokkos::View<const float*> x_, Kokkos::View<float*> y_)
+        : n(n_), a(a_), x(x_), y(y_) {}
+
+    KOKKOS_INLINE_FUNCTION
+    void operator()(const int i) const {
+        y(i) = a * x(i) + y(i);
+    }
+};
+
+// The main function to perform AXPY
+void saxpy_parallel(int n, float a, const float *x_data, float *y_data) {
+    // Initialize Kokkos
+    Kokkos::initialize();
+
+    // Create Kokkos Views (arrays) to wrap the input data
+    Kokkos::View<const float*> x(x_data, n);
+    Kokkos::View<float*> y(y_data, n);
+
+    // Launch the kernel using a parallel_for construct
+    Kokkos::parallel_for("SAXPY", n, SaxpyFunctor(n, a, x, y));
+
+    // Finalize Kokkos
+    Kokkos::finalize();
+}
+
+int main() {
+    // Example usage
+    const int n = 1000000;
+    float a = 2.0f;
+
+    // Allocate and initialize input data
+    float* x = new float[n];
+    float* y = new float[n];
+    for (int i = 0; i < n; ++i) {
+        x[i] = 1.0f;
+        y[i] = 2.0f;
+    }
+
+    // Perform the AXPY operation
+    saxpy_parallel(n, a, x, y);
+
+    // Optionally check the results or use them
+
+    // Clean up
+    delete[] x;
+    delete[] y;
+
+    return 0;
+}
+```
+
+### Explanation:
+1. **Kokkos Initialization and Finalization**:
+   - `Kokkos::initialize()` and `Kokkos::finalize()` are used to initialize and finalize the Kokkos runtime. These should be called at the beginning and end of any program using Kokkos.
+
+2. **Kokkos Views**:
+   - `Kokkos::View` is a Kokkos-managed array. The views are created using the input raw pointers `x_data` and `y_data`. These views wrap the raw arrays without copying the data.
+
+3. **SaxpyFunctor**:
+   - A functor (a struct with an operator overload) named `SaxpyFunctor` is defined to perform the AXPY operation. The functor stores the scalar `a`, and the views `x` and `y`. The AXPY operation is performed in the `operator()` method, which is executed in parallel by Kokkos.
+
+4. **Parallel Execution**:
+   - `Kokkos::parallel_for` launches a parallel kernel. Each iteration computes one element of the result using the provided functor.
+
+5. **Main Function**:
+   - Allocates and initializes the arrays `x` and `y`.
+   - Calls `saxpy_parallel` to perform the AXPY operation.
+   - Deletes the allocated arrays to free memory.
+
+To compile and run this example, you need to link against the Kokkos library and provide appropriate compiler flags for parallel execution (e.g., using OpenMP, CUDA, etc., depending on the Kokkos backend you are using).
+

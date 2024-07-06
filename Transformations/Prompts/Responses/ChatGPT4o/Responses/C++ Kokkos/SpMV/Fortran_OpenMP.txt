@@ -1,0 +1,813 @@
+------------- Output 1 ---------------
+Certainly! Below is a C++ function using the Kokkos library that performs the same Sparse Matrix-Vector multiplication (SpMV) operation, which the provided Fortran subroutine implements using OpenMP.
+
+```cpp
+#include <Kokkos_Core.hpp>
+
+void spmv_parallel(int n, int nnz,
+                   const Kokkos::View<double*> val,
+                   const Kokkos::View<int*> row,
+                   const Kokkos::View<int*> col,
+                   const Kokkos::View<double*> x,
+                   Kokkos::View<double*> y) {
+
+    using execution_space = Kokkos::DefaultExecutionSpace;
+    using range_policy = Kokkos::RangePolicy<execution_space>;
+
+    Kokkos::parallel_for("SparseMatrixVectorMultiply", range_policy(0, n), KOKKOS_LAMBDA(const int i) {
+        y(i) = 0.0;
+        for (int j = row(i); j < row(i + 1); ++j) {
+            y(i) += val(j) * x(col(j));
+        }
+    });
+}
+
+int main(int argc, char* argv[]) {
+    Kokkos::initialize(argc, argv);
+    {
+        // Example Usage
+        int n = ...; // size of the vector
+        int nnz = ...; // number of non-zero entries
+
+        // Allocate and initialize Kokkos Views for val, row, col, x, y
+        Kokkos::View<double*> val("val", nnz);
+        Kokkos::View<int*> row("row", n + 1);
+        Kokkos::View<int*> col("col", nnz);
+        Kokkos::View<double*> x("x", n);
+        Kokkos::View<double*> y("y", n);
+
+        // Initialize val, row, col, and x with appropriate values
+        // ...
+
+        // Perform the SpMV operation
+        spmv_parallel(n, nnz, val, row, col, x, y);
+
+        // Use or print the output y
+        // ...
+    }
+    Kokkos::finalize();
+    return 0;
+}
+```
+
+### Note:
+
+1. **Initialization**: Ensure that you initialize `val`, `row`, `col`, and `x` with appropriate values before calling `spmv_parallel`.
+2. **Kokkos Views**: `Kokkos::View` are used to encapsulate and manage data.
+3. **Parallel Execution**: `parallel_for` provides parallel execution of a for-loop with a `KOKKOS_LAMBDA` function for the loop body.
+
+To compile this code, make sure you've installed Kokkos and link against it. You might use a command like:
+
+```bash
+g++ -O3 -std=c++11 -I/path/to/kokkos/include -L/path/to/kokkos/lib -lkokkos -o spmv spmv.cpp
+```
+
+Replace `/path/to/kokkos/include` and `/path/to/kokkos/lib` with the actual paths to the Kokkos include and library directories on your system.
+
+------------- Output 2 ---------------
+Certainly, let's transform the given Fortran subroutine that performs sparse matrix-vector multiplication (SpMV) into C++ using Kokkos. This will allow for portability across multiple parallel architectures.
+
+First, ensure you have Kokkos installed and properly set up in your development environment. You can find more information about installation and configuration on the Kokkos GitHub page or their documentation.
+
+Below is the equivalent implementation of the provided Fortran subroutine in C++ with Kokkos:
+
+```cpp
+#include <Kokkos_Core.hpp>
+
+// The spmv_parallel function using Kokkos
+void spmv_parallel(int n, int nnz, const Kokkos::View<const double*> &val,
+                   const Kokkos::View<const int*> &row, const Kokkos::View<const int*> &col,
+                   const Kokkos::View<const double*> &x, Kokkos::View<double*> &y)
+{
+    // Set y to be a Kokkos parallel range
+    Kokkos::parallel_for("InitY", n, KOKKOS_LAMBDA(int i) {
+        y(i) = 0.0;
+    });
+
+    // Perform the SpMV operation using Kokkos parallel for
+    Kokkos::parallel_for("SpMV", n, KOKKOS_LAMBDA(int i) {
+        for (int j = row(i); j < row(i+1); ++j) {
+            y(i) += val(j) * x(col(j));
+        }
+    });
+}
+
+int main(int argc, char* argv[]) {
+    Kokkos::initialize(argc, argv);
+    {
+        // Example usage and initialization
+        int n = ...; // Number of rows (size of y and x)
+        int nnz = ...; // Number of non-zero elements in the sparse matrix
+
+        // Allocate host views for initialization
+        Kokkos::View<double*>::HostMirror h_val("h_val", nnz);
+        Kokkos::View<int*>::HostMirror h_row("h_row", n+1);
+        Kokkos::View<int*>::HostMirror h_col("h_col", nnz);
+        Kokkos::View<double*>::HostMirror h_x("h_x", n);
+        Kokkos::View<double*>::HostMirror h_y("h_y", n);
+
+        // Initialize host views with your data (omitted here, fill h_val, h_row, h_col, and h_x with actual data)
+        
+        // Allocate device views
+        Kokkos::View<double*> val("val", nnz);
+        Kokkos::View<int*> row("row", n+1);
+        Kokkos::View<int*> col("col", nnz);
+        Kokkos::View<double*> x("x", n);
+        Kokkos::View<double*> y("y", n);
+
+        // Deep copy from host to device views
+        Kokkos::deep_copy(val, h_val);
+        Kokkos::deep_copy(row, h_row);
+        Kokkos::deep_copy(col, h_col);
+        Kokkos::deep_copy(x, h_x);
+        // No need to copy y as it will be computed
+
+        // Call the spmv_parallel function
+        spmv_parallel(n, nnz, val, row, col, x, y);
+
+        // Copy result back to host
+        Kokkos::deep_copy(h_y, y);
+
+        // Use or display h_y as needed
+    }
+    Kokkos::finalize();
+    return 0;
+}
+```
+
+### Explanation:
+1. **Kokkos Views**:
+   - `Kokkos::View`: Kokkos provides a flexible, multidimensional array API analogous to `std::vector` but designed for high-performance computing.
+   - Host and device views are declared and managed.
+
+2. **Initialization and Copy**:
+   - Initialize your host views (`h_val`, `h_row`, `h_col`, `h_x`) with the matrix and vector data.
+   - Deep copy these host views to the device views (`val`, `row`, `col`, `x`).
+
+3. **Parallel Initialization and Computation**:
+   - **Initialization of y**: Using Kokkos' `parallel_for`, initialize `y` to zero.
+   - **SpMV Operation**: Another Kokkos `parallel_for` is used to compute the sparse matrix-vector multiplication.
+
+4. **Final Copy**:
+   - After computation, copy the result from the device view `y` back to the host view `h_y`.
+
+This approach ensures that the code is portable and can leverage different parallel architectures, such as multicore CPUs and GPUs, supported by Kokkos.
+
+------------- Output 3 ---------------
+Below is an implementation of the `spmv_parallel` function in C++ using the Kokkos library, which is designed for performance portability across different hardware architectures. This example assumes that Kokkos is properly installed and configured in your environment.
+
+```cpp
+#include <Kokkos_Core.hpp>
+
+// Function to compute Sparse matrix-vector multiplication (SpMV)
+void spmv_parallel(int n, int nnz, 
+                   const Kokkos::View<double*> &val, 
+                   const Kokkos::View<int*> &row, 
+                   const Kokkos::View<int*> &col, 
+                   const Kokkos::View<double*> &x, 
+                   Kokkos::View<double*> &y) {
+    
+    // Ensure the output vector y is initialized to zero
+    Kokkos::parallel_for("Initialize_y", Kokkos::RangePolicy<>(0, n), KOKKOS_LAMBDA(int i) {
+        y(i) = 0.0;
+    });
+
+    // Perform the SpMV operation
+    Kokkos::parallel_for("SPMV", Kokkos::RangePolicy<>(0, n), KOKKOS_LAMBDA(int i) {
+        for (int j = row(i); j < row(i + 1); ++j) {
+            y(i) += val(j) * x(col(j));
+        }
+    });
+}
+
+int main(int argc, char* argv[]) {
+    Kokkos::initialize(argc, argv);
+
+    {
+        // Example input data
+        int n = 5;             // Number of rows in the matrix
+        int nnz = 13;          // Number of non-zero values in the matrix
+        double val_array[] = {10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130};
+        int row_array[] = {0, 3, 4, 7, 9, 13}; // Row pointers
+        int col_array[] = {0, 1, 4, 2, 1, 3, 4, 0, 1, 2, 3, 4, 1}; // Column indices
+        double x_array[] = {1, 2, 3, 4, 5};   // Input vector
+
+        // Define Kokkos views for input and output data
+        Kokkos::View<double*> val("val", nnz);
+        Kokkos::View<int*> row("row", n + 1);
+        Kokkos::View<int*> col("col", nnz);
+        Kokkos::View<double*> x("x", n);
+        Kokkos::View<double*> y("y", n);
+
+        // Initialize views with input data
+        Kokkos::parallel_for("Init_val", nnz, KOKKOS_LAMBDA(int i) {
+            val(i) = val_array[i];
+        });
+        Kokkos::parallel_for("Init_row", n + 1, KOKKOS_LAMBDA(int i) {
+            row(i) = row_array[i];
+        });
+        Kokkos::parallel_for("Init_col", nnz, KOKKOS_LAMBDA(int i) {
+            col(i) = col_array[i];
+        });
+        Kokkos::parallel_for("Init_x", n, KOKKOS_LAMBDA(int i) {
+            x(i) = x_array[i];
+        });
+
+        // Call the SpMV function
+        spmv_parallel(n, nnz, val, row, col, x, y);
+
+        // Extracting results for verification (usually done on the host)
+        auto y_host = Kokkos::create_mirror_view(y);
+        Kokkos::deep_copy(y_host, y);
+
+        // Print the result
+        std::cout << "Result vector y:" << std::endl;
+        for (int i = 0; i < n; ++i) {
+            std::cout << y_host(i) << " ";
+        }
+        std::cout << std::endl;
+    }
+
+    Kokkos::finalize();
+
+    return 0;
+}
+```
+
+### Explanation
+1. **Initialization and Parallel Execution**: The `Kokkos::parallel_for` construct is used to parallelize the initialization of the output vector `y` and the computation itself. The lambda function within `Kokkos::parallel_for` allows for parallel execution by the Kokkos runtime.
+
+2. **View Usage**: `Kokkos::View` is a data structure used to manage arrays and their memory spaces. It is a core part of Kokkos for ensuring data portability.
+
+3. **Coordinate Access**: The inner loop accesses the sparse matrix representation using the CSR format, similar to the Fortran version.
+
+4. **Main Function**: Sets up example data and initializes Kokkos views, then calls the `spmv_parallel` function. The result is copied back to the host memory for verification and printed out.
+
+To compile and execute this code, ensure you have Kokkos installed and include the appropriate compile flags for linking against the Kokkos library.
+
+------------- Output 4 ---------------
+Sure! Here's the equivalent C++ function using Kokkos for the Sparse Matrix-Vector Multiplication (SpMV) operation. Note that Kokkos is a powerful C++ library designed for performance portability across parallel computing architectures, so you need to have Kokkos properly installed and set up in your environment to compile and run this code.
+
+```cpp
+#include <Kokkos_Core.hpp>
+
+// Function to perform Sparse Matrix-Vector Multiplication (SpMV)
+void spmv_parallel(int n, int nnz, 
+                   Kokkos::View<const double*> val, 
+                   Kokkos::View<const int*> row, 
+                   Kokkos::View<const int*> col, 
+                   Kokkos::View<const double*> x, 
+                   Kokkos::View<double*> y) 
+{
+    // Ensure sizes match the expectations
+    if (val.extent(0) != (unsigned)nnz || row.extent(0) != (unsigned)(n + 1) || col.extent(0) != (unsigned)nnz || x.extent(0) != (unsigned)n || y.extent(0) != (unsigned)n) {
+        throw std::runtime_error("Input View sizes do not match expected sizes.");
+    }
+
+    // Parallel execution policy
+    Kokkos::parallel_for("spmv_parallel", n, KOKKOS_LAMBDA(int i) {
+        y(i) = 0.0;
+        for (int j = row(i); j < row(i + 1); ++j) {
+            y(i) += val(j) * x(col(j));
+        }
+    });
+}
+
+int main(int argc, char* argv[]) {
+    Kokkos::initialize(argc, argv);
+    {
+        // Example usage with dummy data
+        const int n = 5;
+        const int nnz = 9;
+        
+        double h_val[nnz] = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0};
+        int h_row[n + 1] = {0, 2, 4, 6, 7, 9};
+        int h_col[nnz] = {0, 1, 2, 3, 4, 0, 1, 3, 4};
+        double h_x[n] = {1.0, 2.0, 3.0, 4.0, 5.0};
+        double h_y[n];
+        
+        // Kokkos Views
+        Kokkos::View<double*> val("val", nnz);
+        Kokkos::View<int*> row("row", n + 1);
+        Kokkos::View<int*> col("col", nnz);
+        Kokkos::View<double*> x("x", n);
+        Kokkos::View<double*> y("y", n);
+        
+        // Copy data to device views
+        Kokkos::deep_copy(val, Kokkos::View<double*>("val", nnz, h_val));
+        Kokkos::deep_copy(row, Kokkos::View<int*>("row", n + 1, h_row));
+        Kokkos::deep_copy(col, Kokkos::View<int*>("col", nnz, h_col));
+        Kokkos::deep_copy(x, Kokkos::View<double*>("x", n, h_x));
+        
+        // Call the function
+        spmv_parallel(n, nnz, val, row, col, x, y);
+        
+        // Copy result back to host
+        Kokkos::deep_copy(h_y, y);
+        
+        // Print result
+        for (int i = 0; i < n; ++i) {
+            std::cout << "y[" << i << "] = " << h_y[i] << std::endl;
+        }
+    }
+    Kokkos::finalize();
+    return 0;
+}
+```
+
+This code defines the `spmv_parallel` function and a main program that demonstrates its usage with some dummy data. You'll need to replace the dummy data with actual sparse matrix data in real applications. Ensure you have linked Kokkos correctly in your build system to compile this successfully.
+
+------------- Output 5 ---------------
+Here's an equivalent C++ function for the given Fortran subroutine using Kokkos for parallelization:
+
+```cpp
+#include <Kokkos_Core.hpp>
+
+using Scalar = float;
+using Ordinal = int;
+
+void spmv_parallel(const Ordinal n, const Ordinal nnz,
+                   const Scalar* val, const Ordinal* row, const Ordinal* col,
+                   const Scalar* x, Scalar* y) {
+  // Create Kokkos Views from raw pointers
+  Kokkos::View<const Scalar*> d_val(val, nnz);
+  Kokkos::View<const Ordinal*> d_row(row, n + 1);
+  Kokkos::View<const Ordinal*> d_col(col, nnz);
+  Kokkos::View<const Scalar*> d_x(x, n);
+  Kokkos::View<Scalar*> d_y(y, n);
+
+  // Parallel for loop over rows
+  Kokkos::parallel_for("SpMV", Kokkos::RangePolicy<>(0, n), KOKKOS_LAMBDA(const Ordinal i) {
+    d_y(i) = 0.0;
+    for (Ordinal j = d_row(i); j < d_row(i + 1); ++j) {
+      d_y(i) += d_val(j) * d_x(d_col(j));
+    }
+  });
+
+  // Ensure results are accessible on the host
+  Kokkos::fence();
+}
+
+int main(int argc, char* argv[]) {
+  Kokkos::initialize(argc, argv);
+  {
+    // Example usage here (fill in your data as needed)
+    Ordinal n = ...;
+    Ordinal nnz = ...;
+    Scalar* val = ...;
+    Ordinal* row = ...;
+    Ordinal* col = ...;
+    Scalar* x = ...;
+    Scalar* y = new Scalar[n];
+
+    spmv_parallel(n, nnz, val, row, col, x, y);
+
+    // Output the result in y or use it as needed
+
+    delete[] y;
+  }
+  Kokkos::finalize();
+  return 0;
+}
+```
+
+### Explanation:
+1. **Including Kokkos header**: This is essential to use Kokkos functionalities.
+2. **Defining types**: Using `using` for type consistency.
+3. **Kokkos Views**: Wrapping raw pointers into Kokkos Views to manage memory and access data efficiently on host/device.
+4. **Parallel Loop**: Using `Kokkos::parallel_for` with a range policy to parallelize the outer loop (iteration over rows).
+5. **Lambda Function**: Inside the parallel loop, each thread calculates `y(i)` for a specific row `i`.
+6. **Fence**: Ensures that computation completes before accessing results on the host.
+
+### Notes:
+- Make sure to initialize and finalize Kokkos in your main function.
+- Fill in the example usage part with your actual data.
+- Adjust the `Ordinal` and `Scalar` types if you need different precision or integer sizes.
+- Ensure your environment is set up for Kokkos (compilation linker flags, Kokkos installation, etc.).
+
+This implementation will run efficiently on multi-core CPUs and can be further optimized or extended to run on GPUs if needed by configuring Kokkos properly.
+
+------------- Output 6 ---------------
+To convert the given Fortran subroutine which uses OpenMP to C++ using Kokkos for Sparse Matrix-Vector multiplication (SpMV), you can follow the steps provided below. This example assumes that Kokkos has been properly set up in your environment.
+
+Here's a C++ implementation with Kokkos:
+
+```cpp
+#include <Kokkos_Core.hpp>
+
+// Function to perform Sparse Matrix-Vector multiplication (SpMV) using Kokkos
+void spmv_parallel(int n, int nnz, const double* val, const int* row, const int* col, const double* x, double* y) {
+    // Create Kokkos views from raw pointers
+    Kokkos::View<const double*> d_val(val, nnz);
+    Kokkos::View<const int*> d_row(row, n + 1);
+    Kokkos::View<const int*> d_col(col, nnz);
+    Kokkos::View<const double*> d_x(x, n);
+    Kokkos::View<double*> d_y(y, n);
+
+    // Initialize y vector to zero
+    Kokkos::deep_copy(d_y, 0.0);
+
+    // Parallel for loop using Kokkos
+    Kokkos::parallel_for("spmv_parallel", Kokkos::RangePolicy<>(0, n), KOKKOS_LAMBDA(int i) {
+        double sum = 0.0;
+        for (int j = d_row(i); j < d_row(i + 1); ++j) {
+            sum += d_val(j) * d_x(d_col(j));
+        }
+        d_y(i) = sum;
+    });
+
+    // Copy result back to host
+    Kokkos::deep_copy(Kokkos::View<double*, Kokkos::HostSpace>(y, n), d_y);
+}
+
+int main(int argc, char* argv[]) {
+    Kokkos::initialize(argc, argv);
+    {
+        // Example use of the function
+        int n = ...;    // number of rows
+        int nnz = ...;  // number of non-zero elements
+        double* val = ...;  // non-zero values in the matrix
+        int* row = ...;    // row pointers
+        int* col = ...;    // column indices
+        double* x = ...;   // input vector
+        double* y = new double[n];  // output vector
+
+        // Call the function
+        spmv_parallel(n, nnz, val, row, col, x, y);
+
+        // Use the results in y ...
+
+        // Clean up
+        delete[] y;
+    }
+    Kokkos::finalize();
+    return 0;
+}
+```
+
+### Explanation:
+
+1. **Kokkos Views**:
+   - `Kokkos::View<const double*> d_val(val, nnz)` creates a read-only view of the `val` array.
+   - `Kokkos::View<const int*> d_row(row, n + 1)` creates a read-only view of the `row` array.
+   - `Kokkos::View<const int*> d_col(col, nnz)` creates a read-only view of the `col` array.
+   - `Kokkos::View<const double*> d_x(x, n)` creates a read-only view of the `x` array.
+   - `Kokkos::View<double*> d_y(y, n)` creates a view of the `y` array which will be modified.
+
+2. **Parallel Initialization**:
+   - `Kokkos::deep_copy(d_y, 0.0)` initializes the `y` vector to zero in parallel.
+
+3. **Parallel Computation**:
+   - `Kokkos::parallel_for` is used to parallelize the outer loop over the rows of the matrix.
+   - A `KOKKOS_LAMBDA` function is used to compute the sum of the product of non-zero values and the `x` vector for each row, mirroring the inner loop in the Fortran code.
+
+4. **Copy Back Results**:
+   - `Kokkos::deep_copy(Kokkos::View<double*, Kokkos::HostSpace>(y, n), d_y)` copies the results from the device back to the host `y` array.
+
+5. **Setup and Teardown**:
+   - Kokkos is initialized in the `main` function using `Kokkos::initialize`.
+   - Resources are cleaned up using `Kokkos::finalize`.
+
+Ensure you have included Kokkos header files and linked with Kokkos libraries while compiling this code. The specifics of `val`, `row`, `col`, and `x` array initialization and filling should match your problem's requirements. 
+
+You can compile this code with a C++ compiler with appropriate Kokkos flags. For example:
+
+```sh
+g++ -o spmv -std=c++11 -I/path/to/kokkos/includes -L/path/to/kokkos/libs main.cpp -lkokkos
+```
+
+Replace `/path/to/kokkos/includes` and `/path/to/kokkos/libs` with the actual paths to Kokkos headers and libraries.
+
+------------- Output 7 ---------------
+Certainly! Below is a function in C++ that performs Sparse matrix-vector multiplication (SpMV) using the Kokkos library. This function is analogous to the provided Fortran subroutine utilizing OpenMP.
+
+First, ensure you have Kokkos installed and properly set up in your development environment.
+
+Here is the C++ implementation:
+
+```cpp
+#include <Kokkos_Core.hpp>
+
+// Function to perform sparse matrix-vector multiplication using Kokkos
+template <typename ValueType, typename OrdinalType>
+void spmv_parallel(
+    OrdinalType n,    // Number of rows
+    OrdinalType nnz,  // Number of non-zeros
+    const ValueType* val, // Non-zero values array
+    const OrdinalType* row, // Row pointers array
+    const OrdinalType* col, // Column indices array
+    const ValueType* x, // Input vector
+    ValueType* y) // Output vector
+{
+    // Create Kokkos views
+    Kokkos::View<const ValueType*> d_val(val, nnz);
+    Kokkos::View<const OrdinalType*> d_row(row, n + 1);
+    Kokkos::View<const OrdinalType*> d_col(col, nnz);
+    Kokkos::View<const ValueType*> d_x(x, n);
+    Kokkos::View<ValueType*> d_y(y, n);
+
+    // Parallelize using Kokkos parallel_for
+    Kokkos::parallel_for("SpMV", n, KOKKOS_LAMBDA(const OrdinalType i) {
+        ValueType sum = 0.0;
+        for (OrdinalType j = d_row(i); j < d_row(i + 1); ++j) {
+            sum += d_val(j) * d_x(d_col(j));
+        }
+        d_y(i) = sum;
+    });
+
+    // Ensure that any pending writes to y are completed
+    Kokkos::fence();
+}
+
+int main(int argc, char* argv[]) {
+    // Initialize Kokkos
+    Kokkos::initialize(argc, argv);
+
+    {
+        // Example usage of the spmv_parallel function
+        const int n = 5;    // number of rows
+        const int nnz = 9;  // number of non-zero elements
+
+        // Sparse matrix in CSR format (for example)
+        double val[nnz] = {10, 20, 30, 40, 50, 60, 70, 80, 90};
+        int row[n + 1] = {0, 2, 3, 4, 7, 9}; // row pointers
+        int col[nnz] = {0, 4, 1, 2, 0, 1, 4, 3, 4}; // column indices
+        
+        double x[n] = {1.0, 2.0, 3.0, 4.0, 5.0}; // input vector
+        double y[n] = {0.0};                      // output vector
+
+        // Call the spmv_parallel function
+        spmv_parallel(n, nnz, val, row, col, x, y);
+
+        // Print the resulting vector y
+        for (int i = 0; i < n; ++i) {
+            std::cout << "y[" << i << "] = " << y[i] << std::endl;
+        }
+    }
+
+    // Finalize Kokkos
+    Kokkos::finalize();
+    return 0;
+}
+```
+
+### Explanation
+
+1. **Kokkos Initialization and Finalization**: 
+   - `Kokkos::initialize(argc, argv);` and `Kokkos::finalize();` ensure that the Kokkos runtime is correctly set up and torn down.
+
+2. **Views**: 
+   - `Kokkos::View` is used to manage device memory. Views are created around the `val`, `row`, `col`, `x`, and `y` arrays.
+   
+3. **Parallel For Loop**:
+   - Kokkos provides the `Kokkos::parallel_for` construct for parallelizing the loop.
+   - The lambda function inside the parallel for loop computes the sparse matrix-vector multiplication per row.
+
+4. **Fence**:
+   - `Kokkos::fence();` ensures that all memory operations are complete before proceeding.
+
+### Compilation
+
+Make sure to link against the Kokkos library during compilation. For example, using `g++`:
+
+```sh
+g++ -o spmv -I/path/to/kokkos/include -L/path/to/kokkos/lib spmv.cpp -lkokkoscore -ldl -lpthread
+```
+
+Replace `/path/to/kokkos/include` and `/path/to/kokkos/lib` with the actual paths to your Kokkos installation.
+
+------------- Output 8 ---------------
+Certainly! Below is a C++ function that performs Sparse Matrix-Vector Multiplication (SpMV) operation using Kokkos. This function is equivalent to the provided Fortran subroutine with OpenMP directives.
+
+First, make sure you have Kokkos installed and properly set up in your environment.
+
+Here's the equivalent C++ implementation:
+```cpp
+#include <Kokkos_Core.hpp>
+
+typedef Kokkos::View<double*> VectorType;
+typedef Kokkos::View<const double*> ConstVectorType;
+typedef Kokkos::View<const double*, Kokkos::MemoryTraits<Kokkos::Unmanaged> > UnmanagedConstVectorType;
+typedef Kokkos::View<const int*> ConstIndexType;
+typedef Kokkos::View<const int*, Kokkos::MemoryTraits<Kokkos::Unmanaged> > UnmanagedConstIndexType;
+
+void spmv_parallel(const int n, const int nnz,
+                   const UnmanagedConstVectorType& val, 
+                   const UnmanagedConstIndexType& row,
+                   const UnmanagedConstIndexType& col,
+                   const UnmanagedConstVectorType& x,
+                   VectorType& y)
+{
+    Kokkos::parallel_for("SpMV", Kokkos::RangePolicy<>(0, n), KOKKOS_LAMBDA(const int i) {
+        double sum = 0.0;
+        for (int j = row(i); j < row(i+1); ++j) {
+            sum += val(j) * x(col(j));
+        }
+        y(i) = sum;
+    });
+}
+
+int main(int argc, char* argv[]) {
+    Kokkos::initialize(argc, argv);
+    {
+        const int n = 5; // Example size of the vector x and y
+        const int nnz = 13; // Example number of non-zero elements in the sparse matrix
+        
+        // Allocate and initialize the views for values, row indices, column indices and vectors
+        VectorType y("y", n);
+        UnmanagedConstVectorType val("val", nnz);
+        UnmanagedConstIndexType row("row", n+1);
+        UnmanagedConstIndexType col("col", nnz);
+        UnmanagedConstVectorType x("x", n);
+
+        // Initialize input values here
+        // ...
+
+        // Perform SpMV
+        spmv_parallel(n, nnz, val, row, col, x, y);
+
+        // Optional: To check results or further operations
+        // ...
+    }
+    Kokkos::finalize();
+
+    return 0;
+}
+```
+
+### Explanation:
+
+1. **Kokkos::View**: These are data structures provided by Kokkos for managing multi-dimensional arrays in a parallel-computing environment.
+
+2. **Kokkos::parallel_for**: This Kokkos function generates parallel loops. The lambda function provided inside it specifies the operations to be done in parallel.
+
+3. **Input and Output Handling**:
+   - `VectorType y`: This is the output vector `y`, which is computed in the operation.
+   - `UnmanagedConstVectorType val`: This view holds the non-zero values of the sparse matrix.
+   - `UnmanagedConstIndexType row`: The row pointers indicate the start of each row in `val`.
+   - `UnmanagedConstIndexType col`: These are the column indices corresponding to entries in `val`.
+   - `UnmanagedConstVectorType x`: The input vector `x`.
+
+4. **Main Function**:
+   - Initializes Kokkos.
+   - Creates and initializes the necessary Kokkos::Views for the sparse matrix and vectors.
+   - Calls the `spmv_parallel` function.
+   - Finalizes Kokkos.
+
+### Important Notes:
+
+- Ensure proper initialization of `val`, `row`, `col`, and `x` before calling `spmv_parallel`.
+- The provided `n` and `nnz` should match the size of `x` and `val`, respectively.
+- You may need to link against the Kokkos library and include the appropriate Kokkos headers when compiling.
+
+------------- Output 9 ---------------
+To translate the given Fortran subroutine to C++ using Kokkos for parallel execution, we'll need to follow these steps:
+
+1. Utilize Kokkos for parallel execution and data management.
+2. Set up the Kokkos environment.
+3. Define the data structures for the sparse matrix in compressed row storage (CRS) format.
+4. Implement the sparse matrix-vector multiplication (SpMV) operation using Kokkos for parallel execution.
+
+Below is the C++ code corresponding to the provided Fortran subroutine:
+
+```cpp
+#include <Kokkos_Core.hpp>
+#include <vector>
+
+void spmv_parallel(int n, int nnz, const std::vector<double>& val, const std::vector<int>& row, const std::vector<int>& col, const std::vector<double>& x, std::vector<double>& y) {
+  // Wrap raw pointers from std::vector to Kokkos views
+  Kokkos::View<const double*, Kokkos::HostSpace> val_view(val.data(), nnz);
+  Kokkos::View<const int*, Kokkos::HostSpace> row_view(row.data(), n + 1);
+  Kokkos::View<const int*, Kokkos::HostSpace> col_view(col.data(), nnz);
+  Kokkos::View<const double*, Kokkos::HostSpace> x_view(x.data(), n);
+  Kokkos::View<double*, Kokkos::HostSpace> y_view(y.data(), n);
+  
+  // Parallel for loop using Kokkos
+  Kokkos::parallel_for("spmv_parallel", n, KOKKOS_LAMBDA(int i) {
+    y_view(i) = 0.0;
+    for (int j = row_view(i); j < row_view(i+1); ++j) {
+      y_view(i) += val_view(j) * x_view(col_view(j));
+    }
+  });
+
+  // Ensure that all operations are complete before returning
+  Kokkos::fence();
+}
+
+int main(int argc, char* argv[]) {
+  Kokkos::initialize(argc, argv);
+  {
+    // Example usage
+    int n = 4;
+    int nnz = 9;
+    std::vector<double> val = {10, 20, 30, 40, 50, 60, 70, 80, 90};
+    std::vector<int> row = {0, 2, 4, 7, 9};
+    std::vector<int> col = {0, 1, 2, 3, 1, 2, 3, 2, 3};
+    std::vector<double> x = {1, 2, 3, 4};
+    std::vector<double> y(n);
+
+    spmv_parallel(n, nnz, val, row, col, x, y);
+
+    // Print result
+    for (int i = 0; i < n; ++i) {
+      printf("y[%d] = %f\n", i, y[i]);
+    }
+  }
+  Kokkos::finalize();
+  return 0;
+}
+```
+
+### Explanation:
+1. **Kokkos Initialization and Finalization**:
+   - `Kokkos::initialize(argc, argv);` and `Kokkos::finalize();` are used to set up and tear down the Kokkos runtime environment.
+
+2. **Data Structure**:
+   - We use `std::vector` for managing data, which are then wrapped into Kokkos views for efficient data access during parallel computation.
+
+3. **Parallel Execution**:
+   - The `Kokkos::parallel_for` function is used to parallelize the outer loop over the rows of the matrix.
+   - The lambda function captures the core SpMV computation, analogous to the OpenMP parallel region in the Fortran code.
+
+4. **Synchronization**:
+   - `Kokkos::fence();` ensures that all parallel operations are completed before finalizing or using the result.
+
+Ensure that Kokkos is properly installed and configured in your build system to compile and run this code successfully.
+
+------------- Output 10 ---------------
+Converting the given Fortran subroutine with OpenMP into a function in C++ using Kokkos for a Sparse Matrix-Vector Multiplication (SpMV) requires an understanding of both Kokkos and the SpMV operation. Kokkos is a C++ library for parallel programming and performance portability across various hardware architectures.
+
+Here's how you can implement the equivalent function in C++ using Kokkos:
+
+1. Initialize Kokkos.
+2. Define the function parameters and structure using Kokkos views.
+3. Use a parallel loop to perform the SpMV operation.
+
+Below is the C++ implementation using Kokkos:
+
+```cpp
+#include <Kokkos_Core.hpp>
+#include <iostream>
+
+// Function to perform Sparse Matrix-Vector Multiplication (SpMV) using Kokkos
+void spmv_parallel(int n, int nnz, const double* val, const int* row, const int* col, const double* x, double* y) {
+  // Convert raw pointers to Kokkos views
+  Kokkos::View<const double*> d_val(val, nnz);
+  Kokkos::View<const int*> d_row(row, n + 1);
+  Kokkos::View<const int*> d_col(col, nnz);
+  Kokkos::View<const double*> d_x(x, n);
+  Kokkos::View<double*> d_y(y, n);
+
+  // Initialize the output vector y
+  Kokkos::parallel_for("InitializeY", n, KOKKOS_LAMBDA(int i) {
+    d_y(i) = 0.0;
+  });
+
+  // Perform SpMV
+  Kokkos::parallel_for("SpMV", n, KOKKOS_LAMBDA(int i) {
+    for(int j = d_row(i); j < d_row(i + 1); ++j) {
+      d_y(i) += d_val(j) * d_x(d_col(j));
+    }
+  });
+}
+
+int main(int argc, char* argv[]) {
+  Kokkos::initialize(argc, argv);
+
+  {
+    // Example usage
+    int n = 5;
+    int nnz = 13;
+    double val[13] = {10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130};
+    int row[6] = {0, 3, 4, 7, 10, 13};
+    int col[13] = {0, 1, 4, 1, 0, 2, 3, 1, 2, 4, 0, 3, 4};
+    double x[5] = {1, 2, 3, 4, 5};
+    double y[5] = {0, 0, 0, 0, 0};
+
+    spmv_parallel(n, nnz, val, row, col, x, y);
+
+    // Print the result
+    for(int i = 0; i < n; ++i) {
+      std::cout << "y[" << i << "] = " << y[i] << std::endl;
+    }
+  }
+
+  Kokkos::finalize();
+  return 0;
+}
+```
+
+### Brief Explanation:
+1. **Kokkos Initialization and Finalization**: We initialize Kokkos at the beginning of the `main` function and finalize Kokkos before exiting the program.
+2. **Kokkos Views**: We use Kokkos views to handle the arrays (`val`, `row`, `col`, `x`, and `y`). Kokkos views are data structures that manage memory and can be accessed in parallel operations.
+3. **Initialization of `y`**: We initialize the `y` vector to zeros using a `Kokkos::parallel_for` loop.
+4. **Computing SpMV**: We perform the sparse matrix-vector multiplication using another `Kokkos::parallel_for` loop, distributing the work over parallel threads.
+5. **Example**: The `main` function provides an example of how to call the `spmv_parallel` function.
+
+Compile and run this code to perform Sparse Matrix-Vector Multiplication leveraging Kokkos for parallelism. This will give you a performance-portable implementation akin to the Fortran version with OpenMP.
+
+### Note:
+- **Kokkos Initialization and Finalization**: Ensure to initialize and finalize Kokkos properly when using it in a program.
+- **Parallel Loops**: Kokkos automatically handles thread management and distribution, similar to how OpenMP works with pragmas.
+- **Views and Memory Management**: Kokkos views are key to effectively leveraging its parallelism capabilities while managing data correctly.
+
