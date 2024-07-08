@@ -1,6 +1,6 @@
 PROGRAM performanceTest
     IMPLICIT NONE
-    INTEGER, PARAMETER :: n = 10
+    INTEGER, PARAMETER :: n = 20000000
     REAL, DIMENSION(n) :: x, y
     REAL :: a
     INTEGER :: i

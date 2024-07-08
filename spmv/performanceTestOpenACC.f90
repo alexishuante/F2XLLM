@@ -50,3 +50,4 @@ subroutine spmv_parallel(n, nnz, val, row, col, x, y)
     enddo
     !$ACC END PARALLEL LOOP
   end subroutine spmv_parallel
+  

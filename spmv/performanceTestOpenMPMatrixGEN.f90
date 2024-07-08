@@ -14,14 +14,10 @@ subroutine spmv_parallel(n, nnz, val, row, col, x, y)
     enddo
     !$OMP END PARALLEL DO
   end subroutine spmv_parallel
-  
+
 program main
 implicit none
 
-! real, dimension(4) :: val = [-1.689127, 9.607784, 3.212904, -6.599318]
-! integer, dimension(4) :: col = [4, 1, 3, 4]
-! ! Row pointers are 0-indexed in the file, so we add 1 to each value to make them 1-indexed here
-! integer, dimension(6) :: row = [1, 1, 1, 2, 5, 5]
 real, dimension(4) :: val
 integer, dimension(4) :: col
 integer, dimension(6) :: row
