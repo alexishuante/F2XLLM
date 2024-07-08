@@ -73,6 +73,10 @@ subroutine read_and_print_csr_matrix()
 
   ! Allocate the indptr array
   allocate(indptr(count))
+  indptr = 0  ! Initialize all elements to zero
+
+  ! Debug print
+  print *, "Reading indptr from: ", line(7:)
 
   ! Read the indptr values into the array
   read(line(7:), *) (indptr(j), j = 1, count)
@@ -90,4 +94,3 @@ program main
   ! Call the subroutine to read and print the CSR matrix
   call read_and_print_csr_matrix
 
-end program main

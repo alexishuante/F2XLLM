@@ -1,44 +1,40 @@
 import numpy as np
-import random
-import scipy.sparse as sp
+from scipy.sparse import csr_matrix
 
-def create_csr_matrix(n, nonzero_percentage):
-    # Calculate the total number of elements and the number of nonzeros
-    total_elements = n * n
-    nonzeros = int((nonzero_percentage / 100.0) * total_elements)
-    
-    # Initialize the matrix with zeros
-    matrix = np.zeros((n, n))
-    
-    # Fill the matrix with nonzeros at random positions
-    filled_positions = set()
-    while len(filled_positions) < nonzeros:
-        row = random.randint(0, n-1)
-        col = random.randint(0, n-1)
-        if (row, col) not in filled_positions:
-            matrix[row, col] = random.randint(1, 10)
-            filled_positions.add((row, col))
-    
-    # Convert to CSR format
-    csr_matrix = sp.csr_matrix(matrix)
-    return csr_matrix
+# Matrix dimensions
+rows = 3
+cols = 3
 
-def write_csr_to_file(csr_matrix, filename):
-    with open(filename, 'w') as f:
-        # Write data and indices arrays
-        for i in range(len(csr_matrix.data)):
-            f.write(f"{csr_matrix.data[i]},{csr_matrix.indices[i]}\n")
-        # Separately write the indptr array to distinguish it from data and indices
-        f.write("indptr," + ",".join(map(str, csr_matrix.indptr)) + "\n")
+# Desired percentage of non-zeros
+percentage_nnz = 0.5  # 50% non-zero elements
 
-# Adjust the read function if necessary based on how data is written
+# Calculate the number of non-zero elements
+nnz = int(rows * cols * percentage_nnz)
 
-# Example usage
-n = 5  # Matrix size
-nonzero_percentage = 40  # Percentage of non-zero elements
-csr_matrix = create_csr_matrix(n, nonzero_percentage)
-filename = 'csr_matrix.csv'
-write_csr_to_file(csr_matrix, filename)
+# Generate random data, indices, and indptr
+data = np.random.rand(nnz)
+indices = np.random.randint(0, cols, nnz)
+indptr = np.zeros(rows + 1, dtype=int)
 
-# To read the matrix back
-# Ensure the read_csr_from_file function is correctly implemented
+# Calculate bincounts and ensure the result fits into indptr
+bincounts = np.bincount(np.random.randint(0, rows, nnz))
+np.cumsum(bincounts, out=indptr[1:1 + len(bincounts)])
+
+# Combine and sort data and indices based on row-major order
+combined = np.column_stack((data, indices))
+row_indices = np.repeat(np.arange(rows), np.diff(indptr))
+sorted_indices = np.lexsort((combined[:, 1], row_indices))  # Sort by column, then row
+sorted_combined = combined[sorted_indices]
+
+# Update data and indices with the sorted values
+data = sorted_combined[:, 0]
+indices = sorted_combined[:, 1].astype(int)
+
+# Create CSR matrix
+csr_matrix = csr_matrix((data, indices, indptr), shape=(rows, cols))
+
+# Print information
+print("Percentage of non-zeros:", (nnz / (rows * cols)) * 100)
+print("Data:", data)  # Print the sorted data
+print("Indices:", indices) # Print the sorted indices
+print("Indptr:", indptr)
