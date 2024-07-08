@@ -1,0 +1,482 @@
+--------------- Code Block 1 ---------------
+__global__ void gemm_kernel(int m, int n, int k, double alpha, const double *a, int lda, 
+                            const double *b, int ldb, double beta, double *c, int ldc) {
+    int Row = blockIdx.y * blockDim.y + threadIdx.y;
+    int Col = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (Row < m && Col < n) {
+        double temp = 0.0;
+        for (int i = 0; i < k; ++i) {
+            temp += a[Row * lda + i] * b[i * ldb + Col];
+        }
+        c[Row * ldc + Col] = alpha * temp + beta * c[Row * ldc + Col];
+    }
+}
+
+void gemm_hip(int m, int n, int k, double alpha, const double *a, int lda, 
+              const double *b, int ldb, double beta, double *c, int ldc) {
+    double *d_a, *d_b, *d_c;
+
+    // Allocate device memory
+    hipMalloc(&d_a, m * k * sizeof(double));
+    hipMalloc(&d_b, k * n * sizeof(double));
+    hipMalloc(&d_c, m * n * sizeof(double));
+
+    // Copy matrices to device
+    hipMemcpy(d_a, a, m * k * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_b, b, k * n * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_c, c, m * n * sizeof(double), hipMemcpyHostToDevice);
+
+    // Define the block and grid dimensions 
+    dim3 dimBlock(BLOCK_SIZE, BLOCK_SIZE);
+    dim3 dimGrid((n + BLOCK_SIZE - 1) / BLOCK_SIZE, (m + BLOCK_SIZE - 1) / BLOCK_SIZE);
+
+    // Launch the kernel
+    hipLaunchKernelGGL(gemm_kernel, dimGrid, dimBlock, 0, 0, m, n, k, alpha, d_a, lda, d_b, ldb, beta, d_c, ldc);
+
+    // Copy the result matrix back to host
+    hipMemcpy(c, d_c, m * n * sizeof(double), hipMemcpyDeviceToHost);
+
+    // Free device memory
+    hipFree(d_a);
+    hipFree(d_b);
+    hipFree(d_c);
+}
+
+--------------- Code Block 2 ---------------
+__global__ void gemm_kernel(int m, int n, int k, double alpha, const double* a, int lda, const double* b, int ldb, double beta, double* c, int ldc) {
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    if (row < m && col < n) {
+        double temp = 0.0;
+        
+        for (int i = 0; i < k; i++) {
+            temp += a[row * lda + i] * b[i * ldb + col];
+        }
+        
+        c[row * ldc + col] = alpha * temp + beta * c[row * ldc + col];
+    }
+}
+
+void gemm_hip(int m, int n, int k, double alpha, const double* a, int lda, const double* b, int ldb, double beta, double* c, int ldc) {
+    double* d_a;
+    double* d_b;
+    double* d_c;
+
+    hipMalloc(&d_a, m * k * sizeof(double));
+    hipMalloc(&d_b, k * n * sizeof(double));
+    hipMalloc(&d_c, m * n * sizeof(double));
+
+    hipMemcpy(d_a, a, m * k * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_b, b, k * n * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_c, c, m * n * sizeof(double), hipMemcpyHostToDevice);
+    
+    dim3 threadsPerBlock(TILE_SIZE, TILE_SIZE);
+    dim3 blocksPerGrid((n + TILE_SIZE - 1) / TILE_SIZE, (m + TILE_SIZE - 1) / TILE_SIZE);
+    
+    hipLaunchKernelGGL(gemm_kernel, blocksPerGrid, threadsPerBlock, 0, 0, m, n, k, alpha, d_a, lda, d_b, ldb, beta, d_c, ldc);
+
+    hipMemcpy(c, d_c, m * n * sizeof(double), hipMemcpyDeviceToHost);
+    
+    hipFree(d_a);
+    hipFree(d_b);
+    hipFree(d_c);
+}
+
+--------------- Code Block 3 ---------------
+__global__ void gemm_ker(int m, int n, int k, double alpha, const double* a, int lda, const double* b, int ldb, double beta, double* c, int ldc){
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+
+    __shared__ double a_shared[TILE_SIZE][TILE_SIZE];
+    __shared__ double b_shared[TILE_SIZE][TILE_SIZE];
+
+    double temp = 0.0;
+
+    for (int tile = 0; tile < (k + TILE_SIZE - 1) / TILE_SIZE; ++tile) {
+        if (row < m && tile * TILE_SIZE + threadIdx.x < k)
+            a_shared[threadIdx.y][threadIdx.x] = a[row * lda + tile * TILE_SIZE + threadIdx.x];
+        else
+            a_shared[threadIdx.y][threadIdx.x] = 0.0;
+
+        if (col < n && tile * TILE_SIZE + threadIdx.y < k)
+            b_shared[threadIdx.y][threadIdx.x] = b[(tile * TILE_SIZE + threadIdx.y) * ldb + col];
+        else
+            b_shared[threadIdx.y][threadIdx.x] = 0.0;
+
+        __syncthreads();
+
+        for (int e = 0; e < TILE_SIZE; ++e)
+            temp += a_shared[threadIdx.y][e] * b_shared[e][threadIdx.x];
+
+        __syncthreads();
+    }
+
+    if (row < m && col < n)
+        c[row * ldc + col] = alpha * temp + beta * c[row * ldc + col];
+}
+
+void gemm_parallel(int m, int n, int k, double alpha, const double* a, int lda, const double* b, int ldb, double beta, double* c, int ldc) {
+    double *d_a, *d_b, *d_c;
+    size_t size_a = m * k * sizeof(double);
+    size_t size_b = k * n * sizeof(double);
+    size_t size_c = m * n * sizeof(double);
+
+    hipMalloc((void**)&d_a, size_a);
+    hipMalloc((void**)&d_b, size_b);
+    hipMalloc((void**)&d_c, size_c);
+
+    hipMemcpy(d_a, a, size_a, hipMemcpyHostToDevice);
+    hipMemcpy(d_b, b, size_b, hipMemcpyHostToDevice);
+    hipMemcpy(d_c, c, size_c, hipMemcpyHostToDevice);
+
+    dim3 dimBlock(TILE_SIZE, TILE_SIZE);
+    dim3 dimGrid((n + TILE_SIZE - 1) / TILE_SIZE, (m + TILE_SIZE - 1) / TILE_SIZE);
+
+    hipLaunchKernelGGL(gemm_ker, dimGrid, dimBlock, 0, 0, m, n, k, alpha, d_a, lda, d_b, ldb, beta, d_c, ldc);
+
+    hipMemcpy(c, d_c, size_c, hipMemcpyDeviceToHost);
+
+    hipFree(d_a);
+    hipFree(d_b);
+    hipFree(d_c);
+}
+
+--------------- Code Block 4 ---------------
+__global__ void gemm_kernel(int m, int n, int k, double alpha,
+                            const double *a, int lda,
+                            const double *b, int ldb,
+                            double beta, double *c, int ldc) {
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if (row < m && col < n) {
+        double temp = 0.0;
+        for (int l = 0; l < k; ++l) {
+            temp += a[row * lda + l] * b[l * ldb + col];
+        }
+        c[row * ldc + col] = alpha * temp + beta * c[row * ldc + col];
+    }
+}
+
+extern "C" void gemm_hip(int m, int n, int k, double alpha,
+                         const double *a, int lda,
+                         const double *b, int ldb,
+                         double beta, double *c, int ldc) {
+    double *d_a, *d_b, *d_c;
+    size_t size_a = lda * k * sizeof(double);
+    size_t size_b = ldb * n * sizeof(double);
+    size_t size_c = ldc * n * sizeof(double);
+
+    // Allocate memory on device
+    hipMalloc(&d_a, size_a);
+    hipMalloc(&d_b, size_b);
+    hipMalloc(&d_c, size_c);
+
+    // Copy matrices to device
+    hipMemcpy(d_a, a, size_a, hipMemcpyHostToDevice);
+    hipMemcpy(d_b, b, size_b, hipMemcpyHostToDevice);
+    hipMemcpy(d_c, c, size_c, hipMemcpyHostToDevice);
+
+    // Define block and grid sizes
+    dim3 blockDim(16, 16); // Adjust to match your GPU capabilities
+    dim3 gridDim((n + blockDim.x - 1) / blockDim.x, (m + blockDim.y - 1) / blockDim.y);
+
+    // Launch kernel
+    hipLaunchKernelGGL(gemm_kernel, gridDim, blockDim, 0, 0, m, n, k, alpha, d_a, lda, d_b, ldb, beta, d_c, ldc);
+
+    // Copy result back to host
+    hipMemcpy(c, d_c, size_c, hipMemcpyDeviceToHost);
+
+    // Free device memory
+    hipFree(d_a);
+    hipFree(d_b);
+    hipFree(d_c);
+}
+
+--------------- Code Block 5 ---------------
+__global__ void gemm_kernel(int m, int n, int k, double alpha, const double* __restrict__ a, int lda, const double* __restrict__ b, int ldb, double beta, double* __restrict__ c, int ldc) {
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (row < m && col < n) {
+        double temp = 0.0;
+        for (int l = 0; l < k; ++l) {
+            temp += a[row + l * lda] * b[l + col * ldb];
+        }
+        c[row + col * ldc] = alpha * temp + beta * c[row + col * ldc];
+    }
+}
+
+void gemm_parallel(int m, int n, int k, double alpha, const double* a, int lda, const double* b, int ldb, double beta, double* c, int ldc) {
+    // Device pointers
+    double *d_a, *d_b, *d_c;
+
+    // Allocate device memory
+    hipMalloc((void**)&d_a, lda * k * sizeof(double));
+    hipMalloc((void**)&d_b, ldb * n * sizeof(double));
+    hipMalloc((void**)&d_c, ldc * n * sizeof(double));
+
+    // Copy matrices to device
+    hipMemcpy(d_a, a, lda * k * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_b, b, ldb * n * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_c, c, ldc * n * sizeof(double), hipMemcpyHostToDevice);
+
+    // Configure grid and block sizes
+    dim3 threadsPerBlock(THREADS_PER_BLOCK, THREADS_PER_BLOCK);
+    dim3 blocksPerGrid((n + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, (m + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK);
+
+    // Launch the GEMM kernel
+    hipLaunchKernelGGL(gemm_kernel, blocksPerGrid, threadsPerBlock, 0, 0, m, n, k, alpha, d_a, lda, d_b, ldb, beta, d_c, ldc);
+
+    // Check for any errors launching the kernel
+    hipError_t err = hipGetLastError();
+    if(err != hipSuccess) {
+        printf("Failed to launch gemm_kernel: %s\n", hipGetErrorString(err));
+    }
+
+    // Copy the result back to the host
+    hipMemcpy(c, d_c, ldc * n * sizeof(double), hipMemcpyDeviceToHost);
+
+    // Free device memory
+    hipFree(d_a);
+    hipFree(d_b);
+    hipFree(d_c);
+}
+
+--------------- Code Block 6 ---------------
+__global__ void gemm_kernel(int m, int n, int k, double alpha, const double* a, int lda, const double* b, int ldb, double beta, double* c, int ldc) {
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (row < m && col < n) {
+        double temp = 0.0;
+        for (int l = 0; l < k; l++) {
+            temp += a[row * lda + l] * b[l * ldb + col];
+        }
+        c[row * ldc + col] = alpha * temp + beta * c[row * ldc + col];
+    }
+}
+
+void gemm_parallel(int m, int n, int k, double alpha, const double *a, int lda, const double *b, int ldb, double beta, double *c, int ldc) {
+    double *d_a, *d_b, *d_c;
+
+    // Allocate memory on the device
+    hipMalloc(&d_a, m * k * sizeof(double));
+    hipMalloc(&d_b, k * n * sizeof(double));
+    hipMalloc(&d_c, m * n * sizeof(double));
+
+    // Copy matrices to the device
+    hipMemcpy(d_a, a, m * k * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_b, b, k * n * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_c, c, m * n * sizeof(double), hipMemcpyHostToDevice);
+
+    // Define grid and block dimensions
+    dim3 threadsPerBlock(THREADS_PER_BLOCK, THREADS_PER_BLOCK);
+    dim3 blocksPerGrid((n + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, (m + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK);
+
+    // Launch the GEMM kernel
+    hipLaunchKernelGGL(gemm_kernel, blocksPerGrid, threadsPerBlock, 0, 0, m, n, k, alpha, d_a, lda, d_b, ldb, beta, d_c, ldc);
+
+    // Copy the result matrix back to the host
+    hipMemcpy(c, d_c, m * n * sizeof(double), hipMemcpyDeviceToHost);
+
+    // Free the device memory
+    hipFree(d_a);
+    hipFree(d_b);
+    hipFree(d_c);
+}
+
+--------------- Code Block 7 ---------------
+__global__ void gemm_parallel_kernel(int m, int n, int k, double alpha, const double* a, int lda, const double* b, int ldb, double beta, double* c, int ldc) {
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if (row < m && col < n) {
+        double temp = 0.0;
+        for (int l = 0; l < k; l++) {
+            temp += a[row * lda + l] * b[l * ldb + col];
+        }
+        c[row * ldc + col] = alpha * temp + beta * c[row * ldc + col];
+    }
+}
+
+void gemm_parallel(int m, int n, int k, double alpha, const double* a, int lda, const double* b, int ldb, double beta, double* c, int ldc) {
+    // Device pointers
+    double *d_a, *d_b, *d_c;
+
+    // Allocate memory on the device
+    hipMalloc((void**)&d_a, m * k * sizeof(double));
+    hipMalloc((void**)&d_b, k * n * sizeof(double));
+    hipMalloc((void**)&d_c, m * n * sizeof(double));
+
+    // Copy matrices to device
+    hipMemcpy(d_a, a, m * k * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_b, b, k * n * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_c, c, m * n * sizeof(double), hipMemcpyHostToDevice);
+
+    // Define grid and block dimensions
+    dim3 blockDim(16, 16);
+    dim3 gridDim((n + blockDim.x - 1) / blockDim.x, (m + blockDim.y - 1) / blockDim.y);
+
+    // Launch the kernel
+    hipLaunchKernelGGL(gemm_parallel_kernel, gridDim, blockDim, 0, 0, m, n, k, alpha, d_a, lda, d_b, ldb, beta, d_c, ldc);
+
+    // Copy results back to host
+    hipMemcpy(c, d_c, m * n * sizeof(double), hipMemcpyDeviceToHost);
+
+    // Free device memory
+    hipFree(d_a);
+    hipFree(d_b);
+    hipFree(d_c);
+}
+
+--------------- Code Block 8 ---------------
+__global__ void gemm_kernel(int m, int n, int k, double alpha, const double* a, int lda, const double* b, int ldb, double beta, double* c, int ldc) {
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    if (row < m && col < n) {
+        double temp = 0.0;
+        for (int l = 0; l < k; ++l) {
+            temp += a[row * lda + l] * b[l * ldb + col];
+        }
+        c[row * ldc + col] = alpha * temp + beta * c[row * ldc + col];
+    }
+}
+
+extern "C" void gemm_hip(int m, int n, int k, double alpha, const double* a, int lda, const double* b, int ldb, double beta, double* c, int ldc) {
+    int size_a = m * k * sizeof(double);
+    int size_b = k * n * sizeof(double);
+    int size_c = m * n * sizeof(double);
+
+    // Allocate device memory
+    double* d_a; hipMalloc(&d_a, size_a);
+    double* d_b; hipMalloc(&d_b, size_b);
+    double* d_c; hipMalloc(&d_c, size_c);
+
+    // Copy data to device memory
+    hipMemcpy(d_a, a, size_a, hipMemcpyHostToDevice);
+    hipMemcpy(d_b, b, size_b, hipMemcpyHostToDevice);
+    hipMemcpy(d_c, c, size_c, hipMemcpyHostToDevice);
+
+    // Define block size and grid size
+    dim3 blockSize(16, 16);
+    dim3 gridSize((n + blockSize.x - 1) / blockSize.x, (m + blockSize.y - 1) / blockSize.y);
+
+    // Launch the kernel
+    hipLaunchKernelGGL(gemm_kernel, gridSize, blockSize, 0, 0, m, n, k, alpha, d_a, lda, d_b, ldb, beta, d_c, ldc);
+
+    // Copy the result back to host memory
+    hipMemcpy(c, d_c, size_c, hipMemcpyDeviceToHost);
+
+    // Free device memory
+    hipFree(d_a);
+    hipFree(d_b);
+    hipFree(d_c);
+}
+
+--------------- Code Block 9 ---------------
+__global__ void gemm_parallel_kernel(int m, int n, int k, double alpha, 
+                                     const double* __restrict__ a, int lda, 
+                                     const double* __restrict__ b, int ldb, 
+                                     double beta, double* __restrict__ c, int ldc) {
+    int row = blockIdx.x * blockDim.x + threadIdx.x;
+    int col = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if (row < m && col < n) {
+        double temp = 0.0;
+        for (int l = 0; l < k; l++) {
+            temp += a[row * lda + l] * b[l * ldb + col];
+        }
+        c[row * ldc + col] = alpha * temp + beta * c[row * ldc + col];
+    }
+}
+
+extern "C" void gemm_parallel(int m, int n, int k, double alpha, 
+                              const double* a, int lda, 
+                              const double* b, int ldb, 
+                              double beta, double* c, int ldc) {
+
+    // Device pointers
+    double *d_a, *d_b, *d_c;
+
+    // Allocate device memory
+    CHECK(hipMalloc((void**)&d_a, m * k * sizeof(double)));
+    CHECK(hipMalloc((void**)&d_b, k * n * sizeof(double)));
+    CHECK(hipMalloc((void**)&d_c, m * n * sizeof(double)));
+
+    // Copy data to device
+    CHECK(hipMemcpy(d_a, a, m * k * sizeof(double), hipMemcpyHostToDevice));
+    CHECK(hipMemcpy(d_b, b, k * n * sizeof(double), hipMemcpyHostToDevice));
+    CHECK(hipMemcpy(d_c, c, m * n * sizeof(double), hipMemcpyHostToDevice));
+
+    // Define grid and block dimensions
+    dim3 blockDim(16, 16);
+    dim3 gridDim((m + blockDim.x - 1) / blockDim.x, 
+                 (n + blockDim.y - 1) / blockDim.y);
+
+    // Launch the kernel
+    hipLaunchKernelGGL(gemm_parallel_kernel, gridDim, blockDim, 0, 0, 
+                       m, n, k, alpha, d_a, lda, d_b, ldb, beta, d_c, ldc);
+
+    // Copy result back to host
+    CHECK(hipMemcpy(c, d_c, m * n * sizeof(double), hipMemcpyDeviceToHost));
+
+    // Free device memory
+    CHECK(hipFree(d_a));
+    CHECK(hipFree(d_b));
+    CHECK(hipFree(d_c));
+}
+
+--------------- Code Block 10 ---------------
+__global__ void gemm_parallel_kernel(int m, int n, int k, double alpha, 
+                                     const double* __restrict__ a, int lda, 
+                                     const double* __restrict__ b, int ldb, 
+                                     double beta, double* __restrict__ c, int ldc) {
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (row < m && col < n) {
+        double temp = 0.0;
+        for (int l = 0; l < k; ++l) {
+            temp += a[row * lda + l] * b[l * ldb + col];
+        }
+        c[row * ldc + col] = alpha * temp + beta * c[row * ldc + col];
+    }
+}
+
+void gemm_parallel(int m, int n, int k, double alpha, 
+                   const double* a, int lda, 
+                   const double* b, int ldb, 
+                   double beta, double* c, int ldc) {
+    double *d_a, *d_b, *d_c;
+
+    // Allocate device memory
+    hipMalloc(&d_a, m * k * sizeof(double));
+    hipMalloc(&d_b, k * n * sizeof(double));
+    hipMalloc(&d_c, m * n * sizeof(double));
+
+    // Copy matrices to device
+    hipMemcpy(d_a, a, m * k * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_b, b, k * n * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_c, c, m * n * sizeof(double), hipMemcpyHostToDevice);
+
+    // Define block and grid sizes
+    dim3 dimBlock(BLOCK_SIZE, BLOCK_SIZE);
+    dim3 dimGrid((n + BLOCK_SIZE - 1) / BLOCK_SIZE, (m + BLOCK_SIZE - 1) / BLOCK_SIZE);
+    
+    // Launch the kernel
+    hipLaunchKernelGGL(gemm_parallel_kernel, dimGrid, dimBlock, 0, 0, 
+                       m, n, k, alpha, d_a, lda, d_b, ldb, beta, d_c, ldc);
+
+    // Copy the result back to the host
+    hipMemcpy(c, d_c, m * n * sizeof(double), hipMemcpyDeviceToHost);
+
+    // Free device memory
+    hipFree(d_a);
+    hipFree(d_b);
+    hipFree(d_c);
+}
+

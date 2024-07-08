@@ -1,0 +1,361 @@
+--------------- Output 1 ---------------
+```cpp
+void jacobi_parallel(Kokkos::View<double***> u, Kokkos::View<double***> unew, int n, int niter) {
+    Kokkos::parallel_for("jacobi_kernel", niter, KOKKOS_LAMBDA (const int iter) {
+        for (int k = 1; k < n-1; k++) {
+            for (int j = 1; j < n-1; j++) {
+                for (int i = 1; i < n-1; i++) {
+                    unew(i, j, k) = 0.125 * (u(i-1, j, k) + u(i+1, j, k) + u(i, j-1, k)
+                                             + u(i, j+1, k) + u(i, j, k-1) + u(i, j, k+1) + u(i, j, k));
+                }
+            }
+        }
+    });
+
+    Kokkos::deep_copy(u, unew);
+}
+```
+
+--------------- Output 2 ---------------
+```cpp
+#include <Kokkos_Core.hpp>
+
+void jacobi_parallel(Kokkos::View<double***> u, Kokkos::View<double***> unew, int n, int niter) {
+    Kokkos::parallel_for("JacobiOperation", Kokkos::MDRangePolicy<Kokkos::Rank<3>>({2, 2, 2}, {n-1, n-1, n-1}),
+        KOKKOS_LAMBDA(int i, int j, int k) {
+            unew(i, j, k) = 0.125 * (u(i-1, j, k) + u(i+1, j, k) + u(i, j-1, k)
+                           + u(i, j+1, k) + u(i, j, k-1) + u(i, j, k+1) + u(i, j, k));
+        }
+    );
+
+    Kokkos::deep_copy(u, unew);
+}
+
+int main() {
+    int n = 10;
+    int niter = 100;
+    Kokkos::initialize();
+
+    Kokkos::View<double***> u("u", n, n, n);
+    Kokkos::View<double***> unew("unew", n, n, n);
+
+    // Initialize u here
+
+    jacobi_parallel(u, unew, n, niter);
+
+    Kokkos::finalize();
+    return 0;
+}
+```
+
+--------------- Output 3 ---------------
+```cpp
+#include <Kokkos_Core.hpp>
+
+void jacobi_parallel(Kokkos::View<double***> u, Kokkos::View<double***> unew, int n, int niter) {
+    Kokkos::parallel_for("jacobi_kernel", niter, KOKKOS_LAMBDA(const int iter) {
+        Kokkos::parallel_for("jacobi_ijk", n-2, KOKKOS_LAMBDA(const int k) {
+            for (int j = 1; j < n-1; j++) {
+                for (int i = 1; i < n-1; i++) {
+                    unew(i, j, k) = 0.125 * (u(i-1, j, k) + u(i+1, j, k) + u(i, j-1, k) +
+                                             u(i, j+1, k) + u(i, j, k-1) + u(i, j, k+1) + u(i, j, k));
+                }
+            }
+        });
+        Kokkos::parallel_for("jacobi_copy", n, KOKKOS_LAMBDA(const int i) {
+            for (int j = 0; j < n; j++) {
+                for (int k = 0; k < n; k++) {
+                    u(i, j, k) = unew(i, j, k);
+                }
+            }
+        });
+    });
+}
+```
+
+--------------- Output 4 ---------------
+Here is the equivalent function implemented in C++ with Kokkos:
+
+```cpp
+#include <iostream>
+#include <Kokkos_Core.hpp>
+
+void jacobi_parallel(Kokkos::View<double***> u, Kokkos::View<double***> unew, int n, int niter) {
+  Kokkos::parallel_for("jacobi_kernel", Kokkos::MDRangePolicy<Kokkos::Rank<3>>({2, 2, 2}, {n-1, n-1, n-1}),
+    KOKKOS_LAMBDA (const int i, const int j, const int k) {
+      unew(i, j, k) = 0.125 * (u(i-1, j, k) + u(i+1, j, k) + u(i, j-1, k) +
+                               u(i, j+1, k) + u(i, j, k-1) + u(i, j, k+1) + u(i, j, k));
+    });
+
+  Kokkos::deep_copy(u, unew);
+
+  for (int iter = 1; iter < niter; iter++) {
+    Kokkos::parallel_for("jacobi_kernel", Kokkos::MDRangePolicy<Kokkos::Rank<3>>({2, 2, 2}, {n-1, n-1, n-1}),
+      KOKKOS_LAMBDA (const int i, const int j, const int k) {
+        unew(i, j, k) = 0.125 * (u(i-1, j, k) + u(i+1, j, k) + u(i, j-1, k) +
+                                 u(i, j+1, k) + u(i, j, k-1) + u(i, j, k+1) + u(i, j, k));
+      });
+
+    Kokkos::deep_copy(u, unew);
+  }
+}
+
+int main() {
+  int n = 100;
+  int niter = 1000;
+  Kokkos::initialize();
+  Kokkos::View<double***> u("u", n, n, n);
+  Kokkos::View<double***> unew("unew", n, n, n);
+
+  // Initialize u with some values
+
+  jacobi_parallel(u, unew, n, niter);
+
+  Kokkos::finalize();
+  return 0;
+}
+``` 
+
+Please note that you will need to link against the Kokkos library and ensure that you have Kokkos correctly installed on your system.
+
+--------------- Output 5 ---------------
+Here is the C++ implementation of the Jacobi operation using Kokkos:
+
+```cpp
+#include <iostream>
+#include <Kokkos_Core.hpp>
+
+void jacobi_parallel(Kokkos::View<double***> u, Kokkos::View<double***> unew, int n, int niter) {
+    Kokkos::parallel_for("Jacobi", Kokkos::MDRangePolicy<Kokkos::Rank<3>>({2, 2, 2}, {n-1, n-1, n-1}), KOKKOS_LAMBDA (const int i, const int j, const int k){
+        unew(i, j, k) = 0.125 * (u(i-1, j, k) + u(i+1, j, k) + u(i, j-1, k) +
+                                 u(i, j+1, k) + u(i, j, k-1) + u(i, j, k+1) + u(i, j, k));
+    });
+
+    Kokkos::deep_copy(u, unew);
+
+    for(int iter = 1; iter <= niter; iter++) {
+        Kokkos::parallel_for("Jacobi", Kokkos::MDRangePolicy<Kokkos::Rank<3>>({2, 2, 2}, {n-1, n-1, n-1}), KOKKOS_LAMBDA (const int i, const int j, const int k){
+            unew(i, j, k) = 0.125 * (u(i-1, j, k) + u(i+1, j, k) + u(i, j-1, k) +
+                                     u(i, j+1, k) + u(i, j, k-1) + u(i, j, k+1) + u(i, j, k));
+        });
+
+        Kokkos::deep_copy(u, unew);
+    }
+}
+
+int main() {
+    Kokkos::initialize();
+
+    int n = 10;
+    int niter = 100;
+
+    Kokkos::View<double***> u("u", n, n, n);
+    Kokkos::View<double***> unew("unew", n, n, n);
+
+    jacobi_parallel(u, unew, n, niter);
+
+    Kokkos::finalize();
+
+    return 0;
+}
+```
+
+This implementation uses Kokkos for parallelization and achieves the same Jacobi operation as the Fortran code with OpenACC.
+
+--------------- Output 6 ---------------
+Here is the equivalent function implemented in C++ with Kokkos:
+
+```cpp
+#include <Kokkos_Core.hpp>
+
+void jacobi_parallel(Kokkos::View<double***> u, Kokkos::View<double***> unew, int n, int niter) {
+    Kokkos::parallel_for("jacobi_parallel", Kokkos::MDRangePolicy<Kokkos::Rank<3>>({2, 2, 2}, {n-1, n-1, n-1}),
+        KOKKOS_LAMBDA(int i, int j, int k) {
+            unew(i, j, k) = 0.125 * (u(i-1, j, k) + u(i+1, j, k) + u(i, j-1, k) +
+                                     u(i, j+1, k) + u(i, j, k-1) + u(i, j, k+1) + u(i, j, k));
+        });
+
+    Kokkos::deep_copy(u, unew);
+
+    for(int iter = 1; iter <= niter; iter++) {
+        Kokkos::parallel_for("jacobi_parallel", Kokkos::MDRangePolicy<Kokkos::Rank<3>>({2, 2, 2}, {n-1, n-1, n-1}),
+            KOKKOS_LAMBDA(int i, int j, int k) {
+                unew(i, j, k) = 0.125 * (u(i-1, j, k) + u(i+1, j, k) + u(i, j-1, k) +
+                                        u(i, j+1, k) + u(i, j, k-1) + u(i, j, k+1) + u(i, j, k));
+            });
+
+        Kokkos::deep_copy(u, unew);
+    }
+}
+
+int main() {
+    Kokkos::initialize();
+    int n = 100;
+    int niter = 10;
+    Kokkos::View<double***> u("u", n, n, n);
+    Kokkos::View<double***> unew("unew", n, n, n);
+
+    // Initialize u with some values
+
+    jacobi_parallel(u, unew, n, niter);
+
+    Kokkos::finalize();
+    return 0;
+}
+```
+
+This C++ code uses Kokkos to implement the Jacobi operation in a similar way as the Fortran code using OpenACC. The `jacobi_parallel` function performs the Jacobi iteration on the input 3D arrays `u` and `unew` for a specified number of iterations `niter`. The parallel computation is done using Kokkos parallel constructs.
+
+--------------- Output 7 ---------------
+```cpp
+#include <Kokkos_Core.hpp>
+
+void jacobi_parallel(Kokkos::View<double***> u, Kokkos::View<double***> unew, int n, int niter) {
+  Kokkos::parallel_for("jacobi_kernel", Kokkos::MDRangePolicy<Kokkos::Rank<3>>({2, 2, 2}, {n-1, n-1, n-1}),
+    KOKKOS_LAMBDA(int i, int j, int k) {
+      unew(i, j, k) = 0.125 * (u(i-1, j, k) + u(i+1, j, k) + u(i, j-1, k) +
+                                u(i, j+1, k) + u(i, j, k-1) + u(i, j, k+1) + u(i, j, k));
+    });
+
+  Kokkos::deep_copy(u, unew);
+
+  for (int iter = 1; iter < niter; iter++) {
+    Kokkos::parallel_for("jacobi_kernel", Kokkos::MDRangePolicy<Kokkos::Rank<3>>({2, 2, 2}, {n-1, n-1, n-1}),
+      KOKKOS_LAMBDA(int i, int j, int k) {
+        unew(i, j, k) = 0.125 * (u(i-1, j, k) + u(i+1, j, k) + u(i, j-1, k) +
+                                  u(i, j+1, k) + u(i, j, k-1) + u(i, j, k+1) + u(i, j, k));
+      });
+
+    Kokkos::deep_copy(u, unew);
+  }
+}
+
+int main() {
+  int n = 100;
+  int niter = 10;
+
+  Kokkos::initialize();
+  {
+    Kokkos::View<double***> u("u", n, n, n);
+    Kokkos::View<double***> unew("unew", n, n, n);
+
+    // Initialize u
+
+    jacobi_parallel(u, unew, n, niter);
+
+    // Use updated u
+  }
+  Kokkos::finalize();
+
+  return 0;
+}
+```
+
+--------------- Output 8 ---------------
+```cpp
+#include <Kokkos_Core.hpp>
+
+void jacobi_parallel(Kokkos::View<double***> u, Kokkos::View<double***> unew, const int n, const int niter) {
+    Kokkos::parallel_for("jacobi_kernel", Kokkos::MDRangePolicy<Kokkos::Rank<3>>({1, 1, 1}, {n-1, n-1, n-1}), KOKKOS_LAMBDA(int i, int j, int k) {
+        unew(i, j, k) = 0.125 * (u(i-1, j, k) + u(i+1, j, k) + u(i, j-1, k) + u(i, j+1, k) + u(i, j, k-1) + u(i, j, k+1) + u(i, j, k));
+    });
+
+    Kokkos::deep_copy(u, unew);
+}
+
+int main() {
+    const int n = 100;
+    const int niter = 10;
+
+    Kokkos::initialize();
+    Kokkos::View<double***> u("u", n, n, n);
+    Kokkos::View<double***> unew("unew", n, n, n);
+
+    // Initialize u with values
+
+    jacobi_parallel(u, unew, n, niter);
+
+    Kokkos::finalize();
+
+    return 0;
+}
+```
+
+--------------- Output 9 ---------------
+Here is the equivalent function implemented in C++ with Kokkos:
+
+```cpp
+#include <Kokkos_Core.hpp>
+
+void jacobi_parallel(Kokkos::View<double***> u, Kokkos::View<double***> unew, int n, int niter) {
+    Kokkos::parallel_for("jacobi_parallel", Kokkos::MDRangePolicy<Kokkos::Rank<3>>({1, 1, 1}, {n - 1, n - 1, n - 1}),
+        KOKKOS_LAMBDA(int i, int j, int k) {
+            unew(i, j, k) = 0.125 * (u(i-1, j, k) + u(i+1, j, k) + u(i, j-1, k) +
+                                      u(i, j+1, k) + u(i, j, k-1) + u(i, j, k+1) + u(i, j, k));
+        });
+
+    Kokkos::deep_copy(u, unew);
+
+    for (int iter = 1; iter < niter; ++iter) {
+        Kokkos::parallel_for("jacobi_parallel", Kokkos::MDRangePolicy<Kokkos::Rank<3>>({1, 1, 1}, {n - 1, n - 1, n - 1}),
+            KOKKOS_LAMBDA(int i, int j, int k) {
+                unew(i, j, k) = 0.125 * (u(i-1, j, k) + u(i+1, j, k) + u(i, j-1, k) +
+                                          u(i, j+1, k) + u(i, j, k-1) + u(i, j, k+1) + u(i, j, k));
+            });
+
+        Kokkos::deep_copy(u, unew);
+    }
+}
+
+int main() {
+    Kokkos::initialize();
+    
+    int n = 100;
+    int niter = 100;
+    
+    Kokkos::View<double***> u("u", n, n, n);
+    Kokkos::View<double***> unew("unew", n, n, n);
+
+    // Initialize u and unew
+
+    jacobi_parallel(u, unew, n, niter);
+
+    Kokkos::finalize();
+
+    return 0;
+}
+``` 
+
+This C++ code defines a `jacobi_parallel` function using Kokkos that performs the Jacobi operation on a 3D array of doubles. The function is called with the input arrays `u` and `unew`, as well as the size of the array `n` and the number of iterations `niter`. The function performs the Jacobi operation using Kokkos parallel constructs and updates the input array `u` with the results.
+
+Make sure to include the Kokkos header file and link with the Kokkos library when compiling this code.
+
+--------------- Output 10 ---------------
+Here is the equivalent function implemented in C++ with Kokkos:
+
+```cpp
+#include <Kokkos_Core.hpp>
+
+void jacobi_parallel(Kokkos::View<double***> u, Kokkos::View<double***> unew, int n, int niter) {
+    Kokkos::parallel_for("jacobi_parallel", Kokkos::MDRangePolicy<Kokkos::Rank<3>>({1, 1, 1}, {n-1, n-1, n-1}),
+        KOKKOS_LAMBDA (const int i, const int j, const int k) {
+            unew(i, j, k) = 0.125 * (u(i-1, j, k) + u(i+1, j, k) + u(i, j-1, k)
+                + u(i, j+1, k) + u(i, j, k-1) + u(i, j, k+1) + u(i, j, k));
+        });
+    
+    Kokkos::deep_copy(u, unew);
+
+    for (int iter = 1; iter < niter; ++iter) {
+        Kokkos::parallel_for("jacobi_parallel", Kokkos::MDRangePolicy<Kokkos::Rank<3>>({1, 1, 1}, {n-1, n-1, n-1}),
+            KOKKOS_LAMBDA (const int i, const int j, const int k) {
+                unew(i, j, k) = 0.125 * (u(i-1, j, k) + u(i+1, j, k) + u(i, j-1, k)
+                    + u(i, j+1, k) + u(i, j, k-1) + u(i, j, k+1) + u(i, j, k));
+            });
+
+        Kokkos::deep_copy(u, unew);
+    }
+}
+```
+
+In this code snippet, we use Kokkos to parallelize the Jacobi operation. We define a parallel loop over the grid points with a Kokkos MDRangePolicy, and update the values in the unew array using the Jacobi stencil formula. Finally, we copy the values from unew back to u after each iteration.
+

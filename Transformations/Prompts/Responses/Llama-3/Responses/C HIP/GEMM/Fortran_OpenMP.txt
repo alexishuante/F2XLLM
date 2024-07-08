@@ -1,0 +1,326 @@
+--------------- Output 1 ---------------
+Here is a C function using HIP that calls the Fortran subroutine:
+#include <hip/hip_runtime.h>
+#include <stdio.h>
+
+void gemm_parallel_hip(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  double *a_d, *b_d, *c_d;
+  hipMalloc((void **)&a_d, lda * k * sizeof(double));
+  hipMalloc((void **)&b_d, ldb * n * sizeof(double));
+  hipMalloc((void **)&c_d, ldc * n * sizeof(double));
+  hipMemcpy(a_d, a, lda * k * sizeof(double), hipMemcpyHostToDevice);
+  hipMemcpy(b_d, b, ldb * n * sizeof(double), hipMemcpyHostToDevice);
+  hipMemcpy(c_d, c, ldc * n * sizeof(double), hipMemcpyHostToDevice);
+  
+  // Call Fortran subroutine
+  gemm_parallel_(m, n, k, alpha, a_d, lda, b_d, ldb, beta, c_d, ldc);
+  
+  hipMemcpy(c, c_d, ldc * n * sizeof(double), hipMemcpyDeviceToHost);
+  hipFree(a_d);
+  hipFree(b_d);
+  hipFree(c_d);
+}
+Note that this code assumes that the Fortran subroutine is compiled with the -fc-interop flag to enable C-Fortran interoperability. Also, the HIP runtime is used to allocate and copy memory between the host and device.
+You can call this function from C, and it will perform the GEMM operation using the Fortran subroutine with OpenMP parallelization.
+
+--------------- Output 2 ---------------
+Here is a possible implementation of the GEMM operation in C with HIP:
+#include <hip/hip_runtime.h>
+#include <stdio.h>
+
+void gemm_parallel(int m, int n, int k, float alpha, float *a, int lda, float *b, int ldb, float beta, float *c, int ldc) {
+  int i, j, l;
+  float temp;
+
+  hipLaunchKernel(gemm_kernel, dim3(1), dim3(m, n), 0, 0, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+}
+
+__global__ void gemm_kernel(int m, int n, int k, float alpha, float *a, int lda, float *b, int ldb, float beta, float *c, int ldc) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+
+  if (i < m && j < n) {
+    float temp = 0.0f;
+    for (int l = 0; l < k; l++) {
+      temp += a[i * lda + l] * b[l * ldb + j];
+    }
+    c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+  }
+}
+This implementation uses the HIP runtime API to launch a kernel on the GPU, which performs the GEMM operation in parallel. The kernel is launched with a 2D grid of blocks, where each block processes a subset of the output matrix c. Each thread within a block processes a single element of the output matrix.
+Note that this implementation assumes that the input matrices a and b are stored in column-major order, and that the output matrix c is stored in row-major order. Also, this implementation uses the float data type, but you can modify it to use double or other data types as needed.
+You can compile this code using the HIP compiler, and link it with the HIP runtime library to create an executable that can be run on a GPU.
+I hope this helps! Let me know if you have any questions or need further assistance.
+
+--------------- Output 3 ---------------
+Here is a C function using HIP that calls the provided Fortran subroutine for the GEMM operation:
+#include <hip/hip_runtime.h>
+#include <stdio.h>
+
+void gemm_parallel_hip(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  double *a_d, *b_d, *c_d;
+  hipMalloc((void **)&a_d, lda * k * sizeof(double));
+  hipMalloc((void **)&b_d, ldb * n * sizeof(double));
+  hipMalloc((void **)&c_d, ldc * n * sizeof(double));
+
+  hipMemcpy(a_d, a, lda * k * sizeof(double), hipMemcpyHostToDevice);
+  hipMemcpy(b_d, b, ldb * n * sizeof(double), hipMemcpyHostToDevice);
+  hipMemcpy(c_d, c, ldc * n * sizeof(double), hipMemcpyHostToDevice);
+
+  // Call Fortran subroutine
+  gemm_parallel(m, n, k, alpha, a_d, lda, b_d, ldb, beta, c_d, ldc);
+
+  hipMemcpy(c, c_d, ldc * n * sizeof(double), hipMemcpyDeviceToHost);
+
+  hipFree(a_d);
+  hipFree(b_d);
+  hipFree(c_d);
+}
+Note that this code assumes that the Fortran subroutine is compiled into a shared library that can be linked with the C code. Also, the HIP runtime is used for device memory management and data transfer between host and device.
+
+--------------- Output 4 ---------------
+Here is a C function using HIP that calls the Fortran subroutine for GEMM operation:
+#include <hip/hip_runtime.h>
+#include <stdio.h>
+
+extern void gemm_parallel_(int*, int*, int*, double*, double*, int*, double*, int*, double*, double*, int*);
+
+void gemm HIP(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  double *a_d, *b_d, *c_d;
+  hipMalloc((void **)&a_d, lda*k*sizeof(double));
+  hipMalloc((void **)&b_d, ldb*n*sizeof(double));
+  hipMalloc((void **)&c_d, ldc*n*sizeof(double));
+
+  hipMemcpy(a_d, a, lda*k*sizeof(double), hipMemcpyHostToDevice);
+  hipMemcpy(b_d, b, ldb*n*sizeof(double), hipMemcpyHostToDevice);
+  hipMemcpy(c_d, c, ldc*n*sizeof(double), hipMemcpyHostToDevice);
+
+  gemm_parallel_(&m, &n, &k, &alpha, a_d, &lda, b_d, &ldb, &beta, c_d, &ldc);
+
+  hipMemcpy(c, c_d, ldc*n*sizeof(double), hipMemcpyDeviceToHost);
+
+  hipFree(a_d);
+  hipFree(b_d);
+  hipFree(c_d);
+}
+Note that the Fortran subroutine is called using its C interface (gemm_parallel_) and the HIP runtime library is used for memory management and data transfer between host and device. Also, note that the Fortran subroutine is expected to be compiled with OpenMP enabled to utilize multi-threading on the host.
+
+--------------- Output 5 ---------------
+Here is a C function that calls the Fortran subroutine using HIP (Heterogeneous-Compute Interface for Portability) and OpenMP:
+#include <hip/hip_runtime.h>
+#include <omp.h>
+
+void gemm_parallel_hip(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  hipMemcpyToSymbol(a, a, m * k * sizeof(double));
+  hipMemcpyToSymbol(b, b, k * n * sizeof(double));
+  hipMemcpyToSymbol(c, c, m * n * sizeof(double));
+
+  #pragma omp target teams distribute parallel for collapse(2) map(tofrom:c) thread_limit(256)
+  for (int j = 1; j <= n; j++) {
+    for (int i = 1; i <= m; i++) {
+      double temp = 0.0;
+      #pragma omp for reduction(+:temp)
+      for (int l = 1; l <= k; l++) {
+        temp += a[i + l * lda] * b[l + j * ldb];
+      }
+      c[i + j * ldc] = alpha * temp + beta * c[i + j * ldc];
+    }
+  }
+
+  hipMemcpyFromSymbol(c, c, m * n * sizeof(double));
+}
+
+int main() {
+  int m, n, k, lda, ldb, ldc;
+  double alpha, beta;
+  double *a, *b, *c;
+
+  // Initialize variables and allocate memory
+
+  gemm_parallel_hip(m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+
+  return 0;
+}
+Note that this code assumes that the Fortran subroutine is compiled into a shared library that can be linked with the C code. The hipMemcpyToSymbol and hipMemcpyFromSymbol functions are used to copy data between the host and device memory. The #pragma omp target teams distribute parallel for directive is used to parallelize the loop using OpenMP.
+
+--------------- Output 6 ---------------
+Here is a C function that calls the Fortran subroutine using HIP (Heterogeneous-Compute Interface for Portability) and OpenMP:
+#include <hip/hip_runtime.h>
+#include <omp.h>
+
+void gemm_parallel_hip(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  hipMemcpyToSymbol(a_d, a, m * k * sizeof(double));
+  hipMemcpyToSymbol(b_d, b, k * n * sizeof(double));
+  hipMemcpyToSymbol(c_d, c, m * n * sizeof(double));
+
+  int *m_d, *n_d, *k_d, *lda_d, *ldb_d, *ldc_d;
+  hipMalloc((void **)&m_d, sizeof(int));
+  hipMalloc((void **)&n_d, sizeof(int));
+  hipMalloc((void **)&k_d, sizeof(int));
+  hipMalloc((void **)&lda_d, sizeof(int));
+  hipMalloc((void **)&ldb_d, sizeof(int));
+  hipMalloc((void **)&ldc_d, sizeof(int));
+
+  hipMemcpy(m_d, &m, sizeof(int), hipMemcpyHostToDevice);
+  hipMemcpy(n_d, &n, sizeof(int), hipMemcpyHostToDevice);
+  hipMemcpy(k_d, &k, sizeof(int), hipMemcpyHostToDevice);
+  hipMemcpy(lda_d, &lda, sizeof(int), hipMemcpyHostToDevice);
+  hipMemcpy(ldb_d, &ldb, sizeof(int), hipMemcpyHostToDevice);
+  hipMemcpy(ldc_d, &ldc, sizeof(int), hipMemcpyHostToDevice);
+
+  double *alpha_d, *beta_d;
+  hipMalloc((void **)&alpha_d, sizeof(double));
+  hipMalloc((void **)&beta_d, sizeof(double));
+
+  hipMemcpy(alpha_d, &alpha, sizeof(double), hipMemcpyHostToDevice);
+  hipMemcpy(beta_d, &beta, sizeof(double), hipMemcpyHostToDevice);
+
+  hipLaunchKernel(gemm_parallel, dim3(1), dim3(1), 0, 0, m_d, n_d, k_d, alpha_d, a_d, lda_d, b_d, ldb_d, beta_d, c_d, ldc_d);
+
+  hipMemcpy(c, c_d, m * n * sizeof(double), hipMemcpyDeviceToHost);
+}
+Note that this code assumes that the Fortran subroutine gemm_parallel has been compiled into a shared library that can be called from C. The HIP runtime is used to copy data between the host and device, and to launch the kernel. OpenMP is used to parallelize the loop within the Fortran subroutine.
+Also, note that this is just an example, and you may need to modify it to fit your specific use case. Additionally, you will need to ensure that the HIP runtime and OpenMP libraries are installed and configured correctly on your system.
+
+--------------- Output 7 ---------------
+Here is a C function that calls the Fortran subroutine using HIP (Heterogeneous-Compute Interface for Portability) and OpenMP:
+#include <hip/hip_runtime.h>
+#include <omp.h>
+extern void gemm_parallel_(int *m, int *n, int *k, double *alpha, double *a, int *lda, double *b, int *ldb, double *beta, double *c, int *ldc);
+
+void gemm_parallel_hip(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+    int *d_m, *d_n, *d_k, *d_lda, *d_ldb, *d_ldc;
+    double *d_alpha, *d_beta;
+    hipMalloc((void **)&d_m, sizeof(int));
+    hipMalloc((void **)&d_n, sizeof(int));
+    hipMalloc((void **)&d_k, sizeof(int));
+    hipMalloc((void **)&d_lda, sizeof(int));
+    hipMalloc((void **)&d_ldb, sizeof(int));
+    hipMalloc((void **)&d_ldc, sizeof(int));
+    hipMalloc((void **)&d_alpha, sizeof(double));
+    hipMalloc((void **)&d_beta, sizeof(double));
+    
+    hipMemcpy(d_m, &m, sizeof(int), hipMemcpyHostToDevice);
+    hipMemcpy(d_n, &n, sizeof(int), hipMemcpyHostToDevice);
+    hipMemcpy(d_k, &k, sizeof(int), hipMemcpyHostToDevice);
+    hipMemcpy(d_lda, &lda, sizeof(int), hipMemcpyHostToDevice);
+    hipMemcpy(d_ldb, &ldb, sizeof(int), hipMemcpyHostToDevice);
+    hipMemcpy(d_ldc, &ldc, sizeof(int), hipMemcpyHostToDevice);
+    hipMemcpy(d_alpha, &alpha, sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_beta, &beta, sizeof(double), hipMemcpyHostToDevice);
+    
+    #pragma omp target teams distribute parallel for
+    for (int i = 0; i < m; i++) {
+        for (int j = 0; j < n; j++) {
+            gemm_parallel_(&m, &n, &k, &alpha, a, &lda, b, &ldb, &beta, c, &ldc);
+        }
+    }
+    
+    hipFree(d_m); hipFree(d_n); hipFree(d_k); hipFree(d_lda); hipFree(d_ldb); hipFree(d_ldc);
+    hipFree(d_alpha); hipFree(d_beta);
+}
+Note that this code assumes that the Fortran subroutine gemm_parallel is compiled into a shared library that can be linked with the C code. The HIP runtime is used to allocate device memory and copy data between the host and device. The OpenMP target teams distribute parallel for directive is used to execute the Fortran subroutine on the device in parallel.
+
+--------------- Output 8 ---------------
+Here is a C function using HIP that calls the Fortran subroutine for GEMM with OpenMP:
+#include <hip/hip_runtime.h>
+#include <stdio.h>
+
+extern void gemm_parallel_(int *m, int *n, int *k, double *alpha, double *a, int *lda, double *b, int *ldb, double *beta, double *c, int *ldc);
+
+void gemm_parallel_hip(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  double *a_d, *b_d, *c_d;
+  hipMalloc((void **)&a_d, lda * k * sizeof(double));
+  hipMalloc((void **)&b_d, ldb * n * sizeof(double));
+  hipMalloc((void **)&c_d, ldc * n * sizeof(double));
+
+  hipMemcpy(a_d, a, lda * k * sizeof(double), hipMemcpyHostToDevice);
+  hipMemcpy(b_d, b, ldb * n * sizeof(double), hipMemcpyHostToDevice);
+  hipMemcpy(c_d, c, ldc * n * sizeof(double), hipMemcpyHostToDevice);
+
+  gemm_parallel_(&m, &n, &k, &alpha, a_d, &lda, b_d, &ldb, &beta, c_d, &ldc);
+
+  hipMemcpy(c, c_d, ldc * n * sizeof(double), hipMemcpyDeviceToHost);
+
+  hipFree(a_d);
+  hipFree(b_d);
+  hipFree(c_d);
+}
+Note that this C function allocates memory on the device, copies the data from the host to the device, calls the Fortran subroutine, and then copies the result back to the host.
+Also, the Fortran subroutine is called using its C interface (gemm_parallel_) and the hipMemcpy function is used to copy data between the host and device.
+You will need to compile the Fortran subroutine with OpenMP and the C function with HIP, then link them together to create an executable.
+
+--------------- Output 9 ---------------
+Here is a C function using HIP that calls the Fortran subroutine for the GEMM operation:
+#include <hip/hip_runtime.h>
+#include <stdio.h>
+
+extern void gemm_parallel_(int*, int*, int*, double*, double*, int*, double*, int*, double*, double*, int*);
+
+void gemm_c(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+    hipMemcpyToSymbol(a_d, a, m * k * sizeof(double));
+    hipMemcpyToSymbol(b_d, b, k * n * sizeof(double));
+    hipMemcpyToSymbol(c_d, c, m * n * sizeof(double));
+
+    int *m_d, *n_d, *k_d, *lda_d, *ldb_d, *ldc_d;
+    hipMalloc((void **)&m_d, sizeof(int));
+    hipMalloc((void **)&n_d, sizeof(int));
+    hipMalloc((void **)&k_d, sizeof(int));
+    hipMalloc((void **)&lda_d, sizeof(int));
+    hipMalloc((void **)&ldb_d, sizeof(int));
+    hipMalloc((void **)&ldc_d, sizeof(int));
+
+    hipMemcpy(m_d, &m, sizeof(int), hipMemcpyHostToDevice);
+    hipMemcpy(n_d, &n, sizeof(int), hipMemcpyHostToDevice);
+    hipMemcpy(k_d, &k, sizeof(int), hipMemcpyHostToDevice);
+    hipMemcpy(lda_d, &lda, sizeof(int), hipMemcpyHostToDevice);
+    hipMemcpy(ldb_d, &ldb, sizeof(int), hipMemcpyHostToDevice);
+    hipMemcpy(ldc_d, &ldc, sizeof(int), hipMemcpyHostToDevice);
+
+    double *alpha_d, *beta_d;
+    hipMalloc((void **)&alpha_d, sizeof(double));
+    hipMalloc((void **)&beta_d, sizeof(double));
+
+    hipMemcpy(alpha_d, &alpha, sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(beta_d, &beta, sizeof(double), hipMemcpyHostToDevice);
+
+    hipLaunchKernel(gemm_parallel_, 1, 1, 0, 0, NULL, m_d, n_d, k_d, alpha_d, a_d, lda_d, b_d, ldb_d, beta_d, c_d, ldc_d);
+
+    hipMemcpy(c, c_d, m * n * sizeof(double), hipMemcpyDeviceToHost);
+}
+Note that you will need to modify the HIP code to match your specific use case, such as allocating memory and launching the kernel. Additionally, you will need to compile the Fortran code with OpenMP and link it with the HIP code.
+
+--------------- Output 10 ---------------
+Here is a C function that calls the Fortran subroutine using HIP (Heterogeneous-Compute Interface for Portability) and OpenMP:
+#include <hip/hip_runtime.h>
+#include <omp.h>
+extern void gemm_parallel_(int *m, int *n, int *k, double *alpha, double *a, int *lda, double *b, int *ldb, double *beta, double *c, int *ldc);
+
+void gemm_parallel_hip(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+  double *a_d, *b_d, *c_d;
+  hipMalloc((void **)&a_d, lda * k * sizeof(double));
+  hipMalloc((void **)&b_d, ldb * n * sizeof(double));
+  hipMalloc((void **)&c_d, ldc * n * sizeof(double));
+  hipMemcpy(a_d, a, lda * k * sizeof(double), hipMemcpyHostToDevice);
+  hipMemcpy(b_d, b, ldb * n * sizeof(double), hipMemcpyHostToDevice);
+  hipMemcpy(c_d, c, ldc * n * sizeof(double), hipMemcpyHostToDevice);
+  #pragma omp target data map(to:a_d[0:lda*k], b_d[0:ldb*n], c_d[0:ldc*n])
+  {
+    #pragma omp target teams distribute parallel for
+    for (int j = 0; j < n; j++) {
+      for (int i = 0; i < m; i++) {
+        double temp = 0.0;
+        for (int l = 0; l < k; l++) {
+          temp += a_d[i + l * lda] * b_d[l + j * ldb];
+        }
+        c_d[i + j * ldc] = alpha * temp + beta * c_d[i + j * ldc];
+      }
+    }
+  }
+  hipMemcpy(c, c_d, ldc * n * sizeof(double), hipMemcpyDeviceToHost);
+  hipFree(a_d);
+  hipFree(b_d);
+  hipFree(c_d);
+}
+Note that this code assumes that the Fortran subroutine is compiled with the -fno-underscoring flag to prevent the compiler from appending an underscore to the subroutine name. Also, the hipMemcpy functions are used to copy data between the host and device, and the #pragma omp target directives are used to offload the computation to the device.
+

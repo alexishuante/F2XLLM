@@ -25,9 +25,9 @@ for i, each_message in enumerate(messages):
         for j in range(num_iter):
             response = ai.prompt(message=each_message)  # Prompt and get a response
             response_message = response['message']  # Get message only instead of message, sources, and media
-            response_file.write(f'Output {j+1}:\n{response_message}\n\n')  # Write the response to the file
+            response_file.write(f'--------------- Output {j+1} ---------------\n{response_message}\n')  # Write the response to the file
 
-            print(f'Iteration {j+1}: {response_message}')
+            print(f'\n--------------- Iteration {j+1} ---------------\n\n {response_message}')
 
         print('\n')
         print(f'All responses saved to Prompt{prompt_number}_responses_llama3.txt')

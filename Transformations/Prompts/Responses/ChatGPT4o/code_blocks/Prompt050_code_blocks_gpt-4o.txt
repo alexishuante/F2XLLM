@@ -1,0 +1,189 @@
+--------------- Code Block 1 ---------------
+void spmv_parallel(int n, int nnz, Kokkos::View<const float*> val, Kokkos::View<const int*> row, Kokkos::View<const int*> col, 
+                   Kokkos::View<const float*> x, Kokkos::View<float*> y) {
+  // Parallel loop over each row
+  Kokkos::parallel_for("SpMV", Kokkos::RangePolicy<>(0, n), KOKKOS_LAMBDA(const int i) {
+    y(i) = 0.0f;
+    for(int j = row(i); j < row(i+1); j++) {
+      y(i) += val(j) * x(col(j));
+    }
+  });
+}
+
+--------------- Code Block 2 ---------------
+void spmv_parallel(int n, int nnz,
+                   const Kokkos::View<const float*> &val,
+                   const Kokkos::View<const int*> &row,
+                   const Kokkos::View<const int*> &col,
+                   const Kokkos::View<const float*> &x,
+                   Kokkos::View<float*> &y) {
+
+  // Initialize y vector to zero
+  Kokkos::parallel_for(
+      "initialize_y", 
+      Kokkos::RangePolicy<>(0, n), 
+      KOKKOS_LAMBDA(const int i) {
+          y(i) = 0.0;
+  });
+
+  // Perform SpMV
+  Kokkos::parallel_for(
+      "spmv", 
+      Kokkos::RangePolicy<>(0, n), 
+      KOKKOS_LAMBDA(const int i) {
+          for (int j = row(i); j < row(i + 1); j++) {
+              y(i) += val(j) * x(col(j));
+          }
+  });
+}
+
+--------------- Code Block 3 ---------------
+void spmv_parallel(Ordinal n, Ordinal nnz,
+                   Kokkos::View<const Scalar*> val,
+                   Kokkos::View<const Ordinal*> row,
+                   Kokkos::View<const Ordinal*> col,
+                   Kokkos::View<const Scalar*> x,
+                   Kokkos::View<Scalar*> y) {
+
+    using execution_space = Kokkos::DefaultExecutionSpace;
+
+    Kokkos::parallel_for("spmv_parallel", Kokkos::RangePolicy<execution_space>(0, n),
+        KOKKOS_LAMBDA(const Ordinal& i) {
+            Scalar sum = 0.0;
+            for(Ordinal j = row(i); j < row(i + 1); ++j) {
+                sum += val(j) * x(col(j));
+            }
+            y(i) = sum;
+        }
+    );
+}
+
+--------------- Code Block 4 ---------------
+void spmv_parallel(const int n, const int nnz, 
+                   const Kokkos::View<const double*> val, 
+                   const Kokkos::View<const int*> row, 
+                   const Kokkos::View<const int*> col, 
+                   const Kokkos::View<const double*> x, 
+                   Kokkos::View<double*> y) {
+
+    // Launch parallel computation
+    Kokkos::parallel_for("spmv", Kokkos::RangePolicy<>(0, n), KOKKOS_LAMBDA(const int i) {
+        double sum = 0.0;
+        for (int j = row(i); j < row(i + 1); ++j) {
+            sum += val(j) * x(col(j));
+        }
+        y(i) = sum;
+    });
+
+    // Ensure completion of all device operations before returning
+    Kokkos::fence();
+}
+
+--------------- Code Block 5 ---------------
+void spmv_parallel(int n, int nnz,
+                   Kokkos::View<const float*> val,
+                   Kokkos::View<const int*> row,
+                   Kokkos::View<const int*> col,
+                   Kokkos::View<const float*> x,
+                   Kokkos::View<float*> y) {
+    Kokkos::parallel_for("spmv_parallel", Kokkos::RangePolicy<>(0, n), KOKKOS_LAMBDA(int i) {
+        float sum = 0.0f;
+        for (int j = row(i); j < row(i + 1); ++j) {
+            sum += val(j) * x(col(j));
+        }
+        y(i) = sum;
+    });
+}
+
+--------------- Code Block 6 ---------------
+void spmv_parallel(const IndexType n, const IndexType nnz, 
+                   const Kokkos::View<ValueType*> &val, 
+                   const Kokkos::View<IndexType*> &row, 
+                   const Kokkos::View<IndexType*> &col, 
+                   const Kokkos::View<ValueType*> &x, 
+                   Kokkos::View<ValueType*> &y) 
+{
+  Kokkos::parallel_for("SpMV", Kokkos::RangePolicy<>(0, n), KOKKOS_LAMBDA(const int i) {
+    ValueType sum = 0.0;
+    for(IndexType j = row(i); j < row(i+1); j++) {
+      sum += val(j) * x(col(j));
+    }
+    y(i) = sum;
+  });
+}
+
+--------------- Code Block 7 ---------------
+void spmv_parallel(int n, int nnz, const float* val, const int* row, const int* col, const float* x, float* y) {
+    // Create Kokkos Views for input data
+    Kokkos::View<const float*> d_val(val, nnz);
+    Kokkos::View<const int*> d_row(row, n + 1);
+    Kokkos::View<const int*> d_col(col, nnz);
+    Kokkos::View<const float*> d_x(x, n);
+    Kokkos::View<float*> d_y(y, n);
+
+    // Set the output vector y to zero
+    Kokkos::parallel_for("init_y", n, KOKKOS_LAMBDA(const int i) {
+        d_y(i) = 0.0;
+    });
+
+    // Perform SpMV
+    Kokkos::parallel_for("spmv", n, KOKKOS_LAMBDA(const int i) {
+        for (int j = d_row(i); j < d_row(i+1); ++j) {
+            d_y(i) += d_val(j) * d_x(d_col(j));
+        }
+    });
+}
+
+--------------- Code Block 8 ---------------
+void spmv_parallel(
+    const int n, const int nnz, 
+    const Kokkos::View<double*> val, 
+    const Kokkos::View<int*> row, 
+    const Kokkos::View<int*> col, 
+    const Kokkos::View<double*> x, 
+    Kokkos::View<double*> y) 
+{
+    using exec_space = Kokkos::DefaultExecutionSpace;
+    using range_policy = Kokkos::RangePolicy<exec_space>;
+
+    // Initialize y to zero
+    Kokkos::parallel_for("Initialize y", range_policy(0, n), KOKKOS_LAMBDA(const int i) {
+        y(i) = 0.0;
+    });
+
+    // Perform the SpMV operation
+    Kokkos::parallel_for("SpMV", range_policy(0, n), KOKKOS_LAMBDA(const int i) {
+        for (int j = row(i); j < row(i+1); ++j) {
+            y(i) += val(j) * x(col(j));
+        }
+    });
+}
+
+--------------- Code Block 9 ---------------
+void spmv_parallel(const int n, const int nnz, 
+                   const Kokkos::View<const float*, Device>& val, 
+                   const Kokkos::View<const int*, Device>& row, 
+                   const Kokkos::View<const int*, Device>& col, 
+                   const Kokkos::View<const float*, Device>& x, 
+                   Kokkos::View<float*, Device>& y) {
+  
+  Kokkos::parallel_for("SpMV", Kokkos::RangePolicy<ExecSpace>(0, n), KOKKOS_LAMBDA(const int i) {
+    y(i) = 0.0f;
+    for (int j = row(i); j < row(i + 1); ++j) {
+      y(i) += val(j) * x(col(j));
+    }
+  });
+}
+
+--------------- Code Block 10 ---------------
+void spmv_parallel(int n, int nnz, const Kokkos::View<const float*> val,
+                   const Kokkos::View<const int*> row, const Kokkos::View<const int*> col,
+                   const Kokkos::View<const float*> x, Kokkos::View<float*> y) {
+  Kokkos::parallel_for("SpMV", Kokkos::RangePolicy<>(0, n), KOKKOS_LAMBDA(const int i) {
+    y(i) = 0.0;
+    for (int j = row(i); j < row(i+1); ++j) {
+      y(i) += val(j) * x(col(j));
+    }
+  });
+}
+

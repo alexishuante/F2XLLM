@@ -29,9 +29,9 @@ for i, each_message in enumerate(messages):
                 messages=[{"role": "user", "content": each_message}]
             )
             response_content = response.choices[0].message.content
-            response_file.write(f'Output {j + 1}:\n{response_content}\n\n')  # Write the response to the file
+            response_file.write(f'--------------- Output {j + 1} ---------------\n{response_content}\n\n')  # Write the response to the file
 
-            print(f'Iteration {j + 1}: {response_content}')
+            print(f'\n--------------- Iteration {j + 1} ---------------\n\n {response_content}')
 
         print('\n')
         print(f'All responses saved to Prompt{prompt_number}_responses_gpt3.5turbo.txt')

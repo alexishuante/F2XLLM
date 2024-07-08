@@ -1,0 +1,148 @@
+--------------- Code Block 1 ---------------
+__global__
+void hip_axpy(int n, float a, float *x, float *y) {
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if (tid < n) {
+        y[tid] = a * x[tid] + y[tid];
+    }
+}
+
+void hip_saxpy_parallel(int n, float a, float *x, float *y) {
+    int blockSize = 256;
+    int numBlocks = (n + blockSize - 1) / blockSize;
+
+    hipLaunchKernelGGL(hip_axpy, dim3(numBlocks), dim3(blockSize), 0, 0, n, a, x, y);
+}
+
+--------------- Code Block 2 ---------------
+__global__ void hip_axpy(int n, float a, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+void axpy(int n, float a, float *x, float *y) {
+    int blockSize = 256;
+    int gridSize = (n + blockSize - 1) / blockSize;
+
+    hipLaunchKernelGGL(hip_axpy, dim3(gridSize), dim3(blockSize), 0, 0, n, a, x, y);
+}
+
+--------------- Code Block 3 ---------------
+__global__ void axpy_kernel(int n, float a, float *x, float *y) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+void saxpy_parallel(int n, float a, float *x, float *y) {
+    int blockSize = 256;
+    int numBlocks = (n + blockSize - 1) / blockSize;
+
+    hipLaunchKernelGGL(axpy_kernel, dim3(numBlocks), dim3(blockSize), 0, 0, n, a, x, y);
+}
+
+--------------- Code Block 4 ---------------
+void saxpy_hip(int n, float a, float *x, float *y) {
+    hipLaunchKernelGGL([=](hipLaunchParm lp) {
+        int i = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
+        if (i < n) {
+            y[i] = a * x[i] + y[i];
+        }
+    }, dim3((n + 255) / 256), dim3(256), 0, 0, n, a, x, y);
+}
+
+--------------- Code Block 5 ---------------
+void axpy_parallel(int n, float a, float *x, float *y) {
+    hipLaunchKernelGGL([=](hipLaunchParm lp) {
+        int i = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
+        if (i < n) {
+            y[i] = a * x[i] + y[i];
+        }
+    }, dim3((n + 255) / 256), dim3(256), 0, 0, n, a, x, y);
+}
+
+--------------- Code Block 6 ---------------
+__global__ void axpy_kernel(int n, float a, float *x, float *y) {
+    int tid = threadIdx.x + blockIdx.x * blockDim.x;
+    
+    if(tid < n) {
+        y[tid] = a * x[tid] + y[tid];
+    }
+}
+
+void axpy_parallel(int n, float a, float *x, float *y) {
+    float *d_x, *d_y;
+    
+    hipMalloc(&d_x, n * sizeof(float));
+    hipMalloc(&d_y, n * sizeof(float));
+    
+    hipMemcpy(d_x, x, n * sizeof(float), hipMemcpyHostToDevice);
+    hipMemcpy(d_y, y, n * sizeof(float), hipMemcpyHostToDevice);
+    
+    int block_size = 256;
+    int grid_size = (n + block_size - 1) / block_size;
+    
+    hipLaunchKernelGGL(axpy_kernel, dim3(grid_size), dim3(block_size), 0, 0, n, a, d_x, d_y);
+    
+    hipMemcpy(y, d_y, n * sizeof(float), hipMemcpyDeviceToHost);
+    
+    hipFree(d_x);
+    hipFree(d_y);
+}
+
+--------------- Code Block 7 ---------------
+__global__ void saxpy(int n, float a, float* x, float* y) {
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    if (index < n) {
+        y[index] = a * x[index] + y[index];
+    }
+}
+
+void saxpy_parallel(int n, float a, float* x, float* y) {
+    hipLaunchKernelGGL(saxpy, dim3((n+255)/256), dim3(256), 0, 0, n, a, x, y);
+}
+
+--------------- Code Block 8 ---------------
+__global__ void saxpy_parallel(int n, float a, float *x, float *y) {
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    if (index < n) {
+        y[index] = a * x[index] + y[index];
+    }
+}
+
+--------------- Code Block 9 ---------------
+void saxpy_parallel(int n, float a, float *x, float *y)
+{
+    hipLaunchKernelGGL(
+        [=] __global__ void saxpy_kernel(int n, float a, float *x, float *y)
+        {
+            int tid = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
+            if (tid < n)
+            {
+                y[tid] = a * x[tid] + y[tid];
+            }
+        },
+        dim3((n+255)/256), dim3(256), 0, 0,
+        n, a, x, y
+    );
+}
+
+--------------- Code Block 10 ---------------
+__global__ void saxpy_kernel(int n, float a, float* x, float* y)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    if (i < n)
+    {
+        y[i] = a * x[i] + y[i];
+    }
+}
+
+void saxpy(int n, float a, float* x, float* y)
+{
+    hipLaunchKernelGGL(saxpy_kernel, dim3((n + 255) / 256), dim3(256), 0, 0, n, a, x, y);
+}
+
