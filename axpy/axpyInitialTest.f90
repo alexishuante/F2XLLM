@@ -9,11 +9,8 @@ PROGRAM main
     REAL :: wall_time, warmup
     INTEGER :: i
 
-    
-
     ! Allocate the vectors on the heap
     ALLOCATE(x(n), y(n))
-
 
     ! Initialize the scalar and vectors
     a = 2.0
@@ -40,9 +37,7 @@ PROGRAM main
     ! Deallocate the vectors
     DEALLOCATE(x, y)
 
-
 END PROGRAM main
-
 
 subroutine saxpy_parallel(n, a, x, y)
     implicit none
@@ -59,4 +54,3 @@ subroutine saxpy_parallel(n, a, x, y)
     !$OMP END PARALLEL DO
 
 end subroutine saxpy_parallel
-
