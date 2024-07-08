@@ -1,68 +1,115 @@
-module sparse_matrix_mod
-  implicit none
-  contains
+subroutine spmv_parallel(n, nnz, val, row, col, x, y)
+    integer, intent(in) :: n, nnz
+    real, intent(in) :: val(nnz), x(n)
+    integer, intent(in) :: row(n+1), col(nnz)
+    real, intent(out) :: y(n)
+    integer i, j
+  
+    !$OMP PARALLEL DO DEFAULT(NONE) SHARED(n, nnz, val, row, col, x, y) PRIVATE(i, j)
+    do i = 1, n
+      y(i) = 0.0
+      do j = row(i), row(i+1)-1
+        y(i) = y(i) + val(j) * x(col(j))
+      enddo
+    enddo
+    !$OMP END PARALLEL DO
+  end subroutine spmv_parallel
+  
+program main
+implicit none
 
-  subroutine generateSparseMatrix(rows, cols, disparity, seed, row_ptr, col_ind, values)
-    integer, intent(in) :: rows, cols
-    real, intent(in) :: disparity
-    integer, intent(in) :: seed
-    integer, allocatable, intent(out) :: row_ptr(:), col_ind(:)
-    real, allocatable, intent(out) :: values(:)
-    integer :: total_elements, non_zero_elements, i, j, count
-    real :: rnd_row, rnd_col
+! real, dimension(4) :: val = [-1.689127, 9.607784, 3.212904, -6.599318]
+! integer, dimension(4) :: col = [4, 1, 3, 4]
+! ! Row pointers are 0-indexed in the file, so we add 1 to each value to make them 1-indexed here
+! integer, dimension(6) :: row = [1, 1, 1, 2, 5, 5]
+real, dimension(4) :: val
+integer, dimension(4) :: col
+integer, dimension(6) :: row
 
-    call random_seed(put=seed)
-    total_elements = rows * cols
-    non_zero_elements = int(total_elements * disparity)
-    allocate(row_ptr(rows+1))
-    allocate(col_ind(non_zero_elements))
-    allocate(values(non_zero_elements))
-    row_ptr = 0
-    count = 0
+real, dimension(5) :: x = [1.0, 1.0, 1.0, 1.0, 1.0]
+real, dimension(5) :: y
+integer :: i
+integer :: status
+character(len=100) :: line
 
-    do i = 1, non_zero_elements
-      call random_number(rnd_row)
-      call random_number(rnd_col)
-      j = int(rnd_row * rows) + 1
-      col_ind(i) = int(rnd_col * cols) + 1
-      values(i) = rand()  ! Assuming non-zero elements are random floats
-      row_ptr(j) = row_ptr(j) + 1
+! Read from a file and store the values in the arrays
+! Open the file
+open(1, file='matrix_csr.txt', status='old', action='read')
+
+! Check if it finds the text "# Values:"
+
+read(1, '(A)', iostat=status) line
+if (status /= 0) then
+    print *, "Error reading file"
+    stop
+end if
+
+if (trim(line) == "# Values:") then
+    print *, "Found Values!"
+    ! Code to execute if the text is found
+    ! Add your code here
+    do i = 1, 4
+        read(1, *) line
+        if (trim(line) == "# Column Indices:") then
+            print *, "Found Columns"
+            exit ! Exit the loop if the text is found
+        else
+            read(line, *) val(i)
+        end if
     end do
+end if
+print *, val
 
-    ! Convert row_ptr to CSR format
-    do i = 2, rows + 1
-      row_ptr(i) = row_ptr(i) + row_ptr(i-1)
+! Check if it finds the text "# Column Indices:"
+read(1, '(A)', iostat=status) line
+if (status /= 0) then
+    print *, "Error reading file"
+    stop
+end if
+
+if (trim(line) == "# Column Indices:") then
+    print *, "Found Columns!"
+    ! Code to execute if the text is found
+    do i = 1, 4
+        read(1, *) line
+        if (trim(line) == "# Row Pointers:") then
+            print *, "Found Row Pointers"
+            exit ! Exit the loop if the text is found
+        else
+            read(line, *) col(i)
+        end if
     end do
-  end subroutine generateSparseMatrix
+end if
+print *, col
 
-  subroutine saveSparseMatrix(filename, row_ptr, col_ind, values)
-    character(len=*), intent(in) :: filename
-    integer, intent(in) :: row_ptr(:), col_ind(:)
-    real, intent(in) :: values(:)
-    integer :: i, unit
+! Check if it finds the text "# Row Pointers:"
+read(1, '(A)', iostat=status) line
+if (status /= 0) then
+    print *, "Error reading file"
+    stop
+end if
 
-    open(newunit=unit, file=filename, status='replace', action='write')
-    do i = 1, size(row_ptr)
-      write(unit, *) row_ptr(i)
-    end do
-    do i = 1, size(col_ind)
-      write(unit, *) col_ind(i), values(i)
-    end do
-    close(unit)
-  end subroutine saveSparseMatrix
+if (trim(line) == "# Row Pointers:") then
+    print *, "Found Row Pointers!"
+    read(1, *) row
+end if
+print *, row
 
-end module sparse_matrix_mod
+! Increase all values inside of row by one
+row = row + 1
 
-program testSparseMatrix
-  use sparse_matrix_mod
-  implicit none
-  integer, parameter :: rows = 1000000, cols = 1000000
-  real, parameter :: disparity = 0.01
-  integer, allocatable :: row_ptr(:), col_ind(:)
-  real, allocatable :: values(:)
-  integer :: seed
+! New row values
+print *, "New row values:"
+print *, row
 
-  seed = 42
-  call generateSparseMatrix(rows, cols, disparity, seed, row_ptr, col_ind, values)
-  call saveSparseMatrix('sparse_matrix.dat', row_ptr, col_ind, values)
-end program testSparseMatrix
+
+! Close the file
+close(1)
+
+print *, "Starting parallel computation..."
+
+! Call the subroutine
+call spmv_parallel(5, 4, val, row, col, x, y)
+
+
+end program main
