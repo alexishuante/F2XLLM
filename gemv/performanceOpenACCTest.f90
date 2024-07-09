@@ -61,7 +61,7 @@
 program test_gemv_parallel
     USE iso_c_binding, ONLY: C_LONG_LONG
     implicit none
-    integer, parameter :: n = 31622
+    integer, parameter :: n = 44720
     REAL(KIND=8) :: A(n, n), x(n), y(n)
     INTEGER :: i
     INTEGER :: count_max
@@ -107,17 +107,6 @@ subroutine gemv_parallel(n, A, x, y)
     real(KIND=8), intent(out) :: y(n)
     integer :: i, j
     real :: sum
-
-    ! !$ACC PARALLEL LOOP gang
-    ! do i = 1, n
-    !     sum = 0.0
-    !     !$ACC LOOP worker vector reduction(+:sum)
-    !     do j = 1, n
-    !         sum = sum + A(i, j) * x(j)
-    !     end do
-    !     y(i) = sum
-    ! end do
-    ! !$ACC END PARALLEL LOOP
 
     !$ACC PARALLEL LOOP
     do i = 1, n

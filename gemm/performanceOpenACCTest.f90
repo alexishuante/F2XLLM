@@ -1,13 +1,16 @@
 program test_gemm_parallel
+    USE iso_c_binding, ONLY: C_LONG_LONG
     implicit none
-    integer, parameter :: m = 3, n = 3, k = 3
+    integer, parameter :: m = 18000, n = 18000, k = 18000
     integer, parameter :: lda = m, ldb = k, ldc = m
     real(kind=8), dimension(lda, k) :: A
     real(kind=8), dimension(ldb, n) :: B
     real(kind=8), dimension(ldc, n) :: C
     real(kind=8) :: alpha = 1.0, beta = 0.0
     integer :: i, j, call
-    real(kind=8) :: start_time, end_time, total_time, average_time
+    INTEGER :: count_max
+    INTEGER(C_LONG_LONG) :: start_count, end_count, count_diff, count_rate
+    REAL :: wall_time
 
     ! Initialize matrices A and B with some values
     do i = 1, m
@@ -28,28 +31,23 @@ program test_gemm_parallel
     ! Warmup call to gemm_parallel
     call gemm_parallel(m, n, k, alpha, A, lda, B, ldb, beta, C, ldc)
 
-    total_time = 0.0
-    do call = 1, 10
-        ! Re-initialize matrix C with zeros for each call
-        C = 0.0
 
-        call cpu_time(start_time)
+    ! Find average per call time
+    count_max = 10
+    count_diff = 0
+
+    
+    DO i = 1, count_max
+        CALL system_clock(count_rate=count_rate)
+        CALL system_clock(start_count)
         call gemm_parallel(m, n, k, alpha, A, lda, B, ldb, beta, C, ldc)
-        call cpu_time(end_time)
+        CALL system_clock(end_count)
+        count_diff = count_diff + (end_count - start_count)
+    END DO
 
-        total_time = total_time + (end_time - start_time)
-    end do
 
-    average_time = total_time / 10.0
-
-    ! Output the average time
-    print *, 'Average time for 10 calls: ', average_time, ' seconds'
-
-    ! Output the resulting matrix C from the last call
-    print *, 'Resulting matrix C from the last call:'
-    do i = 1, m
-      print '(3F8.2)', C(i, :)
-    end do
+    wall_time = REAL(count_diff) / REAL(count_rate) / REAL(count_max)
+    PRINT *, "Average time of ", count_max, " calls: ", wall_time, " seconds"
 
 end program test_gemm_parallel
 
