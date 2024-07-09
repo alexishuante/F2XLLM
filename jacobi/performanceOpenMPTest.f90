@@ -1,44 +1,42 @@
 program main
+  USE iso_c_binding, ONLY: C_LONG_LONG
   implicit none
-  integer, parameter :: n = 4, niter = 10, nthreads = 4
-  real(kind=8), dimension(n, n, n) :: u, unew
-  integer :: i, j, k, counter
-  real(kind=8) :: start_time, end_time, total_time, average_time
-  integer :: call_counter
+  integer, parameter :: niter = 10, nthreads = 4
+  integer :: n = 9  ! Adjusted dimension size
+  real(kind=8), allocatable, dimension(:,:,:) :: u, unew
+  integer :: i, j, k, iter
+  INTEGER :: count_max
+  REAL :: start_time, end_time, total_time
+  INTEGER(C_LONG_LONG) :: start_count, end_count, count_diff, count_rate
+  REAL :: wall_time
 
-  ! Initialize timing and counter variables
-  total_time = 0.0
-  call_counter = 0
+  ! Allocate the 3D arrays
+  allocate(u(n, n, n), unew(n, n, n))
 
-  ! Initialize the grid with specific values
-  counter = 1
-  do k = 1, n
-    do j = 1, n
-      do i = 1, n
-        u(i, j, k) = counter
-        counter = counter + 1
-      end do
-    end do
-  end do
-  unew = u
+  ! Initialize the grid
+  u = 1.0
+  unew = 0.0
 
   ! Warmup call
   call jacobi_parallel(u, unew, n, niter, nthreads)
 
-  ! Measure 10 calls to jacobi_parallel
-  do call_counter = 1, 10
-    start_time = omp_get_wtime()
-    call jacobi_parallel(u, unew, n, niter, nthreads)
-    end_time = omp_get_wtime()
-    total_time = total_time + (end_time - start_time)
-  end do
+    ! Find average per call time
+  count_max = 10
+  count_diff = 0
+  i = 0
+  DO i = 1, count_max
+      CALL system_clock(count_rate=count_rate)
+      CALL system_clock(start_count)
+      call jacobi_parallel(u, unew, n, niter, nthreads)
+      CALL system_clock(end_count)
+      count_diff = count_diff + (end_count - start_count)
+  END DO
 
-  average_time = total_time / 10.0
-
-  ! Print the final value of u, unew, and the average time
-  print *, "Final value of u:"
-  print *, u
-  print *, "Average time for 10 calls: ", average_time
+  wall_time = REAL(count_diff) / REAL(count_rate) / REAL(count_max)
+  PRINT *, "Average time of ", count_max, " calls: ", wall_time, " seconds"
+  
+  ! Clean up
+  deallocate(u, unew)
 
 end program main
 

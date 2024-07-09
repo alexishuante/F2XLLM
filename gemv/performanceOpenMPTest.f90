@@ -1,7 +1,7 @@
 PROGRAM main
     USE iso_c_binding, ONLY: C_LONG_LONG
     IMPLICIT NONE
-    INTEGER, PARAMETER :: n = 31622  
+    INTEGER, PARAMETER :: n = 44720 
     REAL(KIND=8), ALLOCATABLE :: A(:,:), x(:), y(:)
     INTEGER :: i
     INTEGER :: count_max
