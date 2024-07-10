@@ -1,8 +1,8 @@
 program main
   USE iso_c_binding, ONLY: C_LONG_LONG
   implicit none
-  integer, parameter :: niter = 10, nthreads = 4
-  integer :: n = 9  ! Adjusted dimension size
+  integer, parameter :: niter = 10, nthreads = 256 ! Double check nthreads
+  integer :: n = 950  ! Adjusted dimension size
   real(kind=8), allocatable, dimension(:,:,:) :: u, unew
   integer :: i, j, k, iter
   INTEGER :: count_max
