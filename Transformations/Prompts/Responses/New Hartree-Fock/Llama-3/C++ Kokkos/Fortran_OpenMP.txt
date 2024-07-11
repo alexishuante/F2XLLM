@@ -1,0 +1,639 @@
+--------------- Output 1 ---------------
+Here is a possible implementation of the Hartree-Fock operation in C++ with Kokkos:
+#include <Kokkos_Core.hpp>
+
+// ...
+
+int nnnn = /* ... */;
+int ngauss = /* ... */;
+double dtol = /* ... */;
+double rcut = /* ... */;
+double sqrpi2 = /* ... */;
+
+Kokkos::View<double***> geom("geom", n, 3, n);
+Kokkos::View<double*> xpnt("xpnt", ngauss);
+Kokkos::View<double*> coef("coef", ngauss);
+Kokkos::View<double**> dens("dens", n, n);
+Kokkos::View<double**> fock("fock", n, n);
+Kokkos::View<double**> schwarz("schwarz", n, n);
+
+Kokkos::parallel_for("Hartree-Fock", nnnn, KOKKOS_LAMBDA(int ijkl) {
+  int ij, kl, i, j, k, l, n;
+  double aij, dij, xij, yij, zij, akl, dkl, aijkl, tt, f0t, eri;
+
+  // ... (same as in the Fortran code)
+
+  Kokkos::atomic_add(&fock(i, j), dens(k, l) * eri * 4.0);
+  Kokkos::atomic_add(&fock(k, l), dens(i, j) * eri * 4.0);
+  Kokkos::atomic_add(&fock(i, k), -dens(j, l) * eri);
+  Kokkos::atomic_add(&fock(i, l), -dens(j, k) * eri);
+  Kokkos::atomic_add(&fock(j, k), -dens(i, l) * eri);
+  Kokkos::atomic_add(&fock(j, l), -dens(i, k) * eri);
+});
+Note that this implementation uses Kokkos' parallel_for to parallelize the outer loop, and Kokkos' atomic_add to update the fock matrix elements atomically. The rest of the code is similar to the Fortran implementation.
+Please note that this is a rough translation, you may need to adjust the code to fit your specific use case. Also, the performance of this code may vary depending on the specific architecture and the size of the problem.
+
+--------------- Output 2 ---------------
+Here is a possible implementation of the Hartree-Fock operation in C++ with Kokkos:
+#include <Kokkos_Core.hpp>
+#include <cmath>
+
+// Define a struct to hold the parameters
+struct HartreeFockParams {
+  int ngauss;
+  double dtol;
+  double rcut;
+  double sqrpi2;
+  Kokkos::View<double**, Kokkos::LayoutRight> xpnt;
+  Kokkos::View<double**, Kokkos::LayoutRight> coef;
+  Kokkos::View<double**, Kokkos::LayoutRight> geom;
+  Kokkos::View<double**, Kokkos::LayoutRight> dens;
+  Kokkos::View<double**, Kokkos::LayoutRight> fock;
+};
+
+// Define a functor to perform the Hartree-Fock operation
+struct HartreeFockFunctor {
+  HartreeFockParams params;
+  HartreeFockFunctor(HartreeFockParams params) : params_(params) {}
+  
+  KOKKOS_INLINE_FUNCTION
+  void operator()(const int ijkl) const {
+    // Decompose triangular ijkl index into ij>=kl
+    int ij = sqrt(2 * ijkl);
+    int n = (ij * ij + ij) / 2;
+    while (n < ijkl) {
+      ij++;
+      n = (ij * ij + ij) / 2;
+    }
+    int kl = ijkl - (ij * ij - ij) / 2;
+    
+    // Check if the Schwarz inequality is satisfied
+    if (params_.schwarz(ij) * params_.schwarz(kl) > params_.dtol) {
+      // Decompose triangular ij index into i>=j
+      int i = sqrt(2 * ij);
+      n = (i * i + i) / 2;
+      while (n < ij) {
+        i++;
+        n = (i * i + i) / 2;
+      }
+      int j = ij - (i * i - i) / 2;
+      
+      // Decompose triangular kl index into k>=l
+      int k = sqrt(2 * kl);
+      n = (k * k + k) / 2;
+      while (n < kl) {
+        k++;
+        n = (k * k + k) / 2;
+      }
+      int l = kl - (k * k - k) / 2;
+      
+      // Compute the ERIs
+      double eri = 0.0;
+      for (int ib = 0; ib < params_.ngauss; ib++) {
+        for (int jb = 0; jb < params_.ngauss; jb++) {
+          double aij = 1.0 / (params_.xpnt(ib) + params_.xpnt(jb));
+          double dij = params_.coef(ib) * params_.coef(jb) * exp(-params_.xpnt(ib) * params_.xpnt(jb) * aij * (
+            (params_.geom(0, i) - params_.geom(0, j)) ** 2 +
+            (params_.geom(1, i) - params_.geom(1, j)) ** 2 +
+            (params_.geom(2, i) - params_.geom(2, j)) ** 2
+          )) * (aij ** 1.5);
+          if (abs(dij) > params_.dtol) {
+            double xij = aij * (params_.xpnt(ib) * params_.geom(0, i) + params_.xpnt(jb) * params_.geom(0, j));
+            double yij = aij * (params_.xpnt(ib) * params_.geom(1, i) + params_.xpnt(jb) * params_.geom(1, j));
+            double zij = aij * (params_.xpnt(ib) * params_.geom(2, i) + params_.xpnt(jb) * params_.geom(2, j));
+            for (int kb = 0; kb < params_.ngauss; kb++) {
+              for (int lb = 0; lb < params_.ngauss; lb++) {
+                double akl = 1.0 / (params_.xpnt(kb) + params_.xpnt(lb));
+                double dkl = dij * params_.coef(kb) * params_.coef(lb) * exp(-params_.xpnt(kb) * params_.xpnt(lb) * akl * (
+                  (params_.geom(0, k) - params_.geom(0, l)) ** 2 +
+                  (params_.geom(1, k) - params_.geom(1, l)) ** 2 +
+                  (params_.geom(2, k) - params_.geom(2, l)) ** 2
+                )) * (akl ** 1.5
+
+--------------- Output 3 ---------------
+Here is a possible implementation of the Hartree-Fock operation in C++ with Kokkos:
+#include <Kokkos_Core.hpp>
+
+// ...
+
+int nj = /* number of basis functions */;
+int nnnn = /* number of unique ijkl indices */;
+
+Kokkos::View<double**, Kokkos::LayoutRight> fock("fock", nj, nj);
+Kokkos::View<double**, Kokkos::LayoutRight> dens("dens", nj, nj);
+Kokkos::View<double**, Kokkos::LayoutRight> schwarz("schwarz", nj, nj);
+Kokkos::View<double**, Kokkos::LayoutRight> geom("geom", 3, nj);
+Kokkos::View<double*, Kokkos::LayoutRight> xpnt("xpnt", ngauss);
+Kokkos::View<double*, Kokkos::LayoutRight> coef("coef", ngauss);
+
+Kokkos::parallel_for(
+  Kokkos::RangePolicy<>(0, nnnn),
+  KOKKOS_LAMBDA(int ijkl) {
+    int ij, kl, i, j, k, l, n;
+    double aij, dij, xij, yij, zij, akl, dkl, aijkl, tt, f0t, eri;
+
+    // ... (same decomposition and calculation as in Fortran code)
+
+    Kokkos::atomic_add(&fock(i, j), dens(k, l) * eri * 4.0);
+    Kokkos::atomic_add(&fock(k, l), dens(i, j) * eri * 4.0);
+    Kokkos::atomic_add(&fock(i, k), -dens(j, l) * eri);
+    Kokkos::atomic_add(&fock(i, l), -dens(j, k) * eri);
+    Kokkos::atomic_add(&fock(j, k), -dens(i, l) * eri);
+    Kokkos::atomic_add(&fock(j, l), -dens(i, k) * eri);
+  }
+);
+Note that this implementation uses the Kokkos::View class to represent the matrices and vectors, and the Kokkos::parallel_for function to parallelize the loop over the ijkl indices. The Kokkos::atomic_add function is used to perform the atomic updates to the fock matrix.
+Also, the ngauss variable is assumed to be defined elsewhere in the code, and the sqrpi2 and rcut variables are not defined in the provided Fortran code, so their values would need to be specified in the C++ implementation as well.
+
+--------------- Output 4 ---------------
+Here is a possible implementation of the Hartree-Fock operation in C++ with Kokkos:
+#include <Kokkos_Core.hpp>
+
+// ...
+
+int nnnn = /* ... */;
+int ngauss = /* ... */;
+double dtol = /* ... */;
+double rcut = /* ... */;
+double sqrpi2 = /* ... */;
+
+Kokkos::View<double**> fock("fock", n, n);
+Kokkos::View<double**> dens("dens", n, n);
+Kokkos::View<double*> xpnt("xpnt", ngauss);
+Kokkos::View<double*> coef("coef", ngauss);
+Kokkos::View<double**, Kokkos::LayoutRight> geom("geom", 3, n);
+
+Kokkos::parallel_for("Hartree-Fock", nnnn, KOKKOS_LAMBDA(int ijkl) {
+  int ij, kl, i, j, k, l, n;
+  double aij, dij, xij, yij, zij, akl, dkl, aijkl, tt, f0t, eri;
+
+  // ... (same as in the Fortran code)
+
+  Kokkos::atomic_add(&fock(i, j), dens(k, l) * eri * 4.0);
+  Kokkos::atomic_add(&fock(k, l), dens(i, j) * eri * 4.0);
+  Kokkos::atomic_add(&fock(i, k), -dens(j, l) * eri);
+  Kokkos::atomic_add(&fock(i, l), -dens(j, k) * eri);
+  Kokkos::atomic_add(&fock(j, k), -dens(i, l) * eri);
+  Kokkos::atomic_add(&fock(j, l), -dens(i, k) * eri);
+});
+Note that this implementation uses Kokkos' parallel_for to parallelize the outer loop, and atomic_add to update the fock matrix elements. The Kokkos::View objects are used to represent the arrays, and the Kokkos::LayoutRight layout is used to match the Fortran column-major ordering.
+Please keep in mind that this is a rough translation, and you may need to adjust the code to match your specific use case. Additionally, the performance of the Kokkos implementation may vary depending on the specific hardware and compiler used.
+
+--------------- Output 5 ---------------
+Here is a possible implementation of the Hartree-Fock operation in C++ with Kokkos:
+#include <Kokkos_Core.hpp>
+#include <Kokkos_Blitz.hpp>
+
+// Define a struct to hold the input data
+struct InputData {
+  int ngauss;
+  int nnnn;
+  double *xpnt;
+  double *coef;
+  double *geom;
+  double *schwarz;
+  double *dens;
+  double dtol;
+  double rcut;
+};
+
+// Define a functor to perform the Hartree-Fock operation
+struct HartreeFockFunctor {
+  InputData data;
+  Kokkos::View<double **> fock;
+
+  KOKKOS_INLINE_FUNCTION
+  void operator()(const int ijkl) const {
+    // Decompose triangular ijkl index into ij>=kl
+    int ij = sqrt(2 * ijkl);
+    int n = (ij * ij + ij) / 2;
+    while (n < ijkl) {
+      ij++;
+      n = (ij * ij + ij) / 2;
+    }
+    int kl = ijkl - (ij * ij - ij) / 2;
+
+    // Compute the Hartree-Fock integral
+    double eri = 0.0;
+    for (int ib = 0; ib < data.ngauss; ib++) {
+      for (int jb = 0; jb < data.ngauss; jb++) {
+        double aij = 1.0 / (data.xpnt[ib] + data.xpnt[jb]);
+        double dij = data.coef[ib] * data.coef[jb] * exp(-data.xpnt[ib] * data.xpnt[jb] * aij *
+          (pow(data.geom[0][i] - data.geom[0][j], 2) +
+           pow(data.geom[1][i] - data.geom[1][j], 2) +
+           pow(data.geom[2][i] - data.geom[2][j], 2))) * (aij * 1.5);
+        if (abs(dij) > data.dtol) {
+          // Compute the integral
+          double xij = aij * (data.xpnt[ib] * data.geom[0][i] + data.xpnt[jb] * data.geom[0][j]);
+          double yij = aij * (data.xpnt[ib] * data.geom[1][i] + data.xpnt[jb] * data.geom[1][j]);
+          double zij = aij * (data.xpnt[ib] * data.geom[2][i] + data.xpnt[jb] * data.geom[2][j]);
+          for (int kb = 0; kb < data.ngauss; kb++) {
+            for (int lb = 0; lb < data.ngauss; lb++) {
+              double akl = 1.0 / (data.xpnt[kb] + data.xpnt[lb]);
+              double dkl = dij * data.coef[kb] * data.coef[lb] * exp(-data.xpnt[kb] * data.xpnt[lb] * akl *
+                (pow(data.geom[0][k] - data.geom[0][l], 2) +
+                 pow(data.geom[1][k] - data.geom[1][l], 2) +
+                 pow(data.geom[2][k] - data.geom[2][l], 2))) * (akl * 1.5);
+              if (abs(dkl) > data.dtol) {
+                double aijkl = (data.xpnt[ib] + data.xpnt[jb]) * (data.xpnt[kb] + data.xpnt[lb]) /
+                  (data.xpnt[ib] + data.xpnt[jb] + data.xpnt[kb] + data.xpnt[lb]);
+                double tt = aijkl * (pow(xij - akl * (data.xpnt[kb] * data.geom[0][k] + data.xpnt[lb] * data.geom[0][l]), 2) +
+                                     pow(yij - akl * (data.xpnt[kb] * data.geom[1][k] + data.xpnt[lb] * data.geom[1][l]), 2) +
+                                     pow(zij - akl * (data.xpnt[kb] * data.geom[2][k] + data.xpnt[lb] * data.geom[2][l]), 2));
+                double f0t = sqrt(tt) > data.rcut ? (tt * -0.5) * erf(sqrt(tt)) : sqrpi2;
+                eri += dkl * f0t * sqrt(aijkl);
+
+--------------- Output 6 ---------------
+Here is a possible implementation of the Hartree-Fock operation in C++ with Kokkos:
+#include <Kokkos_Core.hpp>
+#include <cmath>
+
+// Define a struct to hold the parameters
+struct HartreeFockParams {
+  int nnnn;
+  int ngauss;
+  double dtol;
+  double rcut;
+  double sqrpi2;
+  Kokkos::View<double*> xpnt;
+  Kokkos::View<double*> coef;
+  Kokkos::View<double*> geom;
+  Kokkos::View<double*> schwarz;
+  Kokkos::View<double*> dens;
+  Kokkos::View<double*> fock;
+};
+
+// Define a functor to perform the Hartree-Fock operation
+struct HartreeFockFunctor {
+  HartreeFockParams params;
+  HartreeFockFunctor(HartreeFockParams params) : params(params) {}
+
+  KOKKOS_INLINE_FUNCTION
+  void operator()(const int ijkl) const {
+    // Decompose triangular ijkl index into ij>=kl
+    int ij = sqrt(2 * ijkl);
+    int n = (ij * ij + ij) / 2;
+    while (n < ijkl) {
+      ij++;
+      n = (ij * ij + ij) / 2;
+    }
+    int kl = ijkl - (ij * ij - ij) / 2;
+
+    // Check if the Schwarz inequality is satisfied
+    if (params.schwarz(ij) * params.schwarz(kl) > params.dtol) {
+      // Decompose triangular ij index into i>=j
+      int i = sqrt(2 * ij);
+      n = (i * i + i) / 2;
+      while (n < ij) {
+        i++;
+        n = (i * i + i) / 2;
+      }
+      int j = ij - (i * i - i) / 2;
+
+      // Decompose triangular kl index into k>=l
+      int k = sqrt(2 * kl);
+      n = (k * k + k) / 2;
+      while (n < kl) {
+        k++;
+        n = (k * k + k) / 2;
+      }
+      int l = kl - (k * k - k) / 2;
+
+      // Compute the ERIs
+      double eri = 0.0;
+      for (int ib = 0; ib < params.ngauss; ib++) {
+        for (int jb = 0; jb < params.ngauss; jb++) {
+          double aij = 1.0 / (params.xpnt(ib) + params.xpnt(jb));
+          double dij = params.coef(ib) * params.coef(jb) * exp(-params.xpnt(ib) * params.xpnt(jb) * aij *
+              (pow(params.geom(0, i) - params.geom(0, j), 2) +
+               pow(params.geom(1, i) - params.geom(1, j), 2) +
+               pow(params.geom(2, i) - params.geom(2, j), 2))) * (aij * sqrt(aij));
+          if (abs(dij) > params.dtol) {
+            double xij = aij * (params.xpnt(ib) * params.geom(0, i) + params.xpnt(jb) * params.geom(0, j));
+            double yij = aij * (params.xpnt(ib) * params.geom(1, i) + params.xpnt(jb) * params.geom(1, j));
+            double zij = aij * (params.xpnt(ib) * params.geom(2, i) + params.xpnt(jb) * params.geom(2, j));
+            for (int kb = 0; kb < params.ngauss; kb++) {
+              for (int lb = 0; lb < params.ngauss; lb++) {
+                double akl = 1.0 / (params.xpnt(kb) + params.xpnt(lb));
+                double dkl = dij * params.coef(kb) * params.coef(lb) * exp(-params.xpnt(kb) * params.xpnt(lb) * akl *
+                    (pow(params.geom(0, k) - params.geom(0, l), 2) +
+                     pow(params.geom(1, k) - params.geom(1, l), 2) +
+                     pow(params.geom(2, k) - params.geom(2, l), 2))) * (akl * sqrt(akl));
+                if (abs(dkl) > params.dtol) {
+                  double aijkl = (params.xpnt(ib) + params.xpnt(jb)) * (params.xpnt(kb) + params.xpnt(lb
+
+--------------- Output 7 ---------------
+Here's a possible implementation of the Hartree-Fock operation in C++ with Kokkos:
+#include <Kokkos_Core.hpp>
+#include <Kokkos_Blitz.hpp>
+
+// Define the Kokkos execution space
+Kokkos::DefaultExecutionSpace exec_space;
+
+// Define the Kokkos view for the Fock matrix
+Kokkos::View<double**, Kokkos::Layout::Left, Kokkos::DefaultExecutionSpace> fock("Fock", n, n);
+
+// Define the Kokkos view for the density matrix
+Kokkos::View<double**, Kokkos::Layout::Left, Kokkos::DefaultExecutionSpace> dens("Density", n, n);
+
+// Define the Kokkos view for the geometry array
+Kokkos::View<double**, Kokkos::Layout::Left, Kokkos::DefaultExecutionSpace> geom("Geometry", 3, n);
+
+// Define the Kokkos view for the coefficient array
+Kokkos::View<double*, Kokkos::Layout::Left, Kokkos::DefaultExecutionSpace> coef("Coefficients", ngauss);
+
+// Define the Kokkos view for the exponent array
+Kokkos::View<double*, Kokkos::Layout::Left, Kokkos::DefaultExecutionSpace> xpnt("Exponents", ngauss);
+
+// Define the Kokkos parallel range policy
+Kokkos::RangePolicy<Kokkos::DefaultExecutionSpace> policy(0, nnnn);
+
+// Define the Kokkos parallel for loop
+Kokkos::parallel_for(policy, KOKKOS_LAMBDA(int ijkl) {
+  // Decompose triangular ijkl index into ij>=kl
+  int ij = sqrt(2 * ijkl);
+  int n = (ij * ij + ij) / 2;
+  while (n < ijkl) {
+    ij++;
+    n = (ij * ij + ij) / 2;
+  }
+  int kl = ijkl - (ij * ij - ij) / 2;
+
+  // Check Schwarz inequality
+  if (schwarz(ij) * schwarz(kl) > dtol) {
+    // Decompose triangular ij index into i>=j
+    int i = sqrt(2 * ij);
+    n = (i * i + i) / 2;
+    while (n < ij) {
+      i++;
+      n = (i * i + i) / 2;
+    }
+    int j = ij - (i * i - i) / 2;
+
+    // Decompose triangular kl index into k>=l
+    int k = sqrt(2 * kl);
+    n = (k * k + k) / 2;
+    while (n < kl) {
+      k++;
+      n = (k * k + k) / 2;
+    }
+    int l = kl - (k * k - k) / 2;
+
+    // Compute ERIs
+    double eri = 0.0;
+    for (int ib = 0; ib < ngauss; ib++) {
+      for (int jb = 0; jb < ngauss; jb++) {
+        double aij = 1.0 / (xpnt(ib) + xpnt(jb));
+        double dij = coef(ib) * coef(jb) * exp(-xpnt(ib) * xpnt(jb) * aij * (
+          (geom(0, i) - geom(0, j)) ** 2 +
+          (geom(1, i) - geom(1, j)) ** 2 +
+          (geom(2, i) - geom(2, j)) ** 2
+        )) * (aij ** 1.5);
+        if (abs(dij) > dtol) {
+          double xij = aij * (xpnt(ib) * geom(0, i) + xpnt(jb) * geom(0, j));
+          double yij = aij * (xpnt(ib) * geom(1, i) + xpnt(jb) * geom(1, j));
+          double zij = aij * (xpnt(ib) * geom(2, i) + xpnt(jb) * geom(2, j));
+          for (int kb = 0; kb < ngauss; kb++) {
+            for (int lb = 0; lb < ngauss; lb++) {
+              double akl = 1.0 / (xpnt(kb) + xpnt(lb));
+              double dkl = dij * coef(kb) * coef(lb) * exp(-xpnt(kb) * xpnt(lb) * akl * (
+                (geom(0, k) - geom(0, l)) ** 2 +
+                (geom(1, k) - geom(1, l)) ** 2 +
+                (geom(2, k) - geom(2, l)) ** 2
+              )) * (
+
+--------------- Output 8 ---------------
+Here is a possible implementation of the Hartree-Fock operation in C++ with Kokkos:
+#include <Kokkos_Core.hpp>
+#include <cmath>
+
+// Define a struct to hold the parameters
+struct HFParams {
+  int nnnn;
+  int ngauss;
+  double dtol;
+  double rcut;
+  double sqrpi2;
+  Kokkos::View<double**, Kokkos::LayoutRight> xpnt;
+  Kokkos::View<double**, Kokkos::LayoutRight> coef;
+  Kokkos::View<double**, Kokkos::LayoutRight> geom;
+  Kokkos::View<double**, Kokkos::LayoutRight> dens;
+  Kokkos::View<double**, Kokkos::LayoutRight> fock;
+  Kokkos::View<double**, Kokkos::LayoutRight> schwarz;
+};
+
+// Define a functor to perform the Hartree-Fock operation
+struct HartreeFockFunctor {
+  HFParams params;
+  HartreeFockFunctor(HFParams params) : params(params) {}
+  KOKKOS_INLINE_FUNCTION
+  void operator()(const int ijkl) const {
+    // Decompose triangular ijkl index into ij>=kl
+    int ij = sqrt(2 * ijkl);
+    int n = (ij * ij + ij) / 2;
+    while (n < ijkl) {
+      ij++;
+      n = (ij * ij + ij) / 2;
+    }
+    int kl = ijkl - (ij * ij - ij) / 2;
+
+    // Check if the Schwarz inequality is satisfied
+    if (params.schwarz(ij) * params.schwarz(kl) > params.dtol) {
+      // Decompose triangular ij index into i>=j
+      int i = sqrt(2 * ij);
+      n = (i * i + i) / 2;
+      while (n < ij) {
+        i++;
+        n = (i * i + i) / 2;
+      }
+      int j = ij - (i * i - i) / 2;
+
+      // Decompose triangular kl index into k>=l
+      int k = sqrt(2 * kl);
+      n = (k * k + k) / 2;
+      while (n < kl) {
+        k++;
+        n = (k * k + k) / 2;
+      }
+      int l = kl - (k * k - k) / 2;
+
+      double eri = 0.0;
+      for (int ib = 0; ib < params.ngauss; ib++) {
+        for (int jb = 0; jb < params.ngauss; jb++) {
+          double aij = 1.0 / (params.xpnt(ib) + params.xpnt(jb));
+          double dij = params.coef(ib) * params.coef(jb) *
+                        exp(-params.xpnt(ib) * params.xpnt(jb) * aij *
+                            (pow(params.geom(0, i) - params.geom(0, j), 2) +
+                             pow(params.geom(1, i) - params.geom(1, j), 2) +
+                             pow(params.geom(2, i) - params.geom(2, j), 2))) *
+                        pow(aij, 1.5);
+          if (abs(dij) > params.dtol) {
+            double xij = aij * (params.xpnt(ib) * params.geom(0, i) +
+                                 params.xpnt(jb) * params.geom(0, j));
+            double yij = aij * (params.xpnt(ib) * params.geom(1, i) +
+                                 params.xpnt(jb) * params.geom(1, j));
+            double zij = aij * (params.xpnt(ib) * params.geom(2, i) +
+                                 params.xpnt(jb) * params.geom(2, j));
+            for (int kb = 0; kb < params.ngauss; kb++) {
+              for (int lb = 0; lb < params.ngauss; lb++) {
+                double akl = 1.0 / (params.xpnt(kb) + params.xpnt(lb));
+                double dkl = dij * params.coef(kb) * params.coef(lb) *
+                              exp(-params.xpnt(kb) * params.xpnt(lb) * akl *
+                                  (pow(params.geom(0, k) - params.geom(0, l), 2) +
+                                   pow(params.geom(1, k) - params.geom(1, l), 2) +
+                                   pow(params.geom(2, k) - params.geom(2, l), 2))) *
+                              pow(akl, 1.5);
+                if (abs(dkl) > params.dtol) {
+                  double aijkl = (params
+
+--------------- Output 9 ---------------
+Here is a possible implementation of the Hartree-Fock operation in C++ with Kokkos:
+#include <Kokkos_Core.hpp>
+
+// ...
+
+int nnnn = /* ... */;
+double dtol = /* ... */;
+double sqrpi2 = /* ... */;
+double rcut = /* ... */;
+
+Kokkos::View<double***> fock("fock", n, n, n);
+Kokkos::View<double***> dens("dens", n, n, n);
+Kokkos::View<double*> xpnt("xpnt", ngauss);
+Kokkos::View<double*> coef("coef", ngauss);
+Kokkos::View<double**, Kokkos::LayoutRight> geom("geom", 3, n);
+
+Kokkos::parallel_for("Hartree-Fock", nnnn, KOKKOS_LAMBDA(int ijkl) {
+  int ij, kl, i, j, k, l, n;
+  double aij, dij, xij, yij, zij, akl, dkl, aijkl, tt, f0t, eri;
+
+  // Decompose triangular indices
+  ij = sqrt(2 * ijkl);
+  n = (ij * ij + ij) / 2;
+  while (n < ijkl) {
+    ij++;
+    n = (ij * ij + ij) / 2;
+  }
+  kl = ijkl - (ij * ij - ij) / 2;
+
+  if (schwarz(ij) * schwarz(kl) > dtol) {
+    // Decompose triangular ij index into i>=j
+    i = sqrt(2 * ij);
+    n = (i * i + i) / 2;
+    while (n < ij) {
+      i++;
+      n = (i * i + i) / 2;
+    }
+    j = ij - (i * i - i) / 2;
+
+    // Decompose triangular kl index into k>=l
+    k = sqrt(2 * kl);
+    n = (k * k + k) / 2;
+    while (n < kl) {
+      k++;
+      n = (k * k + k) / 2;
+    }
+    l = kl - (k * k - k) / 2;
+
+    eri = 0.0;
+
+    for (int ib = 0; ib < ngauss; ib++) {
+      for (int jb = 0; jb < ngauss; jb++) {
+        aij = 1.0 / (xpnt(ib) + xpnt(jb));
+        dij = coef(ib) * coef(jb) * exp(-xpnt(ib) * xpnt(jb) * aij *
+          ((geom(0, i) - geom(0, j)) ** 2 +
+           (geom(1, i) - geom(1, j)) ** 2 +
+           (geom(2, i) - geom(2, j)) ** 2)) * (aij ** 1.5);
+
+        if (abs(dij) > dtol) {
+          xij = aij * (xpnt(ib) * geom(0, i) + xpnt(jb) * geom(0, j));
+          yij = aij * (xpnt(ib) * geom(1, i) + xpnt(jb) * geom(1, j));
+          zij = aij * (xpnt(ib) * geom(2, i) + xpnt(jb) * geom(2, j));
+
+          for (int kb = 0; kb < ngauss; kb++) {
+            for (int lb = 0; lb < ngauss; lb++) {
+              akl = 1.0 / (xpnt(kb) + xpnt(lb));
+              dkl = dij * coef(kb) * coef(lb) * exp(-xpnt(kb) * xpnt(lb) * akl *
+                ((geom(0, k) - geom(0, l)) ** 2 +
+                 (geom(1, k) - geom(1, l)) ** 2 +
+                 (geom(2, k) - geom(2, l)) ** 2)) * (akl ** 1.5);
+
+              if (abs(dkl) > dtol) {
+                aijkl = (xpnt(ib) + xpnt(jb)) * (xpnt(kb) + xpnt(lb)) /
+                  (xpnt(ib) + xpnt(jb) + xpnt(kb) + xpnt(lb));
+                tt = aijkl * ((xij - akl * (xpnt(kb) * geom(0, k) + xpnt(lb) * geom(0, l))) ** 2 +
+                              (yij - akl * (xpnt(kb)
+
+--------------- Output 10 ---------------
+Here is a C++ version of the code using Kokkos:
+#include <Kokkos_Core.hpp>
+
+// ...
+
+int nnnn = /*...*/;
+double dtol = /*...*/;
+double xpnt[ngauss] = /*...*/;
+double coef[ngauss] = /*...*/;
+double geom[3][ngauss] = /*...*/;
+double schwarz[ngauss] = /*...*/;
+double dens[ngauss][ngauss] = /*...*/;
+double fock[ngauss][ngauss] = /*...*/;
+
+Kokkos::parallel_for("Hartree-Fock", nnnn, KOKKOS_LAMBDA(int ijkl) {
+  int ij, kl, i, j, k, l;
+  double eri, aij, dij, xij, yij, zij, akl, dkl, aijkl, tt, f0t;
+
+  // decompose triangular ijkl index into ij>=kl
+  ij = sqrt(2 * ijkl);
+  int n = (ij * ij + ij) / 2;
+  while (n < ijkl) {
+    ij++;
+    n = (ij * ij + ij) / 2;
+  }
+  kl = ijkl - (ij * ij - ij) / 2;
+
+  if (schwarz[ij] * schwarz[kl] > dtol) {
+    // decompose triangular ij index into i>=j
+    i = sqrt(2 * ij);
+    n = (i * i + i) / 2;
+    while (n < ij) {
+      i++;
+      n = (i * i + i) / 2;
+    }
+    j = ij - (i * i - i) / 2;
+
+    // decompose triangular kl index into k>=l
+    k = sqrt(2 * kl);
+    n = (k * k + k) / 2;
+    while (n < kl) {
+      k++;
+      n = (k * k + k) / 2;
+    }
+    l = kl - (k * k - k) / 2;
+
+    eri = 0.0;
+    for (int ib = 0; ib < ngauss; ib++) {
+      for (int jb = 0; jb < ngauss; jb++) {
+        aij = 1.0 / (xpnt[ib] + xpnt[jb]);
+        dij = coef[ib] * coef[jb] * exp(-xpnt[ib] * xpnt[jb] * aij *
+                                         ((geom[0][i] - geom[0][j]) * (geom[0][i] - geom[0][j]) +
+                                          (geom[1][i] - geom[1][j]) * (geom[1][i] - geom[1][j]) +
+                                          (geom[2][i] - geom[2][j]) * (geom[2][i] - geom[2][j]))) *
+             (aij * aij * aij);
+        if (abs(dij) > dtol) {
+          xij = aij * (xpnt[ib] * geom[0][i] + xpnt[jb] * geom[0][j]);
+          yij = aij * (xpnt[ib] * geom[1][i] + xpnt[jb] * geom[1][j]);
+          zij = aij * (xpnt[ib] * geom[2][i] + xpnt[jb] * geom[2][j]);
+          for (int kb = 0; kb < ngauss; kb++) {
+            for (int lb = 0; lb < ngauss; lb++) {
+              akl = 1.0 / (xpnt[kb] + xpnt[lb]);
+              dkl = dij * coef[kb] * coef[lb] * exp(-xpnt[kb] * xpnt[lb] * akl *
+                                                     ((geom[0][k] - geom[0][l]) * (geom[0][k] - geom[0][l]) +
+                                                      (geom[1][k] - geom[1][l]) * (geom[1][k] - geom[1][l]) +
+                                                      (geom[2][k] - geom[2][l]) * (geom[2][k] - geom[2][l]))) *
+                   (akl * akl * akl);
+              if (abs(dkl) > dtol) {
+                aijkl = (xpnt[ib] + xpnt[jb]) * (xpnt[kb] + xpnt[lb]) /
+                        (xpnt[ib] + xpnt[jb] + xpnt[kb] + xpnt[lb]);
+                tt =
+

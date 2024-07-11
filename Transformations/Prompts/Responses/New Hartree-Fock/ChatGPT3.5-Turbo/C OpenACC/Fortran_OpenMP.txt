@@ -1,0 +1,984 @@
+--------------- Output 1 ---------------
+```c
+#pragma acc parallel loop collapse(2) private(ib, jb, kb, lb, ijkl, ij, i, j, kl, k, l, n, aij, dij, xij, yij, zij, akl, dkl, aijkl, tt, f0t, eri)
+for (ijkl = 1; ijkl <= nnnn; ijkl++)
+{
+    // decompose triangular ijkl index into ij>=kl
+    ij = sqrt( 2.0 * (double)ijkl );
+    n = (ij * ij + ij) / 2;
+    while (n < ijkl)
+    {
+        ij++;
+        n = (ij * ij + ij) / 2;
+    }
+    kl = ijkl - (ij * ij - ij) / 2;
+
+    if (schwarz(ij) * schwarz(kl) > dtol)
+    {
+        // decompose triangular ij index into i>=j
+        i = sqrt(2.0 * (double)ij);
+        n = (i * i + i) / 2;
+        while (n < ij)
+        {
+            i++;
+            n = (i * i + i) / 2;
+        }
+        j = ij - (i * i - i) / 2;
+
+        // decompose triangular kl index into k>=l
+        k = sqrt(2.0 * (double)kl);
+        n = (k * k + k) / 2;
+        while (n < kl)
+        {
+            k++;
+            n = (k * k + k) / 2;
+        }
+        l = kl - (k * k - k) / 2;
+
+        eri = 0.0;
+        for (ib = 1; ib <= ngauss; ib++)
+        {
+            for (jb = 1; jb <= ngauss; jb++)
+            {
+                aij = 1.0 / (xpnt[ib] + xpnt[jb]);
+                dij = coef[ib] * coef[jb] * exp(-xpnt[ib] * xpnt[jb] * aij *
+                        ((geom[0][i] - geom[0][j]) * (geom[0][i] - geom[0][j]) +
+                         (geom[1][i] - geom[1][j]) * (geom[1][i] - geom[1][j]) +
+                         (geom[2][i] - geom[2][j]) * (geom[2][i] - geom[2][j])) ) * (aij * aij * aij);
+                if (fabs(dij) > dtol)
+                {
+                    xij = aij * (xpnt[ib] * geom[0][i] + xpnt[jb] * geom[0][j]);
+                    yij = aij * (xpnt[ib] * geom[1][i] + xpnt[jb] * geom[1][j]);
+                    zij = aij * (xpnt[ib] * geom[2][i] + xpnt[jb] * geom[2][j]);
+                    for (kb = 1; kb <= ngauss; kb++)
+                    {
+                        for (lb = 1; lb <= ngauss; lb++)
+                        {
+                            akl = 1.0 / (xpnt[kb] + xpnt[lb]);
+                            dkl = dij * coef[kb] * coef[lb] * exp(-xpnt[kb] * xpnt[lb] * akl *
+                                ((geom[0][k] - geom[0][l]) * (geom[0][k] - geom[0][l]) +
+                                 (geom[1][k] - geom[1][l]) * (geom[1][k] - geom[1][l]) +
+                                 (geom[2][k] - geom[2][l]) * (geom[2][k] - geom[2][l])) ) * (akl * akl * akl);
+                            if (fabs(dkl) > dtol)
+                            {
+                                aijkl = (xpnt[ib] + xpnt[jb]) * (xpnt[kb] + xpnt[lb]) / (xpnt[ib] + xpnt[jb] + xpnt[kb] + xpnt[lb]);
+                                tt = aijkl * ((xij - akl * (xpnt[kb] * geom[0][k] + xpnt[lb] * geom[0][l])) * (xij - akl * (xpnt[kb] * geom[0][k] + xpnt[lb] * geom[0][l])) +
+                                              (yij - akl * (xpnt[kb] * geom[1][k] + xpnt[lb] * geom[1][l])) * (yij - akl * (xpnt[kb] * geom[1][k] + xpnt[lb] * geom[1][l])) +
+                                              (zij - akl * (xpnt[kb] * geom[2][k] + xpnt[lb] * geom[2][l])) * (zij - akl * (xpnt[kb] * geom[2][k] + xpnt[lb] * geom[2][l])));
+                                f0t = sqrpi2;
+                                if (tt > rcut)
+                                    f0t = pow(tt, -0.5) * erff(sqrt(tt));
+                                eri += dkl * f0t * sqrt(aijkl);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (i == j)
+            eri *= 0.5;
+        if (k == l)
+            eri *= 0.5;
+        if (i == k && j == l)
+            eri *= 0.5;
+
+        #pragma acc atomic
+        fock[i * n + j] += dens[k * n + l] * eri * 4.0;
+        #pragma acc atomic
+        fock[k * n + l] += dens[i * n + j] * eri * 4.0;
+        #pragma acc atomic
+        fock[i * n + k] -= dens[j * n + l] * eri;
+        #pragma acc atomic
+        fock[i * n + l] -= dens[j * n + k] * eri;
+        #pragma acc atomic
+        fock[j * n + k] -= dens[i * n + l] * eri;
+        #pragma acc atomic
+        fock[j * n + l] -= dens[i * n + k] * eri;
+    }
+}
+```
+
+This C code uses OpenACC directives to parallelize the loop and utilize GPU acceleration for the computation of the Hartree-Fock operation. Make sure to adjust the data types and sizes accordingly in your existing code.
+
+--------------- Output 2 ---------------
+```c
+#pragma acc parallel loop collapse(2) private(ib,jb,kb,lb,ijkl,ij,i,j,kl,k,l,n,aij,dij,xij,yij,zij,akl,dkl,aijkl,tt,f0t,eri)
+for(ijkl = 1; ijkl <= nnnn; ijkl++) {
+    // decompose triangular ijkl index into ij>=kl
+    ij = sqrt(2.0 * (double) ijkl);
+    n = (ij * ij + ij) / 2;
+    while (n < ijkl) {
+        ij++;
+        n = (ij * ij + ij) / 2;
+    }
+
+    kl = ijkl - (ij * ij - ij) / 2;
+
+    if (schwarz(ij) * schwarz(kl) > dtol) {
+        // decompose triangular ij index into i>=j
+        i = sqrt(2.0 * (double) ij);
+        n = (i * i + i) / 2;
+        while (n < ij) {
+            i++;
+            n = (i * i + i) / 2;
+        }
+
+        j = ij - (i * i - i) / 2;
+
+        // decompose triangular kl index into k>=l
+        k = sqrt(2.0 * (double) kl);
+        n = (k * k + k) / 2;
+        while (n < kl) {
+            k++;
+            n = (k * k + k) / 2;
+        }
+
+        l = kl - (k * k - k) / 2;
+
+        eri = 0.0;
+        for (ib = 1; ib <= ngauss; ib++) {
+            for (jb = 1; jb <= ngauss; jb++) {
+                aij = 1.0 / (xpnt[ib - 1] + xpnt[jb - 1]);
+                dij = coef[ib - 1] * coef[jb - 1] * exp(-xpnt[ib - 1] * xpnt[jb - 1] * aij * ((geom[0][i - 1] - geom[0][j - 1]) * (geom[0][i - 1] - geom[0][j - 1]) + (geom[1][i - 1] - geom[1][j - 1]) * (geom[1][i - 1] - geom[1][j - 1]) + (geom[2][i - 1] - geom[2][j - 1]) * (geom[2][i - 1] - geom[2][j - 1])))*(pow(aij, 1.5));
+                
+                if (fabs(dij) > dtol) {
+                    xij = aij * (xpnt[ib - 1] * geom[0][i - 1] + xpnt[jb - 1] * geom[0][j - 1]);
+                    yij = aij * (xpnt[ib - 1] * geom[1][i - 1] + xpnt[jb - 1] * geom[1][j - 1]);
+                    zij = aij * (xpnt[ib - 1] * geom[2][i - 1] + xpnt[jb - 1] * geom[2][j - 1]);
+
+                    for (kb = 1; kb <= ngauss; kb++) {
+                        for (lb = 1; lb <= ngauss; lb++) {
+                            akl = 1.0 / (xpnt[kb - 1] + xpnt[lb - 1]);
+                            dkl = dij * coef[kb - 1] * coef[lb - 1] * exp(-xpnt[kb - 1] * xpnt[lb - 1] * akl * ((geom[0][k - 1] - geom[0][l - 1]) * (geom[0][k - 1] - geom[0][l - 1]) + (geom[1][k - 1] - geom[1][l - 1]) * (geom[1][k - 1] - geom[1][l - 1]) + (geom[2][k - 1] - geom[2][l - 1]) * (geom[2][k - 1] - geom[2][l - 1])))*(pow(akl, 1.5));
+                            
+                            if (fabs(dkl) > dtol) {
+                                aijkl = (xpnt[ib - 1] + xpnt[jb - 1]) * (xpnt[kb - 1] + xpnt[lb - 1]) / (xpnt[ib - 1] + xpnt[jb - 1] + xpnt[kb - 1] + xpnt[lb - 1]);
+                                tt = aijkl * ((xij - akl * (xpnt[kb - 1] * geom[0][k - 1] + xpnt[lb - 1] * geom[0][l - 1])) * (xij - akl * (xpnt[kb - 1] * geom[0][k - 1] + xpnt[lb - 1] * geom[0][l - 1])) + (yij - akl * (xpnt[kb - 1] * geom[1][k - 1] + xpnt[lb - 1] * geom[1][l - 1])) * (yij - akl * (xpnt[kb - 1] * geom[1][k - 1] + xpnt[lb - 1] * geom[1][l - 1])) + (zij - akl * (xpnt[kb - 1] * geom[2][k - 1] + xpnt[lb - 1] * geom[2][l - 1])) * (zij - akl * (xpnt[kb - 1] * geom[2][k - 1] + xpnt[lb - 1] * geom[2][l - 1])));
+                                f0t = sqrpi2;
+                                if (tt > rcut) {
+                                    f0t = pow(tt, -0.5) * erfc(sqrt(tt));
+                                }
+                                eri += dkl * f0t * sqrt(aijkl);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (i == j) eri *= 0.5;
+        if (k == l) eri *= 0.5;
+        if (i == k && j == l) eri *= 0.5;
+
+        #pragma acc atomic
+            fock[i * ncols + j] += dens[k * ncols + l] * eri * 4.0;
+        
+        #pragma acc atomic
+            fock[k * ncols + l] += dens[i * ncols + j] * eri * 4.0;
+        
+        #pragma acc atomic
+            fock[i * ncols + k] -= dens[j * ncols + l] * eri;
+        
+        #pragma acc atomic
+            fock[i * ncols + l] -= dens[j * ncols + k] * eri;
+        
+        #pragma acc atomic
+            fock[j * ncols + k] -= dens[i * ncols + l] * eri;
+        
+        #pragma acc atomic
+            fock[j * ncols + l] -= dens[i * ncols + k] * eri;
+    }
+}
+```
+
+--------------- Output 3 ---------------
+```c
+#pragma acc parallel loop collapse(2) private(ib,jb,kb,lb,ijkl,ij,i,j,kl,k,l,n,aij,dij,xij,yij,zij,akl,dkl,aijkl,tt,f0t,eri) 
+for (ijkl = 0; ijkl < nnnn; ijkl++) {
+    // decompose triangular ijkl index into ij>=kl
+    ij = sqrt( 2.0 * (double) ijkl );
+    n = (ij * ij + ij) / 2;
+    while (n < ijkl) {
+        ij++;
+        n = (ij * ij + ij) / 2;
+    }
+    kl = ijkl - (ij * ij - ij) / 2;
+    
+    if (schwarz(ij) * schwarz(kl) > dtol) {
+        // decompose triangular ij index into i>=j
+        i = sqrt(2.0 * (double) ij);
+        n = (i * i + i) / 2;
+        while (n < ij) {
+            i++;
+            n = (i * i + i) / 2;
+        }
+        j = ij - (i * i - i) / 2;
+        
+        // decompose triangular kl index into k>=l
+        k = sqrt(2.0 * (double) kl);
+        n = (k * k + k) / 2;
+        while (n < kl) {
+            k++;
+            n = (k * k + k) / 2;
+        }
+        l = kl - (k * k - k) / 2;
+        
+        eri = 0.0;
+        for (ib = 0; ib < ngauss; ib++) {
+            for (jb = 0; jb < ngauss; jb++) {
+                aij = 1.0 / (xpnt[ib] + xpnt[jb]);
+                dij = coef[ib] * coef[jb] * exp(-xpnt[ib] * xpnt[jb] * aij * ((geom[0][i] - geom[0][j]) * (geom[0][i] - geom[0][j]) 
+                    + (geom[1][i] - geom[1][j]) * (geom[1][i] - geom[1][j]) 
+                    + (geom[2][i] - geom[2][j]) * (geom[2][i] - geom[2][j])) ) * pow(aij, 1.5);
+                
+                if (fabs(dij) > dtol) {
+                    xij = aij * (xpnt[ib] * geom[0][i] + xpnt[jb] * geom[0][j]);
+                    yij = aij * (xpnt[ib] * geom[1][i] + xpnt[jb] * geom[1][j]);
+                    zij = aij * (xpnt[ib] * geom[2][i] + xpnt[jb] * geom[2][j]);
+                    
+                    for (kb = 0; kb < ngauss; kb++) {
+                        for (lb = 0; lb < ngauss; lb++) {
+                            akl = 1.0 / (xpnt[kb] + xpnt[lb]);
+                            dkl = dij * coef[kb] * coef[lb] * exp(-xpnt[kb] * xpnt[lb] * akl * ((geom[0][k] - geom[0][l]) * (geom[0][k] - geom[0][l]) 
+                                + (geom[1][k] - geom[1][l]) * (geom[1][k] - geom[1][l]) 
+                                + (geom[2][k] - geom[2][l]) * (geom[2][k] - geom[2][l])) ) * pow(akl, 1.5);
+                            
+                            if (fabs(dkl) > dtol) {
+                                aijkl = (xpnt[ib] + xpnt[jb]) * (xpnt[kb] + xpnt[lb]) / (xpnt[ib] + xpnt[jb] + xpnt[kb] + xpnt[lb]);
+                                tt = aijkl * ((xij - akl * (xpnt[kb] * geom[0][k] + xpnt[lb] * geom[0][l])) * (xij - akl * (xpnt[kb] * geom[0][k] + xpnt[lb] * geom[0][l])) 
+                                    + (yij - akl * (xpnt[kb] * geom[1][k] + xpnt[lb] * geom[1][l])) * (yij - akl * (xpnt[kb] * geom[1][k] + xpnt[lb] * geom[1][l])) 
+                                    + (zij - akl * (xpnt[kb] * geom[2][k] + xpnt[lb] * geom[2][l])) * (zij - akl * (xpnt[kb] * geom[2][k] + xpnt[lb] * geom[2][l])) );
+                                f0t = sqrpi2;
+                                
+                                if (tt > rcut) f0t = pow(tt, -0.5) * erf(sqrt(tt));
+                                eri = eri + dkl * f0t * sqrt(aijkl);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        if (i == j) eri *= 0.5;
+        if (k == l) eri *= 0.5;
+        if (i == k && j == l) eri *= 0.5;
+        
+        #pragma acc atomic
+        fock[i*ndim+j] += dens[k*ndim+l] * eri * 4.0;
+        
+        #pragma acc atomic
+        fock[k*ndim+l] += dens[i*ndim+j] * eri * 4.0;
+        
+        #pragma acc atomic
+        fock[i*ndim+k] -= dens[j*ndim+l] * eri;
+        
+        #pragma acc atomic
+        fock[i*ndim+l] -= dens[j*ndim+k] * eri;
+        
+        #pragma acc atomic
+        fock[j*ndim+k] -= dens[i*ndim+l] * eri;
+        
+        #pragma acc atomic
+        fock[j*ndim+l] -= dens[i*ndim+k] * eri;
+    }
+}
+```
+
+--------------- Output 4 ---------------
+Here is the equivalent code implemented in C with OpenACC:
+
+```c
+#pragma acc parallel loop
+for (ijkl = 1; ijkl <= nnnn; ijkl++) {
+    // decompose triangular ijkl index into ij>=kl
+    ij = sqrt( 2.0 * ijkl );
+    n = (ij * ij + ij) / 2;
+    while (n < ijkl) {
+        ij++;
+        n = (ij * ij + ij) / 2;
+    }
+    kl = ijkl - (ij * ij - ij) / 2;
+
+    if (schwarz(ij) * schwarz(kl) > dtol) {
+        i = sqrt( 2.0 * ij );
+        n = (i * i + i) / 2;
+        while (n < ij) {
+            i++;
+            n = (i * i + i) / 2;
+        }
+        j = ij - (i * i - i) / 2;
+
+        k = sqrt( 2.0 * kl );
+        n = (k * k + k) / 2;
+        while (n < kl) {
+            k++;
+            n = (k * k + k) / 2;
+        }
+        l = kl - (k * k - k) / 2;
+
+        eri = 0.0;
+
+        for (ib = 1; ib <= ngauss; ib++) {
+            for (jb = 1; jb <= ngauss; jb++) {
+                aij = 1.0 / (xpnt[ib] + xpnt[jb]);
+                dij = coef[ib] * coef[jb] * exp(-xpnt[ib] * xpnt[jb] * aij *
+                    ((geom[0][i] - geom[0][j]) * (geom[0][i] - geom[0][j]) +
+                     (geom[1][i] - geom[1][j]) * (geom[1][i] - geom[1][j]) +
+                     (geom[2][i] - geom[2][j]) * (geom[2][i] - geom[2][j])) ) * pow(aij, 1.5);
+
+                if (fabs(dij) > dtol) {
+                    xij = aij * (xpnt[ib] * geom[0][i] + xpnt[jb] * geom[0][j]);
+                    yij = aij * (xpnt[ib] * geom[1][i] + xpnt[jb] * geom[1][j]);
+                    zij = aij * (xpnt[ib] * geom[2][i] + xpnt[jb] * geom[2][j]);
+
+                    for (kb = 1; kb <= ngauss; kb++) {
+                        for (lb = 1; lb <= ngauss; lb++) {
+                            akl = 1.0 / (xpnt[kb] + xpnt[lb]);
+                            dkl = dij * coef[kb] * coef[lb] * exp(-xpnt[kb] * xpnt[lb] * akl *
+                                ((geom[0][k] - geom[0][l]) * (geom[0][k] - geom[0][l]) +
+                                 (geom[1][k] - geom[1][l]) * (geom[1][k] - geom[1][l]) +
+                                 (geom[2][k] - geom[2][l]) * (geom[2][k] - geom[2][l])) ) * pow(akl, 1.5);
+
+                            if (fabs(dkl) > dtol) {
+                                aijkl = (xpnt[ib] + xpnt[jb]) * (xpnt[kb] + xpnt[lb]) /
+                                    (xpnt[ib] + xpnt[jb] + xpnt[kb] + xpnt[lb]);
+
+                                tt = aijkl * ((xij - akl * (xpnt[kb] * geom[0][k] + xpnt[lb] * geom[0][l])) * (xij - akl * (xpnt[kb] * geom[0][k] + xpnt[lb] * geom[0][l])) +
+                                              (yij - akl * (xpnt[kb] * geom[1][k] + xpnt[lb] * geom[1][l])) * (yij - akl * (xpnt[kb] * geom[1][k] + xpnt[lb] * geom[1][l])) +
+                                              (zij - akl * (xpnt[kb] * geom[2][k] + xpnt[lb] * geom[2][l])) * (zij - akl * (xpnt[kb] * geom[2][k] + xpnt[lb] * geom[2][l])) );
+
+                                f0t = sqrpi2;
+                                if (tt > rcut) {
+                                    f0t = pow(tt, -0.5) * erf(sqrt(tt));
+                                }
+
+                                eri += dkl * f0t * sqrt(aijkl);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (i == j) {
+            eri *= 0.5;
+        }
+        if (k == l) {
+            eri *= 0.5;
+        }
+        if (i == k && j == l) {
+            eri *= 0.5;
+        }
+
+        #pragma acc atomic update
+        fock[i * ncols + j] += dens[k * ncols + l] * eri * 4.0;
+        #pragma acc atomic update
+        fock[k * ncols + l] += dens[i * ncols + j] * eri * 4.0;
+        #pragma acc atomic update
+        fock[i * ncols + k] -= dens[j * ncols + l] * eri;
+        #pragma acc atomic update
+        fock[i * ncols + l] -= dens[j * ncols + k] * eri;
+        #pragma acc atomic update
+        fock[j * ncols + k] -= dens[i * ncols + l] * eri;
+        #pragma acc atomic update
+        fock[j * ncols + l] -= dens[i * ncols + k] * eri;
+    }
+}
+```
+
+This code uses OpenACC directives to parallelize the computation of the Hartree-Fock operation. The `#pragma acc parallel loop` directive is used to parallelize the loop over `ijkl`. Atomic updates are used to ensure correct updates to the `fock` matrix within parallel regions.
+
+--------------- Output 5 ---------------
+Here is the equivalent code implemented in C with OpenACC:
+
+```c
+#pragma acc parallel loop private(ib,jb,kb,lb,ijkl,ij,i,j,kl,k,l,n,aij,dij,xij,yij,zij,akl,dkl,aijkl,tt,f0t,eri) 
+for(ijkl = 1; ijkl <= nnnn; ijkl++) {
+    // decompose triangular ijkl index into ij>=kl
+    ij = sqrt((double)(2*ijkl));
+    n = (ij*ij + ij)/2;
+    while (n < ijkl) {
+        ij++;
+        n = (ij*ij + ij)/2;
+    }
+    kl = ijkl - (ij*ij - ij)/2;
+    
+    if (schwarz(ij)*schwarz(kl) > dtol) {
+        // decompose triangular ij index into i>=j
+        i = sqrt((double)(2*ij));
+        n = (i*i + i)/2;
+        while (n < ij) {
+            i++;
+            n = (i*i + i)/2;
+        }
+        j = ij - (i*i - i)/2;
+        
+        // decompose triangular kl index into k>=l
+        k = sqrt((double)(2*kl));
+        n = (k*k + k)/2;
+        while (n < kl) {
+            k++;
+            n = (k*k + k)/2;
+        }
+        l = kl - (k*k - k)/2;
+        
+        eri = 0.0;
+        for(ib = 1; ib <= ngauss; ib++) {
+            for(jb = 1; jb <= ngauss; jb++) {
+                aij = 1.0/(xpnt[ib] + xpnt[jb]);
+                dij = coef[ib]*coef[jb]*exp(-xpnt[ib]*xpnt[jb]*aij*(pow(geom[0][i] - geom[0][j], 2) + pow(geom[1][i] - geom[1][j], 2) + pow(geom[2][i] - geom[2][j], 2)))*(pow(aij, 1.5));
+                if (fabs(dij) > dtol) {
+                    xij = aij*(xpnt[ib]*geom[0][i] + xpnt[jb]*geom[0][j]);
+                    yij = aij*(xpnt[ib]*geom[1][i] + xpnt[jb]*geom[1][j]);
+                    zij = aij*(xpnt[ib]*geom[2][i] + xpnt[jb]*geom[2][j]);
+                    for(kb = 1; kb <= ngauss; kb++) {
+                        for(lb = 1; lb <= ngauss; lb++) {
+                            akl = 1.0/(xpnt[kb] + xpnt[lb]);
+                            dkl = dij*coef[kb]*coef[lb]*exp(-xpnt[kb]*xpnt[lb]*akl*(pow(geom[0][k] - geom[0][l], 2) + pow(geom[1][k] - geom[1][l], 2) + pow(geom[2][k] - geom[2][l], 2)))*(pow(akl, 1.5));
+                            if (fabs(dkl) > dtol) {
+                                aijkl = (xpnt[ib] + xpnt[jb])*(xpnt[kb] + xpnt[lb])/(xpnt[ib] + xpnt[jb] + xpnt[kb] + xpnt[lb]);
+                                tt = aijkl*(pow(xij - akl*(xpnt[kb]*geom[0][k] + xpnt[lb]*geom[0][l]), 2) + pow(yij - akl*(xpnt[kb]*geom[1][k] + xpnt[lb]*geom[1][l]), 2) + pow(zij - akl*(xpnt[kb]*geom[2][k] + xpnt[lb]*geom[2][l]), 2));
+                                f0t = sqrpi2;
+                                if (tt > rcut) {
+                                    f0t = pow(tt, -0.5)*erf(sqrt(tt));
+                                }
+                                eri += dkl*f0t*sqrt(aijkl);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        if (i == j) eri = eri*0.5;
+        if (k == l) eri = eri*0.5;
+        if (i == k && j == l) eri = eri*0.5;
+        
+        #pragma acc atomic
+        fock[i*dim+j] += dens[k*dim+l]*eri*4.0;
+        
+        #pragma acc atomic
+        fock[k*dim+l] += dens[i*dim+j]*eri*4.0;
+        
+        #pragma acc atomic
+        fock[i*dim+k] -= dens[j*dim+l]*eri;
+        
+        #pragma acc atomic
+        fock[i*dim+l] -= dens[j*dim+k]*eri;
+        
+        #pragma acc atomic
+        fock[j*dim+k] -= dens[i*dim+l]*eri;
+        
+        #pragma acc atomic
+        fock[j*dim+l] -= dens[i*dim+k]*eri;
+    }
+}
+```
+
+In this code, I assumed that `xpnt`, `coef`, `geom`, `dtol`, `sqrpi2`, `rcut`, `fock`, and `dens` are arrays or variables defined elsewhere in your code. Just make sure to adjust the dimensions and data types accordingly.
+
+--------------- Output 6 ---------------
+Here is the equivalent code implemented in C with OpenACC:
+
+```c
+#pragma acc parallel loop collapse(2) private(ij, kl, i, j, k, l, n, ib, jb, aij, dij, xij, yij, zij, akl, dkl, aijkl, tt, f0t, eri)
+for (ijkl = 1; ijkl <= nnnn; ijkl++) {
+    // decompose triangular ijkl index into ij>=kl
+    ij = sqrt(2.0 * ijkl);
+    n = (ij * ij + ij) / 2;
+    while (n < ijkl) {
+        ij++;
+        n = (ij * ij + ij) / 2;
+    }
+    kl = ijkl - (ij * ij - ij) / 2;
+    if (schwarz(ij) * schwarz(kl) > dtol) {
+        // decompose triangular ij index into i>=j
+        i = sqrt(2.0 * ij);
+        n = (i * i + i) / 2;
+        while (n < ij) {
+            i++;
+            n = (i * i + i) / 2;
+        }
+        j = ij - (i * i - i) / 2;
+        // decompose triangular kl index into k>=l
+        k = sqrt(2.0 * kl);
+        n = (k * k + k) / 2;
+        while (n < kl) {
+            k++;
+            n = (k * k + k) / 2;
+        }
+        l = kl - (k * k - k) / 2;
+        double eri = 0.0;
+        for (ib = 1; ib <= ngauss; ib++) {
+            for (jb = 1; jb <= ngauss; jb++) {
+                aij = 1.0 / (xpnt[ib] + xpnt[jb]);
+                dij = coef[ib] * coef[jb] * exp(-xpnt[ib] * xpnt[jb] * aij *
+                    ((geom[0][i] - geom[0][j]) * (geom[0][i] - geom[0][j]) +
+                     (geom[1][i] - geom[1][j]) * (geom[1][i] - geom[1][j]) +
+                     (geom[2][i] - geom[2][j]) * (geom[2][i] - geom[2][j])) ) * pow(aij, 1.5);
+                if (fabs(dij) > dtol) {
+                    xij = aij * (xpnt[ib] * geom[0][i] + xpnt[jb] * geom[0][j]);
+                    yij = aij * (xpnt[ib] * geom[1][i] + xpnt[jb] * geom[1][j]);
+                    zij = aij * (xpnt[ib] * geom[2][i] + xpnt[jb] * geom[2][j]);
+                    for (int kb = 1; kb <= ngauss; kb++) {
+                        for (int lb = 1; lb <= ngauss; lb++) {
+                            akl = 1.0 / (xpnt[kb] + xpnt[lb]);
+                            dkl = dij * coef[kb] * coef[lb] * exp(-xpnt[kb] * xpnt[lb] * akl *
+                                ((geom[0][k] - geom[0][l]) * (geom[0][k] - geom[0][l]) +
+                                 (geom[1][k] - geom[1][l]) * (geom[1][k] - geom[1][l]) +
+                                 (geom[2][k] - geom[2][l]) * (geom[2][k] - geom[2][l])) ) * pow(akl, 1.5);
+                            if (fabs(dkl) > dtol) {
+                                aijkl = (xpnt[ib] + xpnt[jb]) * (xpnt[kb] + xpnt[lb]) / (xpnt[ib] + xpnt[jb] + xpnt[kb] + xpnt[lb]);
+                                tt = aijkl * ((xij - akl * (xpnt[kb] * geom[0][k] + xpnt[lb] * geom[0][l])) * (xij - akl * (xpnt[kb] * geom[0][k] + xpnt[lb] * geom[0][l])) +
+                                              (yij - akl * (xpnt[kb] * geom[1][k] + xpnt[lb] * geom[1][l])) * (yij - akl * (xpnt[kb] * geom[1][k] + xpnt[lb] * geom[1][l])) +
+                                              (zij - akl * (xpnt[kb] * geom[2][k] + xpnt[lb] * geom[2][l])) * (zij - akl * (xpnt[kb] * geom[2][k] + xpnt[lb] * geom[2][l])));
+                                f0t = sqrpi2;
+                                if (tt > rcut) f0t = pow(tt, -0.5) * erf(sqrt(tt));
+                                eri += dkl * f0t * sqrt(aijkl);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if (i == j) eri *= 0.5;
+        if (k == l) eri *= 0.5;
+        if (i == k && j == l) eri *= 0.5;
+        #pragma acc atomic
+        fock[i * nbf + j] += dens[k * nbf + l] * eri * 4.0;
+        #pragma acc atomic
+        fock[k * nbf + l] += dens[i * nbf + j] * eri * 4.0;
+        #pragma acc atomic
+        fock[i * nbf + k] -= dens[j * nbf + l] * eri;
+        #pragma acc atomic
+        fock[i * nbf + l] -= dens[j * nbf + k] * eri;
+        #pragma acc atomic
+        fock[j * nbf + k] -= dens[i * nbf + l] * eri;
+        #pragma acc atomic
+        fock[j * nbf + l] -= dens[i * nbf + k] * eri;
+    }
+}
+```
+
+Note: Make sure to adjust the data types according to your program and initialize and set up the necessary variables and arrays before this computation.
+
+--------------- Output 7 ---------------
+Here is the equivalent code implemented in C with OpenACC:
+
+```c
+#include <math.h>
+
+void hartree_fock(double *fock, double *dens, double *geom, double *xpnt, double *coef, double sqrpi2, double dtol, double rcut, int ngauss, int nnnn) {
+    #pragma acc parallel loop collapse(2) 
+    for (int ijkl = 0; ijkl < nnnn; ijkl++) {
+        double eri = 0.0;
+        // decompose triangular ijkl index into ij>=kl
+        int ij = sqrt(2*ijkl);
+        int n = (ij*ij + ij)/2;
+        while (n < ijkl) {
+            ij++;
+            n = (ij*ij + ij)/2;
+        }
+        int kl = ijkl - (ij*ij - ij)/2;
+        
+        if (schwarz(ij)*schwarz(kl) > dtol) {
+            // decompose triangular ij index into i>=j
+            int i = sqrt(2*ij);
+            n = (i*i + i)/2;
+            while (n < ij) {
+                i++;
+                n = (i*i + i)/2;
+            }
+            int j = ij - (i*i - i)/2;
+            // decompose triangular kl index into k>=l
+            int k = sqrt(2*kl);
+            n = (k*k + k)/2;
+            while (n < kl) {
+                k++;
+                n = (k*k + k)/2;
+            }
+            int l = kl - (k*k - k)/2;
+            
+            for (int ib = 0; ib < ngauss; ib++) {
+                for (int jb = 0; jb < ngauss; jb++) {
+                    double aij = 1.0/(xpnt[ib] + xpnt[jb]);
+                    double dij = coef[ib]*coef[jb]*exp(-xpnt[ib]*xpnt[jb]*aij*
+                                ((geom[i] - geom[j])*(geom[i] - geom[j]) +
+                                (geom[i+1] - geom[j+1])*(geom[i+1] - geom[j+1]) +
+                                (geom[i+2] - geom[j+2])*(geom[i+2] - geom[j+2])))*(pow(aij, 1.5));
+
+                    if (fabs(dij) > dtol) {
+                        double xij = aij*(xpnt[ib]*geom[i] + xpnt[jb]*geom[j]);
+                        double yij = aij*(xpnt[ib]*geom[i+1] + xpnt[jb]*geom[j+1]);
+                        double zij = aij*(xpnt[ib]*geom[i+2] + xpnt[jb]*geom[j+2]);
+
+                        for (int kb = 0; kb < ngauss; kb++) {
+                            for (int lb = 0; lb < ngauss; lb++) {
+                                double akl = 1.0/(xpnt[kb] + xpnt[lb]);
+                                double dkl = dij*coef[kb]*coef[lb]*exp(-xpnt[kb]*xpnt[lb]*akl*
+                                            ((geom[k] - geom[l])*(geom[k] - geom[l]) +
+                                            (geom[k+1] - geom[l+1])*(geom[k+1] - geom[l+1]) +
+                                            (geom[k+2] - geom[l+2])*(geom[k+2] - geom[l+2])))*(pow(akl, 1.5));
+
+                                if (fabs(dkl) > dtol) {
+                                    double aijkl = (xpnt[ib] + xpnt[jb])*(xpnt[kb] + xpnt[lb]) / (xpnt[ib] + xpnt[jb] + xpnt[kb] + xpnt[lb]);
+                                    double tt = aijkl*((xij - akl*(xpnt[kb]*geom[k] + xpnt[lb]*geom[l]))*(xij - akl*(xpnt[kb]*geom[k] + xpnt[lb]*geom[l])) +
+                                                (yij - akl*(xpnt[kb]*geom[k+1] + xpnt[lb]*geom[l+1]))*(yij - akl*(xpnt[kb]*geom[k+1] + xpnt[lb]*geom[l+1])) +
+                                                (zij - akl*(xpnt[kb]*geom[k+2] + xpnt[lb]*geom[l+2]))*(zij - akl*(xpnt[kb]*geom[k+2] + xpnt[lb]*geom[l+2])));
+                                    double f0t = sqrpi2;
+                                    if (tt > rcut) f0t = pow(tt, -0.5)*erf(sqrt(tt));
+                                    eri += dkl*f0t*sqrt(aijkl);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            if (i == j) eri *= 0.5;
+            if (k == l) eri *= 0.5;
+            if (i == k && j == l) eri *= 0.5;
+                
+            #pragma acc atomic
+            fock[i*3 + j] += dens[k*3 + l]*eri*4.0;
+            #pragma acc atomic
+            fock[k*3 + l] += dens[i*3 + j]*eri*4.0;
+            #pragma acc atomic
+            fock[i*3 + k] -= dens[j*3 + l]*eri;
+            #pragma acc atomic
+            fock[i*3 + l] -= dens[j*3 + k]*eri;
+            #pragma acc atomic
+            fock[j*3 + k] -= dens[i*3 + l]*eri;
+            #pragma acc atomic
+            fock[j*3 + l] -= dens[i*3 + k]*eri;
+        }
+    }
+}
+```
+
+Please note that the variables and function calls have to be modified accordingly. Also, make sure to adjust the loop boundaries and indexing based on the actual array dimensions and data layout in your code.
+
+--------------- Output 8 ---------------
+Here is the equivalent code implemented in C with OpenACC:
+
+```c
+#include <math.h>
+
+void compute_fock(double *geom, double *xpnt, double *coef, double *dens, double *fock, double rcut, double sqrpi2, int ngauss, int nnnn, double dtol)
+{
+    #pragma acc parallel loop
+    for (int ijkl = 1; ijkl <= nnnn; ijkl++)
+    {
+        int ij = sqrt(2 * ijkl);
+        int n = (ij * ij + ij) / 2;
+        while (n < ijkl)
+        {
+            ij++;
+            n = (ij * ij + ij) / 2;
+        }
+        int kl = ijkl - (ij * ij - ij) / 2;
+
+        if (schwarz(ij) * schwarz(kl) > dtol)
+        {
+            int i = sqrt(2 * ij);
+            n = (i * i + i) / 2;
+            while (n < ij)
+            {
+                i++;
+                n = (i * i + i) / 2;
+            }
+            int j = ij - (i * i - i) / 2;
+
+            int k = sqrt(2 * kl);
+            n = (k * k + k) / 2;
+            while (n < kl)
+            {
+                k++;
+                n = (k * k + k) / 2;
+            }
+            int l = kl - (k * k - k) / 2;
+
+            double eri = 0.0;
+
+            #pragma acc loop collapse(2)
+            for (int ib = 1; ib <= ngauss; ib++)
+            {
+                for (int jb = 1; jb <= ngauss; jb++)
+                {
+                    double aij = 1.0 / (xpnt[ib] + xpnt[jb]);
+                    double dij = coef[ib] * coef[jb] * exp(-xpnt[ib] * xpnt[jb] * aij *
+                        ((geom[0 * n + i] - geom[1 * n + j]) * (geom[0 * n + i] - geom[1 * n + j]) +
+                        (geom[2 * n + i] - geom[2 * n + j]) * (geom[2 * n + i] - geom[2 * n + j]) +
+                        (geom[3 * n + i] - geom[3 * n + j]) * (geom[3 * n + i] - geom[3 * n + j])))*(pow(aij, 1.5));
+
+                    if (fabs(dij) > dtol)
+                    {
+                        double xij = aij * (xpnt[ib] * geom[0 * n + i] + xpnt[jb] * geom[0 * n + j]);
+                        double yij = aij * (xpnt[ib] * geom[1 * n + i] + xpnt[jb] * geom[1 * n + j]);
+                        double zij = aij * (xpnt[ib] * geom[2 * n + i] + xpnt[jb] * geom[2 * n + j]);
+
+                        for (int kb = 1; kb <= ngauss; kb++)
+                        {
+                            for (int lb = 1; lb <= ngauss; lb++)
+                            {
+                                double akl = 1.0 / (xpnt[kb] + xpnt[lb]);
+                                double dkl = dij * coef[kb] * coef[lb] * exp(-xpnt[kb] * xpnt[lb] * akl *
+                                    ((geom[0 * n + k] - geom[1 * n + l]) * (geom[0 * n + k] - geom[1 * n + l]) +
+                                    (geom[2 * n + k] - geom[2 * n + l]) * (geom[2 * n + k] - geom[2 * n + l]) +
+                                    (geom[3 * n + k] - geom[3 * n + l]) * (geom[3 * n + k] - geom[3 * n + l])))*(pow(akl, 1.5));
+
+                                if (fabs(dkl) > dtol)
+                                {
+                                    double aijkl = (xpnt[ib] + xpnt[jb]) * (xpnt[kb] + xpnt[lb]) /
+                                        (xpnt[ib] + xpnt[jb] + xpnt[kb] + xpnt[lb]);
+
+                                    double tt = aijkl * ((xij - akl * (xpnt[kb] * geom[0 * n + k] + xpnt[lb] * geom[0 * n + l])) * 
+                                                        (xij - akl * (xpnt[kb] * geom[0 * n + k] + xpnt[lb] * geom[0 * n + l])) +
+                                            (yij - akl * (xpnt[kb] * geom[1 * n + k] + xpnt[lb] * geom[1 * n + l])) * 
+                                                        (yij - akl * (xpnt[kb] * geom[1 * n + k] + xpnt[lb] * geom[1 * n + l])) +
+                                            (zij - akl * (xpnt[kb] * geom[2 * n + k] + xpnt[lb] * geom[2 * n + l])) *
+                                                        (zij - akl * (xpnt[kb] * geom[2 * n + k] + xpnt[lb] * geom[2 * n + l])));
+
+                                    double f0t = sqrpi2;
+
+                                    if (tt > rcut)
+                                    {
+                                        f0t  =  pow(tt, -0.5) * erfc(sqrt(tt));
+                                    }
+                                    eri += dkl * f0t * sqrt(aijkl);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (i == j)
+                eri *= 0.5;
+            if (k == l)
+                eri *= 0.5;
+            if (i == k && j == l)
+                eri *= 0.5;
+
+            #pragma acc atomic
+            fock[i * n + j] += dens[k * n + l] * eri * 4.0;
+
+            #pragma acc atomic
+            fock[k * n + l] += dens[i * n + j] * eri * 4.0;
+
+            #pragma acc atomic
+            fock[i * n + k] -= dens[j * n + l] * eri;
+
+            #pragma acc atomic
+            fock[i * n + l] -= dens[j * n + k] * eri;
+
+            #pragma acc atomic
+            fock[j * n + k] -= dens[i * n + l] * eri;
+
+            #pragma acc atomic
+            fock[j * n + l] -= dens[i * n + k] * eri;
+        }
+    }
+}
+```
+
+Please note that the `schwarz()` function and other custom functions used in the Fortran code need to be defined and implemented in C as well for this code to work properly.
+
+--------------- Output 9 ---------------
+Here is the equivalent code implemented in C with OpenACC for the given Fortran code with OpenMP:
+
+```c
+#pragma acc parallel loop collapse(2) private(ib, jb, kb, lb, ijkl, ij, i, j, kl, k, l, n, aij, dij, xij, yij, zij, akl, dkl, aijkl, tt, f0t, eri)
+for (ijkl = 1; ijkl <= nnnn; ijkl++) {
+    // decompose triangular ijkl index into ij>=kl
+    ij = sqrt( 2.0 * (double)ijkl );
+    n = (ij * ij + ij) / 2;
+    while (n < ijkl) {
+        ij++;
+        n = (ij * ij + ij) / 2;
+    }
+    kl = ijkl - (ij * ij - ij) / 2;
+    
+    if (schwarz(ij) * schwarz(kl) > dtol) {
+        // decompose triangular ij index into i>=j
+        i = sqrt(2.0 * (double)ij);
+        n = (i * i + i) / 2;
+        while (n < ij) {
+            i++;
+            n = (i * i + i) / 2;
+        }
+        j = ij - (i * i - i) / 2;
+
+        // decompose triangular kl index into k>=l
+        k = sqrt(2.0 * (double)kl);
+        n = (k * k + k) / 2;
+        while (n < kl) {
+            k++;
+            n = (k * k + k) / 2;
+        }
+        l = kl - (k * k - k) / 2;
+
+        eri = 0.0;
+        for (ib = 1; ib <= ngauss; ib++) {
+            for (jb = 1; jb <= ngauss; jb++) {
+                aij = 1.0 / (xpnt[ib] + xpnt[jb]);
+                dij = coef[ib] * coef[jb] * exp(-xpnt[ib] * xpnt[jb] * aij * pow((geom[0][i] - geom[0][j]), 2) + pow((geom[1][i] - geom[1][j]), 2) + pow((geom[2][i] - geom[2][j]), 2)) * pow(aij, 1.5);
+                
+                if (fabs(dij) > dtol) {
+                    xij = aij * (xpnt[ib] * geom[0][i] + xpnt[jb] * geom[0][j]);
+                    yij = aij * (xpnt[ib] * geom[1][i] + xpnt[jb] * geom[1][j]);
+                    zij = aij * (xpnt[ib] * geom[2][i] + xpnt[jb] * geom[2][j]);
+                    
+                    for (kb = 1; kb <= ngauss; kb++) {
+                        for (lb = 1; lb <= ngauss; lb++) {
+                            akl = 1.0 / (xpnt[kb] + xpnt[lb]);
+                            dkl = dij * coef[kb] * coef[lb] * exp(-xpnt[kb] * xpnt[lb] * akl * (pow((geom[0][k] - geom[0][l]), 2) + pow((geom[1][k] - geom[1][l]), 2) + pow((geom[2][k] - geom[2][l]), 2))) * pow(akl, 1.5);
+                            
+                            if (fabs(dkl) > dtol) {
+                                aijkl = (xpnt[ib] + xpnt[jb]) * (xpnt[kb] + xpnt[lb]) / (xpnt[ib] + xpnt[jb] + xpnt[kb] + xpnt[lb]);
+                                tt = aijkl * ((xij - akl * (xpnt[kb] * geom[0][k] + xpnt[lb] * geom[0][l])) + pow(2) + 
+                                              (yij - akl * (xpnt[kb] * geom[1][k] + xpnt[lb] * geom[1][l])) + pow(2) +
+                                              (zij - akl * (xpnt[kb] * geom[2][k] + xpnt[lb] * geom[2][l])) + pow(2));
+                                
+                                f0t = sqrpi2;
+                                if (tt > rcut) {
+                                    f0t = pow(tt, -0.5) * erf(sqrt(tt));
+                                }
+                                eri += dkl * f0t * sqrt(aijkl);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (i == j) {
+            eri *= 0.5;
+        }
+        if (k == l) {
+            eri *= 0.5;
+        }
+        if (i == k && j == l) {
+            eri *= 0.5;
+        }
+
+        #pragma acc atomic
+        fock[i][j] += dens[k][l] * eri * 4.0;
+
+        #pragma acc atomic
+        fock[k][l] += dens[i][j] * eri * 4.0;
+
+        #pragma acc atomic
+        fock[i][k] -= dens[j][l] * eri;
+
+        #pragma acc atomic
+        fock[i][l] -= dens[j][k] * eri;
+
+        #pragma acc atomic
+        fock[j][k] -= dens[i][l] * eri;
+
+        #pragma acc atomic
+        fock[j][l] -= dens[i][k] * eri;
+    }
+}
+```
+
+In this code snippet, OpenACC directives are used to parallelize the loop and apply atomic operations for updating the `fock` matrix. The collapse clause is used to collapse the nested loops for better parallelization.
+
+--------------- Output 10 ---------------
+```c
+#include <math.h>
+#include <omp.h>
+
+void hartree_fock(int nnnn, double *fock, double *geom, double *xpnt, double *coef, double dtol, double sqrpi2, double rcut, double *dens, int ngauss) {
+    #pragma acc parallel loop present(geom, xpnt, coef, dens, fock)
+    for (int ijkl = 1; ijkl <= nnnn; ijkl++) {
+        int ij = sqrt(2 * ijkl);
+        int n = (ij * ij + ij) / 2;
+        while (n < ijkl) {
+            ij++;
+            n = (ij * ij + ij) / 2;
+        }
+        
+        int kl = ijkl - (ij * ij - ij) / 2;
+        if (schwarz(ij) * schwarz(kl) > dtol) {
+            int i = sqrt(2 * ij);
+            n = (i * i + i) / 2;
+            while (n < ij) {
+                i++;
+                n = (i * i + i) / 2;
+            }
+            
+            int j = ij - (i * i - i) / 2;
+            int k = sqrt(2 * kl);
+            n = (k * k + k) / 2;
+            while (n < kl) {
+                k++;
+                n = (k * k + k) / 2;
+            }
+            
+            int l = kl - (k * k - k) / 2;
+            double eri = 0.0;
+            for (int ib = 1; ib <= ngauss; ib++) {
+                for (int jb = 1; jb <= ngauss; jb++) {
+                    double aij = 1.0 / (xpnt[ib - 1] + xpnt[jb - 1]);
+                    double dij = coef[ib - 1] * coef[jb - 1] * exp(-xpnt[ib - 1] * xpnt[jb - 1] * aij *
+                        ((geom[i-1] - geom[j-1]) * (geom[i-1] - geom[j-1]) +
+                        (geom[i+1] - geom[j+1]) * (geom[i+1] - geom[j+1]) +
+                        (geom[i+2] - geom[j+2]) * (geom[i+2] - geom[j+2])) * (aij * 1.5);
+                    if (fabs(dij) > dtol) {
+                        double xij = aij * (xpnt[ib - 1] * geom[i-1] + xpnt[jb - 1] * geom[j-1]);
+                        double yij = aij * (xpnt[ib - 1] * geom[i+1] + xpnt[jb - 1] * geom[j+1]);
+                        double zij = aij * (xpnt[ib - 1] * geom[i+2] + xpnt[jb - 1] * geom[j+2]);
+                        for (int kb = 1; kb <= ngauss; kb++) {
+                            for (int lb = 1; lb <= ngauss; lb++) {
+                                double akl = 1.0 / (xpnt[kb - 1] + xpnt[lb - 1]);
+                                double dkl = dij * coef[kb - 1] * coef[lb - 1] * exp(-xpnt[kb - 1] * xpnt[lb - 1] * akl *
+                                    ((geom[k-1] - geom[l-1]) * (geom[k-1] - geom[l-1]) +
+                                    (geom[k+1] - geom[l+1]) * (geom[k+1] - geom[l+1]) +
+                                    (geom[k+2] - geom[l+2]) * (geom[k+2] - geom[l+2])) * (akl * 1.5);
+                                if (fabs(dkl) > dtol) {
+                                    double aijkl = (xpnt[ib - 1] + xpnt[jb - 1]) * (xpnt[kb - 1] + xpnt[lb - 1]) /
+                                        (xpnt[ib - 1] + xpnt[jb - 1] + xpnt[kb - 1] + xpnt[lb - 1]);
+                                    double tt = aijkl * ((xij - akl * (xpnt[kb - 1] * geom[k-1] + xpnt[lb - 1] * geom[l-1])) * (xij - akl * (xpnt[kb - 1] * geom[k-1] + xpnt[lb - 1] * geom[l-1])) +
+                                            (yij - akl * (xpnt[kb - 1] * geom[k+1] + xpnt[lb - 1] * geom[l+1])) * (yij - akl * (xpnt[kb - 1] * geom[k+1] + xpnt[lb - 1] * geom[l+1])) +
+                                            (zij - akl * (xpnt[kb - 1] * geom[k+2] + xpnt[lb - 1] * geom[l+2])) * (zij - akl * (xpnt[kb - 1] * geom[k+2] + xpnt[lb - 1] * geom[l+2])));
+                                    double f0t = sqrpi2;
+                                    if (tt > rcut) {
+                                        f0t = pow(tt, -0.5) * erf(sqrt(tt));
+                                    }
+                                    eri = eri + dkl * f0t * sqrt(aijkl);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if (i == j) {
+                eri = eri * 0.5;
+            }
+            if (k == l) {
+                eri = eri * 0.5;
+            }
+            if (i == k && j == l) {
+                eri = eri * 0.5;
+            }
+            
+            #pragma acc atomic
+            fock[i * n + j] += dens[k * n + l] * eri * 4.0;
+            #pragma acc atomic
+            fock[k * n + l] += dens[i * n + j] * eri * 4.0;
+            #pragma acc atomic
+            fock[i * n + k] -= dens[j * n + l] * eri;
+            #pragma acc atomic
+            fock[i * n + l] -= dens[j * n + k] * eri;
+            #pragma acc atomic
+            fock[j * n + k] -= dens[i * n + l] * eri;
+            #pragma acc atomic
+            fock[j * n + l] -= dens[i * n + k] * eri;
+        }
+    }
+}
+```
+

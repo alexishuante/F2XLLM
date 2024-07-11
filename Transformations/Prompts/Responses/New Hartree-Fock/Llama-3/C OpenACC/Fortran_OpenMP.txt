@@ -1,0 +1,704 @@
+--------------- Output 1 ---------------
+Here is a possible implementation of the Hartree-Fock operation in C with OpenACC:
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <openacc.h>
+
+#define sqrtpi2 0.9189385332046727
+
+void hartree_fock(int nnnn, double *schwarz, double *xpnt, double *coef, double *geom, double *dens, double *fock) {
+  int ijkl, ij, kl, i, j, k, l, ib, jb, kb, lb;
+  double aij, dij, xij, yij, zij, akl, dkl, aijkl, tt, f0t, eri;
+
+  #pragma acc parallel loop private(ib, jb, kb, lb, ijkl, ij, i, j, kl, k, l, n, aij, dij, xij, yij, zij, akl, dkl, aijkl, tt, f0t, eri)
+  for (ijkl = 1; ijkl <= nnnn; ijkl++) {
+    // decompose triangular ijkl index into ij>=kl
+    ij = sqrt(2 * ijkl);
+    int n = (ij * ij + ij) / 2;
+    while (n < ijkl) {
+      ij++;
+      n = (ij * ij + ij) / 2;
+    }
+    kl = ijkl - (ij * ij - ij) / 2;
+
+    if (schwarz[ij] * schwarz[kl] > dtol) {
+      // decompose triangular ij index into i>=j
+      i = sqrt(2 * ij);
+      n = (i * i + i) / 2;
+      while (n < ij) {
+        i++;
+        n = (i * i + i) / 2;
+      }
+      j = ij - (i * i - i) / 2;
+
+      // decompose triangular kl index into k>=l
+      k = sqrt(2 * kl);
+      n = (k * k + k) / 2;
+      while (n < kl) {
+        k++;
+        n = (k * k + k) / 2;
+      }
+      l = kl - (k * k - k) / 2;
+
+      eri = 0.0;
+
+      for (ib = 1; ib <= ngauss; ib++) {
+        for (jb = 1; jb <= ngauss; jb++) {
+          aij = 1.0 / (xpnt[ib] + xpnt[jb]);
+          dij = coef[ib] * coef[jb] * exp(-xpnt[ib] * xpnt[jb] * aij * (
+            (geom[0][i] - geom[0][j]) * (geom[0][i] - geom[0][j]) +
+            (geom[1][i] - geom[1][j]) * (geom[1][i] - geom[1][j]) +
+            (geom[2][i] - geom[2][j]) * (geom[2][i] - geom[2][j])
+          )) * (aij ** 1.5);
+
+          if (fabs(dij) > dtol) {
+            xij = aij * (xpnt[ib] * geom[0][i] + xpnt[jb] * geom[0][j]);
+            yij = aij * (xpnt[ib] * geom[1][i] + xpnt[jb] * geom[1][j]);
+            zij = aij * (xpnt[ib] * geom[2][i] + xpnt[jb] * geom[2][j]);
+
+            for (kb = 1; kb <= ngauss; kb++) {
+              for (lb = 1; lb <= ngauss; lb++) {
+                akl = 1.0 / (xpnt[kb] + xpnt[lb]);
+                dkl = dij * coef[kb] * coef[lb] * exp(-xpnt[kb] * xpnt[lb] * akl * (
+                  (geom[0][k] - geom[0][l]) * (geom[0][k] - geom[0][l]) +
+                  (geom[1][k] - geom[1][l]) * (geom[1][k] - geom[1][l]) +
+                  (geom[2][k] - geom[2][l]) * (geom[2][k] - geom[2][l])
+                )) * (akl ** 1.5);
+
+                if (fabs(dkl) > dtol) {
+                  aijkl = (xpnt[ib] + xpnt[jb]) * (xpnt[k
+
+--------------- Output 2 ---------------
+Here is the equivalent C code with OpenACC:
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#define sqrpi2 0.529177209
+#define rcut 16.0
+
+void hartree_fock(int nnnn, double *schwarz, double *xpnt, double *coef, double *geom, double *dens, double *fock) {
+  int ijkl, ij, kl, i, j, k, l, ib, jb, kb, lb;
+  double eri, aij, dij, xij, yij, zij, akl, dkl, aijkl, tt, f0t;
+
+  #pragma acc parallel loop private(ib, jb, kb, lb, ijkl, ij, i, j, kl, k, l, n, aij, dij, xij, yij, zij, akl, dkl, aijkl, tt, f0t, eri)
+  for (ijkl = 1; ijkl <= nnnn; ijkl++) {
+    // decompose triangular ijkl index into ij>=kl
+    ij = sqrt(2 * ijkl);
+    int n = (ij * ij + ij) / 2;
+    while (n < ijkl) {
+      ij++;
+      n = (ij * ij + ij) / 2;
+    }
+    kl = ijkl - (ij * ij - ij) / 2;
+
+    if (schwarz[ij] * schwarz[kl] > dtol) {
+      // decompose triangular ij index into i>=j
+      i = sqrt(2 * ij);
+      n = (i * i + i) / 2;
+      while (n < ij) {
+        i++;
+        n = (i * i + i) / 2;
+      }
+      j = ij - (i * i - i) / 2;
+
+      // decompose triangular kl index into k>=l
+      k = sqrt(2 * kl);
+      n = (k * k + k) / 2;
+      while (n < kl) {
+        k++;
+        n = (k * k + k) / 2;
+      }
+      l = kl - (k * k - k) / 2;
+
+      eri = 0.0;
+
+      for (ib = 1; ib <= ngauss; ib++) {
+        for (jb = 1; jb <= ngauss; jb++) {
+          aij = 1.0 / (xpnt[ib] + xpnt[jb]);
+          dij = coef[ib] * coef[jb] * exp(-xpnt[ib] * xpnt[jb] * aij * (
+              (geom[0] * i - geom[0] * j) * (geom[0] * i - geom[0] * j) +
+              (geom[1] * i - geom[1] * j) * (geom[1] * i - geom[1] * j) +
+              (geom[2] * i - geom[2] * j) * (geom[2] * i - geom[2] * j))) * (aij**1.5);
+
+          if (fabs(dij) > dtol) {
+            xij = aij * (xpnt[ib] * geom[0] * i + xpnt[jb] * geom[0] * j);
+            yij = aij * (xpnt[ib] * geom[1] * i + xpnt[jb] * geom[1] * j);
+            zij = aij * (xpnt[ib] * geom[2] * i + xpnt[jb] * geom[2] * j);
+
+            for (kb = 1; kb <= ngauss; kb++) {
+              for (lb = 1; lb <= ngauss; lb++) {
+                akl = 1.0 / (xpnt[kb] + xpnt[lb]);
+                dkl = dij * coef[kb] * coef[lb] * exp(-xpnt[kb] * xpnt[lb] * akl * (
+                    (geom[0] * k - geom[0] * l) * (geom[0] * k - geom[0] * l) +
+                    (geom[1] * k - geom[1] * l) * (geom[1] * k - geom[1] * l) +
+                    (geom[2] * k - geom[2] * l) * (geom[2] * k - geom[2] * l))) * (akl**1.5);
+
+                if (fabs(dkl) > dtol) {
+                  aijkl = (xpnt[ib] + xpnt[jb]) * (xpnt[kb
+
+--------------- Output 3 ---------------
+Here is a possible implementation of the Hartree-Fock operation in C with OpenACC:
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <openacc.h>
+
+#define sqrpi2 0.886226925452757
+
+void hartree_fock(int nnnn, double *xpnt, double *coef, double *geom, double *dens, double *fock, double *schwarz, double dtol, double rcut) {
+  int ijkl, ij, kl, i, j, k, l, ib, jb, kb, lb;
+  double aij, dij, xij, yij, zij, akl, dkl, aijkl, tt, f0t, eri;
+
+  #pragma acc data present(xpnt, coef, geom, dens, fock, schwarz)
+  #pragma acc parallel loop private(ib, jb, kb, lb, ijkl, ij, i, j, kl, k, l, n, aij, dij, xij, yij, zij, akl, dkl, aijkl, tt, f0t, eri)
+  for (ijkln = 1; ijlkn <= nnnn; ijlkn++) {
+    ij = sqrt(2 * ijkl);
+    n = (ij * ij + ij) / 2;
+    while (n < ijkl) {
+      ij++;
+      n = (ij * ij + ij) / 2;
+    }
+    kl = ijkl - (ij * ij - ij) / 2;
+
+    if (schwarz[ij] * schwarz[kl] > dtol) {
+      i = sqrt(2 * ij);
+      n = (i * i + i) / 2;
+      while (n < ij) {
+        i++;
+        n = (i * i + i) / 2;
+      }
+      j = ij - (i * i - i) / 2;
+
+      k = sqrt(2 * kl);
+      n = (k * k + k) / 2;
+      while (n < kl) {
+        k++;
+        n = (k * k + k) / 2;
+      }
+      l = kl - (k * k - k) / 2;
+
+      eri = 0.0;
+
+      #pragma acc loop private(ib, jb)
+      for (ib = 1; ib <= ngauss; ib++) {
+        for (jb = 1; jb <= ngauss; jb++) {
+          aij = 1.0 / (xpnt[ib] + xpnt[jb]);
+          dij = coef[ib] * coef[jb] * exp(-xpnt[ib] * xpnt[jb] * aij * (
+              (geom[0] * i - geom[0] * j) * (geom[0] * i - geom[0] * j) +
+              (geom[1] * i - geom[1] * j) * (geom[1] * i - geom[1] * j) +
+              (geom[2] * i - geom[2] * j) * (geom[2] * i - geom[2] * j)
+          )) * (aij ** 1.5);
+
+          if (fabs(dij) > dtol) {
+            xij = aij * (xpnt[ib] * geom[0] * i + xpnt[jb] * geom[0] * j);
+            yij = aij * (xpnt[ib] * geom[1] * i + xpnt[jb] * geom[1] * j);
+            zij = aij * (xpnt[ib] * geom[2] * i + xpnt[jb] * geom[2] * j);
+
+            #pragma acc loop private(kb, lb)
+            for (kb = 1; kb <= ngauss; kb++) {
+              for (lb = 1; lb <= ngauss; lb++) {
+                akl = 1.0 / (xpnt[kb] + xpnt[lb]);
+                dkl = dij * coef[kb] * coef[lb] * exp(-xpnt[kb] * xpnt[lb] * akl * (
+                    (geom[0] * k - geom[0] * l) * (geom[0] * k - geom[0] * l) +
+                    (geom[1] * k - geom[1] * l) * (geom[1] * k - geom[1] * l) +
+                    (geom[2] * k - geom[2] * l) * (geom[2] * k - geom[2] * l)
+                )) * (akl ** 1.5);
+
+                if (fabs
+
+--------------- Output 4 ---------------
+Here is a possible implementation of the Hartree-Fock operation in C with OpenACC:
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <openacc.h>
+
+#define sqrpi2 0.8862269254527579
+#define rcut 16.0
+
+void hartree_fock(int nnnn, double *schwarz, double *xpnt, double *coef, double *geom, double *dens, double *fock) {
+  int ijkl, ij, kl, i, j, k, l, ib, jb, kb, lb;
+  double aij, dij, xij, yij, zij, akl, dkl, aijkl, tt, f0t, eri;
+
+  #pragma acc parallel loop private(ib, jb, kb, lb, ijkl, ij, i, j, kl, k, l, n, aij, dij, xij, yij, zij, akl, dkl, aijkl, tt, f0t, eri)
+  for (ijkl = 1; ijkl <= nnnn; ijkl++) {
+    // decompose triangular ijkl index into ij>=kl
+    ij = sqrt(2 * ijkl);
+    int n = (ij * ij + ij) / 2;
+    while (n < ijkl) {
+      ij++;
+      n = (ij * ij + ij) / 2;
+    }
+    kl = ijkl - (ij * ij - ij) / 2;
+
+    if (schwarz[ij] * schwarz[kl] > dtol) {
+      // decompose triangular ij index into i>=j
+      i = sqrt(2 * ij);
+      n = (i * i + i) / 2;
+      while (n < ij) {
+        i++;
+        n = (i * i + i) / 2;
+      }
+      j = ij - (i * i - i) / 2;
+
+      // decompose triangular kl index into k>=l
+      k = sqrt(2 * kl);
+      n = (k * k + k) / 2;
+      while (n < kl) {
+        k++;
+        n = (k * k + k) / 2;
+      }
+      l = kl - (k * k - k) / 2;
+
+      eri = 0.0;
+
+      for (ib = 1; ib <= ngauss; ib++) {
+        for (jb = 1; jb <= ngauss; jb++) {
+          aij = 1.0 / (xpnt[ib] + xpnt[jb]);
+          dij = coef[ib] * coef[jb] * exp(-xpnt[ib] * xpnt[jb] * aij * (
+              (geom[0] * i - geom[0] * j) * (geom[0] * i - geom[0] * j) +
+              (geom[1] * i - geom[1] * j) * (geom[1] * i - geom[1] * j) +
+              (geom[2] * i - geom[2] * j) * (geom[2] * i - geom[2] * j))) * (aij**1.5);
+
+          if (abs(dij) > dtol) {
+            xij = aij * (xpnt[ib] * geom[0] * i + xpnt[jb] * geom[0] * j);
+            yij = aij * (xpnt[ib] * geom[1] * i + xpnt[jb] * geom[1] * j);
+            zij = aij * (xpnt[ib] * geom[2] * i + xpnt[jb] * geom[2] * j);
+
+            for (kb = 1; kb <= ngauss; kb++) {
+              for (lb = 1; lb <= ngauss; lb++) {
+                akl = 1.0 / (xpnt[kb] + xpnt[lb]);
+                dkl = dij * coef[kb] * coef[lb] * exp(-xpnt[kb] * xpnt[lb] * akl * (
+                    (geom[0] * k - geom[0] * l) * (geom[0] * k - geom[0] * l) +
+                    (geom[1] * k - geom[1] * l) * (geom[1] * k - geom[1] * l) +
+                    (geom[2] * k - geom[2] * l) * (geom[2] * k - geom[2] * l))) * (akl**1.5);
+
+                if (abs(dkl) > dtol) {
+                  aijkl = (
+
+--------------- Output 5 ---------------
+Here is a possible implementation of the Hartree-Fock operation in C with OpenACC:
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <openacc.h>
+
+#define sqrpi2 0.886226925452757
+
+void hartree_fock(int nnnn, double *schwarz, double *xpnt, double *coef, double *geom, double *dens, double *fock) {
+  int ijkl, ij, kl, i, j, k, l, ib, jb, kb, lb;
+  double eri, aij, dij, xij, yij, zij, akl, dkl, aijkl, tt, f0t;
+
+  #pragma acc data copy(schwarz, xpnt, coef, geom, dens, fock)
+  #pragma acc parallel loop private(ib, jb, kb, lb, ijkl, ij, kl, i, j, k, l, eri, aij, dij, xij, yij, zij, akl, dkl, aijkl, tt, f0t)
+  for (ijkln = 1; ijkln <= nnnn; ijkln++) {
+    // decompose triangular ijkl index into ij>=kl
+    ij = sqrt(2 * ijkl);
+    int n = (ij * ij + ij) / 2;
+    while (n < ijkl) {
+      ij++;
+      n = (ij * ij + ij) / 2;
+    }
+    kl = ijkl - (ij * ij - ij) / 2;
+
+    if (schwarz[ij] * schwarz[kl] > dtol) {
+      // decompose triangular ij index into i>=j
+      i = sqrt(2 * ij);
+      n = (i * i + i) / 2;
+      while (n < ij) {
+        i++;
+        n = (i * i + i) / 2;
+      }
+      j = ij - (i * i - i) / 2;
+
+      // decompose triangular kl index into k>=l
+      k = sqrt(2 * kl);
+      n = (k * k + k) / 2;
+      while (n < kl) {
+        k++;
+        n = (k * k + k) / 2;
+      }
+      l = kl - (k * k - k) / 2;
+
+      eri = 0.0;
+
+      #pragma acc loop private(ib, jb, kb, lb, aij, dij, xij, yij, zij, akl, dkl, aijkl, tt, f0t)
+      for (ib = 1; ib <= ngauss; ib++) {
+        for (jb = 1; jb <= ngauss; jb++) {
+          aij = 1.0 / (xpnt[ib] + xpnt[jb]);
+          dij = coef[ib] * coef[jb] * exp(-xpnt[ib] * xpnt[jb] * aij * (
+              (geom[0] * i - geom[0] * j) * (geom[0] * i - geom[0] * j) +
+              (geom[1] * i - geom[1] * j) * (geom[1] * i - geom[1] * j) +
+              (geom[2] * i - geom[2] * j) * (geom[2] * i - geom[2] * j)
+          )) * (aij ** 1.5);
+
+          if (fabs(dij) > dtol) {
+            xij = aij * (xpnt[ib] * geom[0] * i + xpnt[jb] * geom[0] * j);
+            yij = aij * (xpnt[ib] * geom[1] * i + xpnt[jb] * geom[1] * j);
+            zij = aij * (xpnt[ib] * geom[2] * i + xpnt[jb] * geom[2] * j);
+
+            for (kb = 1; kb <= ngauss; kb++) {
+              for (lb = 1; lb <= ngauss; lb++) {
+                akl = 1.0 / (xpnt[kb] + xpnt[lb]);
+                dkl = dij * coef[kb] * coef[lb] * exp(-xpnt[kb] * xpnt[lb] * akl * (
+                    (geom[0] * k - geom[0] * l) * (geom[0] * k - geom[0] * l) +
+                    (geom[1] * k - geom[1] * l) * (geom[1] * k - geom[1] * l)
+
+--------------- Output 6 ---------------
+Here is a possible implementation of the Hartree-Fock operation in C with OpenACC:
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <openacc.h>
+
+#define sqrpi2 0.529177211
+#define rcut 15.0
+
+void hartree_fock(int nnnn, double *schwarz, double *xpnt, double *coef, double *geom, double *dens, double *fock) {
+  int ijkl, ij, kl, i, j, k, l, ib, jb, kb, lb;
+  double aij, dij, xij, yij, zij, akl, dkl, aijkl, tt, f0t, eri;
+
+  #pragma acc parallel loop private(ib, jb, kb, lb, ijkl, ij, i, j, kl, k, l, n, aij, dij, xij, yij, zij, akl, dkl, aijkl, tt, f0t, eri)
+  for (ijkl = 1; ijkl <= nnnn; ijkl++) {
+    // decompose triangular ijkl index into ij>=kl
+    ij = sqrt(2 * ijkl);
+    int n = (ij * ij + ij) / 2;
+    while (n < ijkl) {
+      ij++;
+      n = (ij * ij + ij) / 2;
+    }
+    kl = ijkl - (ij * ij - ij) / 2;
+
+    if (schwarz[ij] * schwarz[kl] > dtol) {
+      // decompose triangular ij index into i>=j
+      i = sqrt(2 * ij);
+      n = (i * i + i) / 2;
+      while (n < ij) {
+        i++;
+        n = (i * i + i) / 2;
+      }
+      j = ij - (i * i - i) / 2;
+
+      // decompose triangular kl index into k>=l
+      k = sqrt(2 * kl);
+      n = (k * k + k) / 2;
+      while (n < kl) {
+        k++;
+        n = (k * k + k) / 2;
+      }
+      l = kl - (k * k - k) / 2;
+
+      eri = 0.0;
+
+      for (ib = 1; ib <= ngauss; ib++) {
+        for (jb = 1; jb <= ngauss; jb++) {
+          aij = 1.0 / (xpnt[ib] + xpnt[jb]);
+          dij = coef[ib] * coef[jb] * exp(-xpnt[ib] * xpnt[jb] * aij * (
+              (geom[0] * i - geom[0] * j) * (geom[0] * i - geom[0] * j) +
+              (geom[1] * i - geom[1] * j) * (geom[1] * i - geom[1] * j) +
+              (geom[2] * i - geom[2] * j) * (geom[2] * i - geom[2] * j))) * (aij ** 1.5);
+
+          if (abs(dij) > dtol) {
+            xij = aij * (xpnt[ib] * geom[0] * i + xpnt[jb] * geom[0] * j);
+            yij = aij * (xpnt[ib] * geom[1] * i + xpnt[jb] * geom[1] * j);
+            zij = aij * (xpnt[ib] * geom[2] * i + xpnt[jb] * geom[2] * j);
+
+            for (kb = 1; kb <= ngauss; kb++) {
+              for (lb = 1; lb <= ngauss; lb++) {
+                akl = 1.0 / (xpnt[kb] + xpnt[lb]);
+                dkl = dij * coef[kb] * coef[lb] * exp(-xpnt[kb] * xpnt[lb] * akl * (
+                    (geom[0] * k - geom[0] * l) * (geom[0] * k - geom[0] * l) +
+                    (geom[1] * k - geom[1] * l) * (geom[1] * k - geom[1] * l) +
+                    (geom[2] * k - geom[2] * l) * (geom[2] * k - geom[2] * l))) * (akl ** 1.5);
+
+                if (abs(dkl) > dtol) {
+                  aijkl = (xp
+
+--------------- Output 7 ---------------
+Here is a possible implementation of the Hartree-Fock operation in C with OpenACC:
+#include <stdio.h>
+#include <math.h>
+#include <openacc.h>
+
+#define sqrpi2 0.886226925452758
+#define rcut 16.0
+
+void hartree_fock(int nnnn, double *schwarz, double *xpnt, double *coef, double *geom, double *dens, double *fock) {
+  int ijkl, ij, kl, i, j, k, l, ib, jb, kb, lb;
+  double aij, dij, xij, yij, zij, akl, dkl, aijkl, tt, f0t, eri;
+
+  #pragma acc parallel loop private(ib, jb, kb, lb, ijkl, ij, i, j, kl, k, l, n, aij, dij, xij, yij, zij, akl, dkl, aijkl, tt, f0t, eri)
+  for (ijkl = 1; ijkl <= nnnn; ijkl++) {
+    // decompose triangular ijkl index into ij>=kl
+    ij = sqrt(2 * ijkl);
+    int n = (ij * ij + ij) / 2;
+    while (n < ijkl) {
+      ij++;
+      n = (ij * ij + ij) / 2;
+    }
+    kl = ijkl - (ij * ij - ij) / 2;
+
+    if (schwarz[ij] * schwarz[kl] > dtol) {
+      // decompose triangular ij index into i>=j
+      i = sqrt(2 * ij);
+      n = (i * i + i) / 2;
+      while (n < ij) {
+        i++;
+        n = (i * i + i) / 2;
+      }
+      j = ij - (i * i - i) / 2;
+
+      // decompose triangular kl index into k>=l
+      k = sqrt(2 * kl);
+      n = (k * k + k) / 2;
+      while (n < kl) {
+        k++;
+        n = (k * k + k) / 2;
+      }
+      l = kl - (k * k - k) / 2;
+
+      eri = 0.0;
+
+      for (ib = 1; ib <= ngauss; ib++) {
+        for (jb = 1; jb <= ngauss; jb++) {
+          aij = 1.0 / (xpnt[ib] + xpnt[jb]);
+          dij = coef[ib] * coef[jb] * exp(-xpnt[ib] * xpnt[jb] * aij * (
+              (geom[0][i] - geom[0][j]) * (geom[0][i] - geom[0][j]) +
+              (geom[1][i] - geom[1][j]) * (geom[1][i] - geom[1][j]) +
+              (geom[2][i] - geom[2][j]) * (geom[2][i] - geom[2][j])
+          )) * (aij ** 1.5);
+
+          if (fabs(dij) > dtol) {
+            xij = aij * (xpnt[ib] * geom[0][i] + xpnt[jb] * geom[0][j]);
+            yij = aij * (xpnt[ib] * geom[1][i] + xpnt[jb] * geom[1][j]);
+            zij = aij * (xpnt[ib] * geom[2][i] + xpnt[jb] * geom[2][j]);
+
+            for (kb = 1; kb <= ngauss; kb++) {
+              for (lb = 1; lb <= ngauss; lb++) {
+                akl = 1.0 / (xpnt[kb] + xpnt[lb]);
+                dkl = dij * coef[kb] * coef[lb] * exp(-xpnt[kb] * xpnt[lb] * akl * (
+                    (geom[0][k] - geom[0][l]) * (geom[0][k] - geom[0][l]) +
+                    (geom[1][k] - geom[1][l]) * (geom[1][k] - geom[1][l]) +
+                    (geom[2][k] - geom[2][l]) * (geom[2][k] - geom[2][l])
+                )) * (akl ** 1.5);
+
+                if (fabs(dkl) > dtol) {
+                  aijkl = (xpnt[ib] + xpnt[jb]) * (xpnt
+
+--------------- Output 8 ---------------
+Here is a possible implementation of the Hartree-Fock operation in C with OpenACC:
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <openacc.h>
+
+#define sqrpi2 0.25
+#define rcut 12.0
+
+void hartree_fock(int nnnn, double *schwarz, double *xpnt, double *coef, double *geom, double *dens, double *fock) {
+  int ijkl, ij, kl, i, j, k, l, ib, jb, kb, lb;
+  double dij, aij, xij, yij, zij, dkl, akl, tt, f0t, eri, aijkl;
+
+  #pragma acc parallel loop private(ib, jb, kb, lb, ijkl, ij, i, j, kl, k, l, n, aij, dij, xij, yij, zij, akl, dkl, aijkl, tt, f0t, eri)
+  for (ijkl = 1; ijkl <= nnnn; ijkl++) {
+    // decompose triangular ijkl index into ij>=kl
+    ij = sqrt(2 * ijkl);
+    int n = (ij * ij + ij) / 2;
+    while (n < ijkl) {
+      ij++;
+      n = (ij * ij + ij) / 2;
+    }
+    kl = ijkl - (ij * ij - ij) / 2;
+
+    if (schwarz[ij] * schwarz[kl] > dtol) {
+      // decompose triangular ij index into i>=j
+      i = sqrt(2 * ij);
+      n = (i * i + i) / 2;
+      while (n < ij) {
+        i++;
+        n = (i * i + i) / 2;
+      }
+      j = ij - (i * i - i) / 2;
+
+      // decompose triangular kl index into k>=l
+      k = sqrt(2 * kl);
+      n = (k * k + k) / 2;
+      while (n < kl) {
+        k++;
+        n = (k * k + k) / 2;
+      }
+      l = kl - (k * k - k) / 2;
+
+      eri = 0.0;
+
+      for (ib = 1; ib <= ngauss; ib++) {
+        for (jb = 1; jb <= ngauss; jb++) {
+          aij = 1.0 / (xpnt[ib] + xpnt[jb]);
+          dij = coef[ib] * coef[jb] * exp(-xpnt[ib] * xpnt[jb] * aij * (
+              (geom[0] * i - geom[0] * j) * (geom[0] * i - geom[0] * j) +
+              (geom[1] * i - geom[1] * j) * (geom[1] * i - geom[1] * j) +
+              (geom[2] * i - geom[2] * j) * (geom[2] * i - geom[2] * j)
+          )) * (aij ** 1.5);
+
+          if (fabs(dij) > dtol) {
+            xij = aij * (xpnt[ib] * geom[0] * i + xpnt[jb] * geom[0] * j);
+            yij = aij * (xpnt[ib] * geom[1] * i + xpnt[jb] * geom[1] * j);
+            zij = aij * (xpnt[ib] * geom[2] * i + xpnt[jb] * geom[2] * j);
+
+            for (kb = 1; kb <= ngauss; kb++) {
+              for (lb = 1; lb <= ngauss; lb++) {
+                akl = 1.0 / (xpnt[kb] + xpnt[lb]);
+                dkl = dij * coef[kb] * coef[lb] * exp(-xpnt[kb] * xpnt[lb] * akl * (
+                    (geom[0] * k - geom[0] * l) * (geom[0] * k - geom[0] * l) +
+                    (geom[1] * k - geom[1] * l) * (geom[1] * k - geom[1] * l) +
+                    (geom[2] * k - geom[2] * l) * (geom[2] * k - geom[2] * l)
+                )) * (akl ** 1.5);
+
+                if (fabs(dkl) > dtol) {
+                  aijkl =
+
+--------------- Output 9 ---------------
+Here is a possible implementation of the Hartree-Fock operation in C with OpenACC:
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <openacc.h>
+
+#define sqrpi2 0.886226925452757
+#define rcut 16.0
+
+void hartree_fock(int nnnn, double *schwarz, double *xpnt, double *coef, double *geom, double *dens, double *fock) {
+  int ijkl, ij, kl, i, j, k, l, ib, jb, kb, lb;
+  double aij, dij, xij, yij, zij, akl, dkl, aijkl, tt, f0t, eri;
+
+  #pragma acc parallel loop private(ib, jb, kb, lb, ijkl, ij, i, j, kl, k, l, n, aij, dij, xij, yij, zij, akl, dkl, aijkl, tt, f0t, eri)
+  for (ijkl = 1; ijkl <= nnnn; ijkl++) {
+    // decompose triangular ijkl index into ij>=kl
+    ij = sqrt(2 * ijkl);
+    int n = (ij * ij + ij) / 2;
+    while (n < ijkl) {
+      ij++;
+      n = (ij * ij + ij) / 2;
+    }
+    kl = ijkl - (ij * ij - ij) / 2;
+
+    if (schwarz[ij] * schwarz[kl] > dtol) {
+      // decompose triangular ij index into i>=j
+      i = sqrt(2 * ij);
+      n = (i * i + i) / 2;
+      while (n < ij) {
+        i++;
+        n = (i * i + i) / 2;
+      }
+      j = ij - (i * i - i) / 2;
+
+      // decompose triangular kl index into k>=l
+      k = sqrt(2 * kl);
+      n = (k * k + k) / 2;
+      while (n < kl) {
+        k++;
+        n = (k * k + k) / 2;
+      }
+      l = kl - (k * k - k) / 2;
+
+      eri = 0.0;
+
+      #pragma acc loop private(ib, jb)
+      for (ib = 1; ib <= ngauss; ib++) {
+        for (jb = 1; jb <= ngauss; jb++) {
+          aij = 1.0 / (xpnt[ib] + xpnt[jb]);
+          dij = coef[ib] * coef[jb] * exp(-xpnt[ib] * xpnt[jb] * aij * (
+              (geom[0] * i - geom[0] * j) * (geom[0] * i - geom[0] * j) +
+              (geom[1] * i - geom[1] * j) * (geom[1] * i - geom[1] * j) +
+              (geom[2] * i - geom[2] * j) * (geom[2] * i - geom[2] * j)
+          )) * (aij ** 1.5);
+
+          if (abs(dij) > dtol) {
+            xij = aij * (xpnt[ib] * geom[0] * i + xpnt[jb] * geom[0] * j);
+            yij = aij * (xpnt[ib] * geom[1] * i + xpnt[jb] * geom[1] * j);
+            zij = aij * (xpnt[ib] * geom[2] * i + xpnt[jb] * geom[2] * j);
+
+            #pragma acc loop private(kb, lb)
+            for (kb = 1; kb <= ngauss; kb++) {
+              for (lb = 1; lb <= ngauss; lb++) {
+                akl = 1.0 / (xpnt[kb] + xpnt[lb]);
+                dkl = dij * coef[kb] * coef[lb] * exp(-xpnt[kb] * xpnt[lb] * akl * (
+                    (geom[0] * k - geom[0] * l) * (geom[0] * k - geom[0] * l) +
+                    (geom[1] * k - geom[1] * l) * (geom[1] * k - geom[1] * l) +
+                    (geom[2] * k - geom[2] * l) * (geom[2] * k - geom[2] * l)
+                )) *
+
+--------------- Output 10 ---------------
+Here is a possible implementation of the Hartree-Fock operation in C with OpenACC:
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <openacc.h>
+
+#define sqrpi2 0.282094791773878143
+#define rcut 16.0
+
+void hartree_fock(int nnnn, double *schwarz, double *xpnt, double *coef, double *geom, double *dens, double *fock) {
+  int ijkl, ij, kl, i, j, k, l, ib, jb, kb, lb;
+  double aij, dij, xij, yij, zij, akl, dkl, aijkl, tt, f0t, eri;
+
+  #pragma acc parallel loop private(ib, jb, kb, lb, ijkl, ij, i, j, kl, k, l, n, aij, dij, xij, yij, zij, akl, dkl, aijkl, tt, f0t, eri)
+  for (ijkl = 1; ijkl <= nnnn; ijkl++) {
+    // decompose triangular ijkl index into ij>=kl
+    ij = sqrt(2 * ijkl);
+    int n = (ij * ij + ij) / 2;
+    while (n < ijkl) {
+      ij++;
+      n = (ij * ij + ij) / 2;
+    }
+    kl = ijkl - (ij * ij - ij) / 2;
+
+    if (schwarz[ij] * schwarz[kl] > dtol) {
+      // decompose triangular ij index into i>=j
+      i = sqrt(2 * ij);
+      n = (i * i + i) / 2;
+      while (n < ij) {
+        i++;
+        n = (i * i + i) / 2;
+      }
+      j = ij - (i * i - i) / 2;
+
+      // decompose triangular kl index into k>=l
+      k = sqrt(2 * kl);
+      n = (k * k + k) / 2;
+      while (n < kl) {
+        k++;
+        n = (k * k + k) / 2;
+      }
+      l = kl - (k * k - k) / 2;
+
+      eri = 0.0;
+
+      for (ib = 1; ib <= ngauss; ib++) {
+        for (jb = 1; jb <= ngauss; jb++) {
+          aij = 1.0 / (xpnt[ib] + xpnt[jb]);
+          dij = coef[ib] * coef[jb] * exp(-xpnt[ib] * xpnt[jb] * aij *
+              ((geom[0] * i - geom[0] * j) * (geom[0] * i - geom[0] * j) +
+               (geom[1] * i - geom[1] * j) * (geom[1] * i - geom[1] * j) +
+               (geom[2] * i - geom[2] * j) * (geom[2] * i - geom[2] * j))) *
+              (aij ** 1.5);
+
+          if (abs(dij) > dtol) {
+            xij = aij * (xpnt[ib] * geom[0] * i + xpnt[jb] * geom[0] * j);
+            yij = aij * (xpnt[ib] * geom[1] * i + xpnt[jb] * geom[1] * j);
+            zij = aij * (xpnt[ib] * geom[2] * i + xpnt[jb] * geom[2] * j);
+
+            for (kb = 1; kb <= ngauss; kb++) {
+              for (lb = 1; lb <= ngauss; lb++) {
+                akl = 1.0 / (xpnt[kb] + xpnt[lb]);
+                dkl = dij * coef[kb] * coef[lb] * exp(-xpnt[kb] * xpnt[lb] * akl *
+                    ((geom[0] * k - geom[0] * l) * (geom[0] * k - geom[0] * l) +
+                     (geom[1] * k - geom[1] * l) * (geom[1] * k - geom[1] * l) +
+                     (geom[2] * k - geom[2] * l) * (geom[2] * k - geom[2] * l))) *
+                    (akl ** 1.5);
+
+                if (abs(dkl) > dtol) {
+                  aijkl
+

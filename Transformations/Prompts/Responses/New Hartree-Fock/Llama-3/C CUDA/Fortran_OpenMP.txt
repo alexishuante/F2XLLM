@@ -1,0 +1,659 @@
+--------------- Output 1 ---------------
+Here is a possible implementation of the Hartree-Fock operation in C with CUDA:
+#include <cuda_runtime.h>
+#include <cusolver_dense.h>
+
+#define NGAUSS  ...
+#define NNNN   ...
+
+__global__ void hartreeFockKernel(double *fock, double *dens, double *xpnt, double *geom, double *coef, double *schwarz, double dtol, double rcut) {
+  int ijkl = blockIdx.x * blockDim.x + threadIdx.x;
+  if (ijkl >= NNNN) return;
+
+  // Decompose triangular ijkl index into ij>=kl
+  int ij = sqrt(2 * ijkl);
+  int n = (ij * ij + ij) / 2;
+  while (n < ijkl) {
+    ij++;
+    n = (ij * ij + ij) / 2;
+  }
+  int kl = ijkl - (ij * ij - ij) / 2;
+
+  // ... (rest of the kernel implementation)
+}
+
+int main() {
+  // Allocate device memory
+  double *fock, *dens, *xpnt, *geom, *coef, *schwarz;
+  cudaMalloc((void **)&fock, NNNN * sizeof(double));
+  cudaMalloc((void **)&dens, NNNN * sizeof(double));
+  cudaMalloc((void **)&xpnt, NGAUSS * sizeof(double));
+  cudaMalloc((void **)&geom, 3 * NNNN * sizeof(double));
+  cudaMalloc((void **)&coef, NGAUSS * sizeof(double));
+  cudaMalloc((void **)&schwarz, NNNN * sizeof(double));
+
+  // Initialize device memory
+  // ...
+
+  // Launch kernel
+  int blockSize = 256;
+  int numBlocks = (NNNN + blockSize - 1) / blockSize;
+  hartreeFockKernel<<<numBlocks, blockSize>>>(fock, dens, xpnt, geom, coef, schwarz, dtol, rcut);
+
+  // Synchronize and check for errors
+  cudaDeviceSynchronize();
+  cudaError_t error = cudaGetLastError();
+  if (error != cudaSuccess) {
+    printf("Error: %s\n", cudaGetErrorString(error));
+    return 1;
+  }
+
+  // Copy result back to host
+  double *fock_host = (double *)malloc(NNNN * sizeof(double));
+  cudaMemcpy(fock_host, fock, NNNN * sizeof(double), cudaMemcpyDeviceToHost);
+
+  // Use the result
+  // ...
+
+  // Free device memory
+  cudaFree(fock);
+  cudaFree(dens);
+  cudaFree(xpnt);
+  cudaFree(geom);
+  cudaFree(coef);
+  cudaFree(schwarz);
+
+  return 0;
+}
+Note that this is a simplified example and you may need to modify it to suit your specific use case. Additionally, you will need to implement the hartreeFockKernel function to perform the actual computation.
+
+--------------- Output 2 ---------------
+Here is a possible implementation of the Hartree-Fock operation in C with CUDA:
+#include <cuda_runtime.h>
+#include <cusparse.h>
+
+#define NGAUSS  ...
+#define NN  ...
+
+// Kernel function
+__global__ void hartreeFockKernel(double *fock, double *dens, double *xpnt, double *geom, double *coef, double *schwarz, int nnnn) {
+  int ijkl = blockIdx.x * blockDim.x + threadIdx.x;
+  if (ijkl >= nnnn) return;
+
+  // Decompose triangular ijkl index into ij>=kl
+  int ij = sqrt(2 * ijkl);
+  int n = (ij * ij + ij) / 2;
+  while (n < ijkl) {
+    ij++;
+    n = (ij * ij + ij) / 2;
+  }
+  int kl = ijkl - (ij * ij - ij) / 2;
+
+  // Compute eri and update fock matrix
+  ...
+}
+
+int main() {
+  // Allocate memory on host
+  double *fock, *dens, *xpnt, *geom, *coef, *schwarz;
+  cudaMallocHost((void **)&fock, NN * NN * sizeof(double));
+  cudaMallocHost((void **)&dens, NN * NN * sizeof(double));
+  cudaMallocHost((void **)&xpnt, NGAUSS * sizeof(double));
+  cudaMallocHost((void **)&geom, 3 * NN * sizeof(double));
+  cudaMallocHost((void **)&coef, NGAUSS * sizeof(double));
+  cudaMallocHost((void **)&schwarz, NN * sizeof(double));
+
+  // Allocate memory on device
+  double *d_fock, *d_dens, *d_xpnt, *d_geom, *d_coef, *d_schwarz;
+  cudaMalloc((void **)&d_fock, NN * NN * sizeof(double));
+  cudaMalloc((void **)&d_dens, NN * NN * sizeof(double));
+  cudaMalloc((void **)&d_xpnt, NGAUSS * sizeof(double));
+  cudaMalloc((void **)&d_geom, 3 * NN * sizeof(double));
+  cudaMalloc((void **)&d_coef, NGAUSS * sizeof(double));
+  cudaMalloc((void **)&d_schwarz, NN * sizeof(double));
+
+  // Copy data from host to device
+  cudaMemcpy(d_fock, fock, NN * NN * sizeof(double), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_dens, dens, NN * NN * sizeof(double), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_xpnt, xpnt, NGAUSS * sizeof(double), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_geom, geom, 3 * NN * sizeof(double), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_coef, coef, NGAUSS * sizeof(double), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_schwarz, schwarz, NN * sizeof(double), cudaMemcpyHostToDevice);
+
+  // Launch kernel
+  int blockSize = 256;
+  int numBlocks = (nnnn + blockSize - 1) / blockSize;
+  hartreeFockKernel<<<numBlocks, blockSize>>>(d_fock, d_dens, d_xpnt, d_geom, d_coef, d_schwarz, nnnn);
+
+  // Copy result from device to host
+  cudaMemcpy(fock, d_fock, NN * NN * sizeof(double), cudaMemcpyDeviceToHost);
+
+  // Free memory
+  cudaFreeHost(fock);
+  cudaFreeHost(dens);
+  cudaFreeHost(xpnt);
+  cudaFreeHost(geom);
+  cudaFreeHost(coef);
+  cudaFreeHost(schwarz);
+  cudaFree(d_fock);
+  cudaFree(d_dens);
+  cudaFree(d_xpnt);
+  cudaFree(d_geom);
+  cudaFree(d_coef);
+  cudaFree(d_schwarz);
+
+  return 0;
+}
+Note that this is a simplified example and you may need to modify it to suit your specific use case. Additionally, you will need to include the necessary CUDA libraries and headers, and ensure that your system is properly configured for CUDA development.
+Also, the above code is a simple example of how to parallelize the Hartree-Fock operation using CUDA. You may need to optimize the kernel function and memory access patterns to achieve better performance.
+
+--------------- Output 3 ---------------
+Here is a sample implementation of the Hartree-Fock operation in C with CUDA:
+#include <cuda_runtime.h>
+#include <stdio.h>
+
+#define NGAUSS  ...
+#define NNNN   ...
+
+__global__ void hartreeFockKernel(double *fock, double *dens, double *xpnt, double *geom, double *coef, double dtol, double rcut) {
+  int ijkl = blockIdx.x * blockDim.x + threadIdx.x;
+  if (ijkl >= NNNN) return;
+
+  // Decompose triangular ijkl index into ij>=kl
+  int ij = sqrt(2 * ijkl);
+  int n = (ij * ij + ij) / 2;
+  while (n < ijkl) {
+    ij++;
+    n = (ij * ij + ij) / 2;
+  }
+  int kl = ijkl - (ij * ij - ij) / 2;
+
+  // ... (rest of the kernel implementation)
+}
+
+int main() {
+  // Allocate arrays on host
+  double *fock, *dens, *xpnt, *geom, *coef;
+
+  // Allocate arrays on device
+  double *d_fock, *d_dens, *d_xpnt, *d_geom, *d_coef;
+
+  // Initialize arrays on host
+  // ...
+
+  // Copy arrays from host to device
+  cudaMemcpy(d_fock, fock, sizeof(double) * NNNN, cudaMemcpyHostToDevice);
+  cudaMemcpy(d_dens, dens, sizeof(double) * NNNN, cudaMemcpyHostToDevice);
+  cudaMemcpy(d_xpnt, xpnt, sizeof(double) * NGAUSS, cudaMemcpyHostToDevice);
+  cudaMemcpy(d_geom, geom, sizeof(double) * 3 * NNNN, cudaMemcpyHostToDevice);
+  cudaMemcpy(d_coef, coef, sizeof(double) * NGAUSS, cudaMemcpyHostToDevice);
+
+  // Launch kernel
+  int blockSize = 256;
+  int numBlocks = (NNNN + blockSize - 1) / blockSize;
+  hartreeFockKernel<<<numBlocks, blockSize>>>(d_fock, d_dens, d_xpnt, d_geom, d_coef, dtol, rcut);
+
+  // Copy result from device to host
+  cudaMemcpy(fock, d_fock, sizeof(double) * NNNN, cudaMemcpyDeviceToHost);
+
+  // Free device memory
+  cudaFree(d_fock);
+  cudaFree(d_dens);
+  cudaFree(d_xpnt);
+  cudaFree(d_geom);
+  cudaFree(d_coef);
+
+  return 0;
+}
+Note that this is a simplified example and you may need to modify it to fit your specific use case. Additionally, you will need to implement the kernel function hartreeFockKernel to perform the actual computation.
+
+--------------- Output 4 ---------------
+Here's a simple implementation of the Hartree-Fock operation in C with CUDA:
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+
+#define N 100
+#define BLOCK_SIZE 16
+
+__global__ void hartreeFockKernel(double *fock, double *dens, double *xpnt, double *geom, int *ngauss, int *schwarz, double *dtol, double *rcut) {
+    int ijkl = blockIdx.x * blockDim.x + threadIdx.x;
+    int ij, kl, i, j, k, l, n;
+    double aij, dij, xij, yij, zij, akl, dkl, aijkl, tt, f0t, eri;
+
+    // Decompose triangular ijkl index into ij>=kl
+    ij = sqrt(2 * ijkl);
+    n = (ij * ij + ij) / 2;
+    while (n < ijkl) {
+        ij = ij + 1;
+        n = (ij * ij + ij) / 2;
+    }
+    kl = ijkl - (ij * ij - ij) / 2;
+
+    // Compute Hartree-Fock operation
+    if (schwarz[ij] * schwarz[kl] > *dtol) {
+        // Decompose triangular ij index into i>=j
+        i = sqrt(2 * ij);
+        n = (i * i + i) / 2;
+        while (n < ij) {
+            i = i + 1;
+            n = (i * i + i) / 2;
+        }
+        j = ij - (i * i - i) / 2;
+
+        // Decompose triangular kl index into k>=l
+        k = sqrt(2 * kl);
+        n = (k * k + k) / 2;
+        while (n < kl) {
+            k = k + 1;
+            n = (k * k + k) / 2;
+        }
+        l = kl - (k * k - k) / 2;
+
+        eri = 0.0;
+        for (int ib = 0; ib < *ngauss; ib++) {
+            for (int jb = 0; jb < *ngauss; jb++) {
+                aij = 1.0 / (xpnt[ib] + xpnt[jb]);
+                dij = coef[ib] * coef[jb] * exp(-xpnt[ib] * xpnt[jb] * aij * (
+                    (geom[0] * i - geom[0] * j) * (geom[0] * i - geom[0] * j) +
+                    (geom[1] * i - geom[1] * j) * (geom[1] * i - geom[1] * j) +
+                    (geom[2] * i - geom[2] * j) * (geom[2] * i - geom[2] * j)
+                )) * (aij ** 1.5);
+
+                if (fabs(dij) > *dtol) {
+                    xij = aij * (xpnt[ib] * geom[0] * i + xpnt[jb] * geom[0] * j);
+                    yij = aij * (xpnt[ib] * geom[1] * i + xpnt[jb] * geom[1] * j);
+                    zij = aij * (xpnt[ib] * geom[2] * i + xpnt[jb] * geom[2] * j);
+
+                    for (int kb = 0; kb < *ngauss; kb++) {
+                        for (int lb = 0; lb < *ngauss; lb++) {
+                            akl = 1.0 / (xpnt[kb] + xpnt[lb]);
+                            dkl = dij * coef[kb] * coef[lb] * exp(-xpnt[kb] * xpnt[lb] * akl * (
+                                (geom[0] * k - geom[0] * l) * (geom[0] * k - geom[0] * l) +
+                                (geom[1] * k - geom[1] * l) * (geom[1] * k - geom[1] * l) +
+                                (geom[2] * k - geom[2] * l) * (geom[2] * k - geom[2] * l)
+                            )) * (akl ** 1.5);
+
+                            if (fabs(dkl) > *dtol) {
+                                aijkl = (xpnt[ib] + xpnt[jb]) * (xpnt[kb] + xpnt[lb]) / (xpnt[ib] + xpnt[jb] + xpnt[kb] + xp
+
+--------------- Output 5 ---------------
+Here is a simple implementation of the Hartree-Fock operation in C with CUDA:
+#include <stdio.h>
+#include <math.h>
+
+#define N 10
+#define ngauss 10
+
+__global__ void hartreeFockKernel(double *fock, double *dens, double *xpnt, double *geom, double *coef, double dtol, double rcut) {
+    int ijkl = blockIdx.x * blockDim.x + threadIdx.x;
+    int ij, kl, i, j, k, l, ib, jb, kb, lb;
+    double aij, dij, xij, yij, zij, akl, dkl, aijkl, tt, f0t, eri;
+
+    if (ijkl >= N) return;
+
+    // decompose triangular ijkl index into ij>=kl
+    ij = sqrt(2 * ijkl);
+    int n = (ij * ij + ij) / 2;
+    while (n < ijkl) {
+        ij++;
+        n = (ij * ij + ij) / 2;
+    }
+    kl = ijkl - (ij * ij - ij) / 2;
+
+    if (schwarz(ij) * schwarz(kl) > dtol) {
+        // decompose triangular ij index into i>=j
+        i = sqrt(2 * ij);
+        n = (i * i + i) / 2;
+        while (n < ij) {
+            i++;
+            n = (i * i + i) / 2;
+        }
+        j = ij - (i * i - i) / 2;
+
+        // decompose triangular kl index into k>=l
+        k = sqrt(2 * kl);
+        n = (k * k + k) / 2;
+        while (n < kl) {
+            k++;
+            n = (k * k + k) / 2;
+        }
+        l = kl - (k * k - k) / 2;
+
+        eri = 0.0;
+        for (ib = 0; ib < ngauss; ib++) {
+            for (jb = 0; jb < ngauss; jb++) {
+                aij = 1.0 / (xpnt[ib] + xpnt[jb]);
+                dij = coef[ib] * coef[jb] * exp(-xpnt[ib] * xpnt[jb] * aij * (
+                    (geom[0] * i - geom[0] * j) * (geom[0] * i - geom[0] * j) +
+                    (geom[1] * i - geom[1] * j) * (geom[1] * i - geom[1] * j) +
+                    (geom[2] * i - geom[2] * j) * (geom[2] * i - geom[2] * j)
+                )) * (aij ** 1.5);
+                if (abs(dij) > dtol) {
+                    xij = aij * (xpnt[ib] * geom[0] * i + xpnt[jb] * geom[0] * j);
+                    yij = aij * (xpnt[ib] * geom[1] * i + xpnt[jb] * geom[1] * j);
+                    zij = aij * (xpnt[ib] * geom[2] * i + xpnt[jb] * geom[2] * j);
+                    for (kb = 0; kb < ngauss; kb++) {
+                        for (lb = 0; lb < ngauss; lb++) {
+                            akl = 1.0 / (xpnt[kb] + xpnt[lb]);
+                            dkl = dij * coef[kb] * coef[lb] * exp(-xpnt[kb] * xpnt[lb] * akl * (
+                                (geom[0] * k - geom[0] * l) * (geom[0] * k - geom[0] * l) +
+                                (geom[1] * k - geom[1] * l) * (geom[1] * k - geom[1] * l) +
+                                (geom[2] * k - geom[2] * l) * (geom[2] * k - geom[2] * l)
+                            )) * (akl ** 1.5);
+                            if (abs(dkl) > dtol) {
+                                aijkl = (xpnt[ib] + xpnt[jb]) * (xpnt[kb] + xpnt[lb]) /
+                                    (xpnt[ib] + xpnt[jb] + xpnt[kb] + xpnt[lb]);
+                                tt = aijkl * (
+                                    (xij - akl * (xpnt[kb] * geom[0] *
+
+--------------- Output 6 ---------------
+Here is a possible implementation of the Hartree-Fock operation in C with CUDA:
+#include <cuda_runtime.h>
+#include <cusolver_dn.h>
+
+#define NGAUSS  ...
+#define NNNN   ...
+
+__global__ void hartreeFockKernel(double *fock, double *dens, double *xpnt, double *geom, double *coef, double *schwarz, int ngauss, int nnnn) {
+  int ijkl = blockIdx.x * blockDim.x + threadIdx.x;
+  if (ijkl >= nnnn) return;
+
+  // Decompose triangular ijkl index into ij>=kl
+  int ij = sqrt(2 * ijkl);
+  int n = (ij * ij + ij) / 2;
+  while (n < ijkl) {
+    ij++;
+    n = (ij * ij + ij) / 2;
+  }
+  int kl = ijkl - (ij * ij - ij) / 2;
+
+  // ... (rest of the kernel implementation)
+}
+
+int main() {
+  // Allocate memory on host
+  double *fock, *dens, *xpnt, *geom, *coef, *schwarz;
+  cudaMalloc((void **)&fock, NNNN * sizeof(double));
+  cudaMalloc((void **)&dens, NNNN * sizeof(double));
+  cudaMalloc((void **)&xpnt, NGAUSS * sizeof(double));
+  cudaMalloc((void **)&geom, 3 * NGAUSS * sizeof(double));
+  cudaMalloc((void **)&coef, NGAUSS * sizeof(double));
+  cudaMalloc((void **)&schwarz, NNNN * sizeof(double));
+
+  // Initialize data on host
+  // ...
+
+  // Launch kernel
+  int blockSize = 256;
+  int numBlocks = (NNNN + blockSize - 1) / blockSize;
+  hartreeFockKernel<<<numBlocks, blockSize>>>(fock, dens, xpnt, geom, coef, schwarz, ngauss, nnnn);
+
+  // Synchronize and check for errors
+  cudaDeviceSynchronize();
+  cudaError_t err = cudaGetLastError();
+  if (err != cudaSuccess) {
+    printf("Error: %s\n", cudaGetErrorString(err));
+    return 1;
+  }
+
+  // Copy result back to host
+  cudaMemcpy(fock_host, fock, NNNN * sizeof(double), cudaMemcpyDeviceToHost);
+
+  return 0;
+}
+Note that this implementation uses the CUDA runtime API and assumes that the necessary libraries (e.g. cusolver_dn) are available. Additionally, the kernel implementation is not complete and requires the rest of the code to be implemented similarly to the Fortran version.
+Also, please note that the Fortran code uses OpenMP directives to parallelize the loop, while the CUDA implementation uses a GPU kernel to parallelize the computation. The two approaches are different and require different programming models.
+
+--------------- Output 7 ---------------
+Here is a possible implementation of the Hartree-Fock operation in C with CUDA:
+#include <cuda_runtime.h>
+#include <cusolver_dn.h>
+
+#define NGAUSS  ...
+#define NNNN   ...
+
+__global__ void hartreeFockKernel(double *fock, double *dens, double *xpnt, double *geom, double *coef, double *schwarz, double dtol, double rcut) {
+  int ijkl = blockIdx.x * blockDim.x + threadIdx.x;
+  if (ijkl >= NNNN) return;
+
+  // decompose triangular ijkl index into ij>=kl
+  int ij = sqrt(2 * ijkl);
+  int n = (ij * ij + ij) / 2;
+  while (n < ijkl) {
+    ij++;
+    n = (ij * ij + ij) / 2;
+  }
+  int kl = ijkl - (ij * ij - ij) / 2;
+
+  if (schwarz[ij] * schwarz[kl] > dtol) {
+    // ... (rest of the kernel implementation)
+  }
+}
+
+int main() {
+  // Allocate memory on host
+  double *fock, *dens, *xpnt, *geom, *coef, *schwarz;
+
+  // Allocate memory on device
+  double *d_fock, *d_dens, *d_xpnt, *d_geom, *d_coef, *d_schwarz;
+  cudaMalloc((void **)&d_fock, NNNN * sizeof(double));
+  cudaMalloc((void **)&d_dens, NNNN * sizeof(double));
+  cudaMalloc((void **)&d_xpnt, NGAUSS * sizeof(double));
+  cudaMalloc((void **)&d_geom, 3 * NNNN * sizeof(double));
+  cudaMalloc((void **)&d_coef, NGAUSS * sizeof(double));
+  cudaMalloc((void **)&d_schwarz, NNNN * sizeof(double));
+
+  // Copy data from host to device
+  cudaMemcpy(d_fock, fock, NNNN * sizeof(double), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_dens, dens, NNNN * sizeof(double), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_xpnt, xpnt, NGAUSS * sizeof(double), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_geom, geom, 3 * NNNN * sizeof(double), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_coef, coef, NGAUSS * sizeof(double), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_schwarz, schwarz, NNNN * sizeof(double), cudaMemcpyHostToDevice);
+
+  // Launch kernel
+  int blockSize = 256;
+  int numBlocks = (NNNN + blockSize - 1) / blockSize;
+  hartreeFockKernel<<<numBlocks, blockSize>>>(d_fock, d_dens, d_xpnt, d_geom, d_coef, d_schwarz, dtol, rcut);
+
+  // Copy result from device to host
+  cudaMemcpy(fock, d_fock, NNNN * sizeof(double), cudaMemcpyDeviceToHost);
+
+  // Free memory on device
+  cudaFree(d_fock);
+  cudaFree(d_dens);
+  cudaFree(d_xpnt);
+  cudaFree(d_geom);
+  cudaFree(d_coef);
+  cudaFree(d_schwarz);
+
+  return 0;
+}
+Note that this is a simplified example and you may need to modify it to fit your specific use case. Additionally, you will need to include the necessary CUDA headers and libraries, as well as any additional dependencies required by your application.
+Also, the hartreeFockKernel function is not fully implemented, you need to complete it based on the Fortran code you provided.
+It's important to note that the CUDA kernel is launched in parallel, so you need to make sure that the memory access is done in a way that is safe for parallel execution.
+You can use the cudaMemcpy function to copy data between the host and device, and the cudaMalloc function to allocate memory on the device.
+You can use the cusolver_dn library to perform the linear algebra operations on the device.
+Please let me know if you need more help.
+
+--------------- Output 8 ---------------
+Here's a possible implementation of the Hartree-Fock operation in C with CUDA:
+#include <cuda_runtime.h>
+#include <stdio.h>
+
+#define NGAUSS  ...
+#define NNNN   ...
+
+// Device functions
+__device__ double sqrpi2 = 1.0 / sqrt(2.0 * M_PI);
+__device__ double schwarz(int ij) { ... }
+__device__ double coef(int ib) { ... }
+__device__ double xpnt(int ib) { ... }
+__device__ double geom(int i, int j) { ... }
+
+__global__ void hartreeFockKernel(double *fock, double *dens, int *ngauss, int *nnnn) {
+  int ijkl = blockIdx.x * blockDim.x + threadIdx.x;
+  if (ijkl >= *nnnn) return;
+
+  // Decompose triangular ijkl index into ij>=kl
+  int ij = sqrt(2 * ijkl);
+  int n = (ij * ij + ij) / 2;
+  while (n < ijkl) {
+    ij++;
+    n = (ij * ij + ij) / 2;
+  }
+  int kl = ijkl - (ij * ij - ij) / 2;
+
+  // Compute eri and update fock matrix
+  if (schwarz(ij) * schwarz(kl) > dtol) {
+    // ... (rest of the computation)
+  }
+}
+
+int main() {
+  // Allocate memory on host
+  double *fock, *dens;
+  int *ngauss, *nnnn;
+  cudaMalloc((void **)&fock, sizeof(double) * NNNN);
+  cudaMalloc((void **)&dens, sizeof(double) * NNNN);
+  cudaMalloc((void **)&ngauss, sizeof(int));
+  cudaMalloc((void **)&nnnn, sizeof(int));
+
+  // Initialize data on host
+  ...
+
+  // Copy data to device
+  cudaMemcpy(ngauss, &ngauss, sizeof(int), cudaMemcpyHostToDevice);
+  cudaMemcpy(nnnn, &nnnn, sizeof(int), cudaMemcpyHostToDevice);
+  cudaMemcpy(fock, &fock, sizeof(double) * NNNN, cudaMemcpyHostToDevice);
+  cudaMemcpy(dens, &dens, sizeof(double) * NNNN, cudaMemcpyHostToDevice);
+
+  // Launch kernel
+  int blockSize = 256;
+  int numBlocks = (NNNN + blockSize - 1) / blockSize;
+  hartreeFockKernel<<<numBlocks, blockSize>>>(fock, dens, ngauss, nnnn);
+
+  // Copy result back to host
+  cudaMemcpy(&fock, fock, sizeof(double) * NNNN, cudaMemcpyDeviceToHost);
+
+  // Free memory on device
+  cudaFree(fock);
+  cudaFree(dens);
+  cudaFree(ngauss);
+  cudaFree(nnnn);
+
+  return 0;
+}
+Note that this implementation assumes that the schwarz, coef, xpnt, and geom functions are implemented as device functions, and that the fock and dens arrays are already allocated and initialized on the host. Additionally, the ngauss and nnnn variables are assumed to be already defined on the host.
+Also, the hartreeFockKernel function is launched with a block size of 256 and a number of blocks that depends on the size of the NNNN array. You may need to adjust these parameters to achieve optimal performance on your specific hardware.
+It's important to note that this is a simplified example, you may need to add more functionality to the kernel and the main function to match the original Fortran code.
+
+--------------- Output 9 ---------------
+Here is a possible implementation of the Hartree-Fock operation in C with CUDA:
+#include <cuda_runtime.h>
+#include <cusolver_dn.h>
+
+#define NGAUSS  ...
+#define DTOL  ...
+#define RCUT  ...
+
+__global__ void hartreeFockKernel(double *fock, double *dens, double *xpnt, double *geom, int *schwarz, int nnnn) {
+  int ijkl = blockIdx.x * blockDim.x + threadIdx.x;
+  if (ijkl >= nnnn) return;
+
+  int ij, kl, i, j, k, l, ib, jb, kb, lb;
+  double aij, dij, xij, yij, zij, akl, dkl, aijkl, tt, f0t, eri;
+
+  // Decompose triangular indices
+  ij = sqrt(2 * ijkl);
+  kl = ijkl - (ij * ij - ij) / 2;
+  i = sqrt(2 * ij);
+  j = ij - (i * i - i) / 2;
+  k = sqrt(2 * kl);
+  l = kl - (k * k - k) / 2;
+
+  // Compute ERIs
+  eri = 0.0;
+  for (ib = 0; ib < NGAUSS; ib++) {
+    for (jb = 0; jb < NGAUSS; jb++) {
+      aij = 1.0 / (xpnt[ib] + xpnt[jb]);
+      dij = coef[ib] * coef[jb] * exp(-xpnt[ib] * xpnt[jb] * aij * (
+        (geom[0][i] - geom[0][j]) * (geom[0][i] - geom[0][j]) +
+        (geom[1][i] - geom[1][j]) * (geom[1][i] - geom[1][j]) +
+        (geom[2][i] - geom[2][j]) * (geom[2][i] - geom[2][j])
+      )) * (aij ** 1.5);
+      if (abs(dij) > DTOL) {
+        xij = aij * (xpnt[ib] * geom[0][i] + xpnt[jb] * geom[0][j]);
+        yij = aij * (xpnt[ib] * geom[1][i] + xpnt[jb] * geom[1][j]);
+        zij = aij * (xpnt[ib] * geom[2][i] + xpnt[jb] * geom[2][j]);
+        for (kb = 0; kb < NGAUSS; kb++) {
+          for (lb = 0; lb < NGAUSS; lb++) {
+            akl = 1.0 / (xpnt[kb] + xpnt[lb]);
+            dkl = dij * coef[kb] * coef[lb] * exp(-xpnt[kb] * xpnt[lb] * akl * (
+              (geom[0][k] - geom[0][l]) * (geom[0][k] - geom[0][l]) +
+              (geom[1][k] - geom[1][l]) * (geom[1][k] - geom[1][l]) +
+              (geom[2][k] - geom[2][l]) * (geom[2][k] - geom[2][l])
+            )) * (akl ** 1.5);
+            if (abs(dkl) > DTOL) {
+              aijkl = (xpnt[ib] + xpnt[jb]) * (xpnt[kb] + xpnt[lb]) /
+                (xpnt[ib] + xpnt[jb] + xpnt[kb] + xpnt[lb]);
+              tt = aijkl * (
+                (xij - akl * (xpnt[kb] * geom[0][k] + xpnt[lb] * geom[0][l])) * 
+                (xij - akl * (xpnt[kb] * geom[0][k] + xpnt[lb] * geom[0][l])) +
+                (yij - akl * (xpnt[kb] * geom[1][k] + xpnt[lb] * geom[1][l])) * 
+                (yij - akl * (xpnt[kb] * geom[1][k] + xpnt[lb] * geom[1][l])) +
+                (zij - akl * (xpnt[kb] * geom[2][k] + xpnt[lb] * geom[2][l])) * 
+                (zij - akl
+
+--------------- Output 10 ---------------
+Here's a possible implementation of the Hartree-Fock operation in C with CUDA:
+#include <cuda_runtime.h>
+#include <cusolver_dense.h>
+
+// Define the number of threads per block
+#define NUM_THREADS 256
+
+// Define the CUDA kernel for the Hartree-Fock operation
+__global__ void hartreeFockKernel(double *fock, double *dens, double *xpnt, double *geom, int ngauss, int nnnn) {
+  int ijkl = blockIdx.x * blockDim.x + threadIdx.x;
+  if (ijkl >= nnnn) return;
+
+  // Decompose triangular ijkl index into ij>=kl
+  int ij = sqrt(2 * ijkl);
+  int n = (ij * ij + ij) / 2;
+  while (n < ijkl) {
+    ij++;
+    n = (ij * ij + ij) / 2;
+  }
+  int kl = ijkl - (ij * ij - ij) / 2;
+
+  // Compute the Hartree-Fock integral
+  double eri = 0.0;
+  for (int ib = 0; ib < ngauss; ib++) {
+    for (int jb = 0; jb < ngauss; jb++) {
+      double aij = 1.0 / (xpnt[ib] + xpnt[jb]);
+      double dij = coef[ib] * coef[jb] * exp(-xpnt[ib] * xpnt[jb] * aij * (
+          (geom[0][i] - geom[0][j]) * (geom[0][i] - geom[0][j]) +
+          (geom[1][i] - geom[1][j]) * (geom[1][i] - geom[1][j]) +
+          (geom[2][i] - geom[2][j]) * (geom[2][i] - geom[2][j])) * (aij ** 1.5);
+      if (abs(dij) > dtol) {
+        double xij = aij * (xpnt[ib] * geom[0][i] + xpnt[jb] * geom[0][j]);
+        double yij = aij * (xpnt[ib] * geom[1][i] + xpnt[jb] * geom[1][j]);
+        double zij = aij * (xpnt[ib] * geom[2][i] + xpnt[jb] * geom[2][j]);
+        for (int kb = 0; kb < ngauss; kb++) {
+          for (int lb = 0; lb < ngauss; lb++) {
+            double akl = 1.0 / (xpnt[kb] + xpnt[lb]);
+            double dkl = dij * coef[kb] * coef[lb] * exp(-xpnt[kb] * xpnt[lb] * akl * (
+                (geom[0][k] - geom[0][l]) * (geom[0][k] - geom[0][l]) +
+                (geom[1][k] - geom[1][l]) * (geom[1][k] - geom[1][l]) +
+                (geom[2][k] - geom[2][l]) * (geom[2][k] - geom[2][l])) * (akl ** 1.5);
+            if (abs(dkl) > dtol) {
+              double aijkl = (xpnt[ib] + xpnt[jb]) * (xpnt[kb] + xpnt[lb]) /
+                  (xpnt[ib] + xpnt[jb] + xpnt[kb] + xpnt[lb]);
+              double tt = aijkl * ((xij - akl * (xpnt[kb] * geom[0][k] + xpnt[lb] * geom[0][l])) * (xij - akl * (xpnt[kb] * geom[0][k] + xpnt[lb] * geom[0][l])) +
+                  (yij - akl * (xpnt[kb] * geom[1][k] + xpnt[lb] * geom[1][l])) * (yij - akl * (xpnt[kb] * geom[1][k] + xpnt[lb] * geom[1][l])) +
+                  (zij - akl * (xpnt[kb] * geom[2][k] + xpnt[lb] * geom[2][l])) * (zij - akl * (xpnt[kb] * geom[2][k] + xpnt[lb] * geom[2][l])));
+              double f0t = sqrpi2;
+              if (tt > rcut) f
+
