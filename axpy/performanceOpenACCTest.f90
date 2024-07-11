@@ -75,7 +75,7 @@
 PROGRAM main
     USE iso_c_binding, ONLY: C_LONG_LONG
     IMPLICIT NONE
-    INTEGER, PARAMETER :: n = 1000000000
+    INTEGER, PARAMETER :: n = 925000000
     REAL(KIND=8), DIMENSION(n) :: x, y
     REAL(KIND=8) :: a
     INTEGER :: count_max
@@ -100,6 +100,7 @@ PROGRAM main
     ! Transfer data to device once
     !$acc data copyin(x, a) create(y)
     DO i = 1, count_max
+        y = 0.0
         CALL system_clock(count_rate=count_rate)
         CALL system_clock(start_count)
         CALL saxpy(n, a, x, y)
