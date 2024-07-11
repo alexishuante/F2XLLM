@@ -3,7 +3,7 @@ program main
     use openacc
     implicit none
     integer, parameter :: niter = 10
-    integer :: n = 1000  ! Adjusted dimension size
+    integer :: n = 975  ! Adjusted dimension size
     real(kind=8), allocatable, dimension(:,:,:) :: u, unew
     integer :: i, j, k, iter
     integer :: count_max

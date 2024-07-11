@@ -61,7 +61,7 @@
 program test_gemv_parallel
     USE iso_c_binding, ONLY: C_LONG_LONG
     implicit none
-    integer, parameter :: n = 44720
+    integer, parameter :: n = 43346
     REAL(KIND=8) :: A(n, n), x(n), y(n)
     INTEGER :: i
     INTEGER :: count_max
