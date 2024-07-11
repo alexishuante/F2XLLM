@@ -1,0 +1,364 @@
+--------------- Output 1 ---------------
+Here is a possible implementation of the SpMV operation in C with CUDA:
+#include <cuda_runtime.h>
+
+__global__ void spmv_kernel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n) {
+    float sum = 0.0;
+    for (int j = row[i]; j < row[i+1]; j++) {
+      sum += val[j] * x[col[j]];
+    }
+    y[i] = sum;
+  }
+}
+
+void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+  int blockSize = 256;
+  int numBlocks = (n + blockSize - 1) / blockSize;
+  spmv_kernel<<<numBlocks, blockSize>>>(n, nnz, val, row, col, x, y);
+  cudaDeviceSynchronize();
+}
+Note that this implementation assumes that the input matrices and vectors are already stored in device memory (i.e., on the GPU). If they are not, you will need to add code to transfer them to the device before calling the kernel.
+Also, this is just one possible implementation, and there are many ways to optimize and customize the code for specific use cases.
+
+--------------- Output 2 ---------------
+Here is a possible implementation of the SpMV operation in C with CUDA:
+#include <cuda_runtime.h>
+
+__global__ void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n) {
+    float sum = 0.0;
+    for (int j = row[i]; j < row[i+1]; j++) {
+      sum += val[j] * x[col[j]];
+    }
+    y[i] = sum;
+  }
+}
+
+void spmv_cuda(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+  int blockSize = 256;
+  int numBlocks = (n + blockSize - 1) / blockSize;
+  float *d_val, *d_x, *d_y;
+  int *d_row, *d_col;
+
+  cudaMalloc((void **)&d_val, nnz * sizeof(float));
+  cudaMalloc((void **)&d_x, n * sizeof(float));
+  cudaMalloc((void **)&d_y, n * sizeof(float));
+  cudaMalloc((void **)&d_row, (n+1) * sizeof(int));
+  cudaMalloc((void **)&d_col, nnz * sizeof(int));
+
+  cudaMemcpy(d_val, val, nnz * sizeof(float), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_x, x, n * sizeof(float), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_row, row, (n+1) * sizeof(int), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_col, col, nnz * sizeof(int), cudaMemcpyHostToDevice);
+
+  spmv_parallel<<<numBlocks, blockSize>>>(n, nnz, d_val, d_row, d_col, d_x, d_y);
+
+  cudaMemcpy(y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
+
+  cudaFree(d_val);
+  cudaFree(d_x);
+  cudaFree(d_y);
+  cudaFree(d_row);
+  cudaFree(d_col);
+}
+Note that this implementation assumes that the input matrix is stored in the CSR (Compressed Sparse Row) format, which is the same format used in the Fortran implementation. The spmv_parallel kernel is executed in parallel by multiple threads, each of which computes a portion of the output vector y. The spmv_cuda function allocates memory on the GPU, copies the input data to the GPU, launches the kernel, and copies the output data back to the host.
+
+--------------- Output 3 ---------------
+Here is a possible implementation of the SpMV operation in C with CUDA:
+#include <cuda_runtime.h>
+
+__global__ void spmv_kernel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n) {
+    float sum = 0.0;
+    for (int j = row[i]; j < row[i+1]; j++) {
+      sum += val[j] * x[col[j]];
+    }
+    y[i] = sum;
+  }
+}
+
+void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+  int blockSize = 256;
+  int numBlocks = (n + blockSize - 1) / blockSize;
+  spmv_kernel<<<numBlocks, blockSize>>>(n, nnz, val, row, col, x, y);
+  cudaDeviceSynchronize();
+}
+Note that this implementation assumes that the input matrix is stored in the Compressed Sparse Row (CSR) format, which is the same format used in the Fortran implementation. The spmv_kernel function is executed in parallel by multiple threads on the GPU, each of which computes a portion of the output vector y. The spmv_parallel function launches the kernel and synchronizes the result.
+You will need to modify the memory management and data transfer to suit your specific use case. Additionally, you may want to optimize the block size and other parameters for better performance.
+
+--------------- Output 4 ---------------
+Here is the equivalent function in C with CUDA:
+#include <cuda_runtime.h>
+
+__global__ void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n) {
+    float sum = 0.0;
+    for (int j = row[i]; j < row[i+1]; j++) {
+      sum += val[j] * x[col[j]];
+    }
+    y[i] = sum;
+  }
+}
+
+void spmv_wrapper(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+  int blockSize = 256;
+  int numBlocks = (n + blockSize - 1) / blockSize;
+  float *d_val, *d_x, *d_y;
+  int *d_row, *d_col;
+  cudaMalloc((void **)&d_val, nnz * sizeof(float));
+  cudaMalloc((void **)&d_x, n * sizeof(float));
+  cudaMalloc((void **)&d_y, n * sizeof(float));
+  cudaMalloc((void **)&d_row, (n+1) * sizeof(int));
+  cudaMalloc((void **)&d_col, nnz * sizeof(int));
+  cudaMemcpy(d_val, val, nnz * sizeof(float), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_x, x, n * sizeof(float), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_row, row, (n+1) * sizeof(int), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_col, col, nnz * sizeof(int), cudaMemcpyHostToDevice);
+  spmv_parallel<<<numBlocks, blockSize>>>(n, nnz, d_val, d_row, d_col, d_x, d_y);
+  cudaMemcpy(y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
+  cudaFree(d_val);
+  cudaFree(d_x);
+  cudaFree(d_y);
+  cudaFree(d_row);
+  cudaFree(d_col);
+}
+Note that this implementation assumes that the CUDA device is already set up and that the val, row, col, x, and y arrays are already allocated and initialized on the host. The spmv_wrapper function allocates device memory, copies the data to the device, launches the kernel, and copies the result back to the host.
+
+--------------- Output 5 ---------------
+Here is the equivalent function in C with CUDA:
+#include <cuda_runtime.h>
+
+__global__ void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n) {
+    float sum = 0.0;
+    for (int j = row[i]; j < row[i+1]; j++) {
+      sum += val[j] * x[col[j]];
+    }
+    y[i] = sum;
+  }
+}
+
+void spmv_parallel_wrapper(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+  int blockSize = 256;
+  int numBlocks = (n + blockSize - 1) / blockSize;
+  float *d_val, *d_x, *d_y;
+  int *d_row, *d_col;
+  cudaMalloc((void **)&d_val, nnz * sizeof(float));
+  cudaMalloc((void **)&d_x, n * sizeof(float));
+  cudaMalloc((void **)&d_y, n * sizeof(float));
+  cudaMalloc((void **)&d_row, (n+1) * sizeof(int));
+  cudaMalloc((void **)&d_col, nnz * sizeof(int));
+  cudaMemcpy(d_val, val, nnz * sizeof(float), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_x, x, n * sizeof(float), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_row, row, (n+1) * sizeof(int), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_col, col, nnz * sizeof(int), cudaMemcpyHostToDevice);
+  spmv_parallel<<<numBlocks, blockSize>>>(n, nnz, d_val, d_row, d_col, d_x, d_y);
+  cudaMemcpy(y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
+  cudaFree(d_val); cudaFree(d_x); cudaFree(d_y); cudaFree(d_row); cudaFree(d_col);
+}
+Note that this implementation assumes that the CUDA device is already set up and that the val, row, col, x, and y arrays are already allocated and copied to the device. The spmv_parallel_wrapper function takes care of copying the data to the device, launching the kernel, and copying the result back to the host.
+
+--------------- Output 6 ---------------
+Here is the equivalent function in C with CUDA:
+#include <cuda_runtime.h>
+
+__global__ void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n) {
+    float sum = 0.0;
+    for (int j = row[i]; j < row[i+1]; j++) {
+      sum += val[j] * x[col[j]];
+    }
+    y[i] = sum;
+  }
+}
+
+void spmv_parallel_wrapper(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+  int blockSize = 256;
+  int numBlocks = (n + blockSize - 1) / blockSize;
+  float *val_d, *x_d, *y_d;
+  int *row_d, *col_d;
+
+  cudaMalloc((void **)&val_d, nnz * sizeof(float));
+  cudaMalloc((void **)&x_d, n * sizeof(float));
+  cudaMalloc((void **)&y_d, n * sizeof(float));
+  cudaMalloc((void **)&row_d, (n+1) * sizeof(int));
+  cudaMalloc((void **)&col_d, nnz * sizeof(int));
+
+  cudaMemcpy(val_d, val, nnz * sizeof(float), cudaMemcpyHostToDevice);
+  cudaMemcpy(x_d, x, n * sizeof(float), cudaMemcpyHostToDevice);
+  cudaMemcpy(row_d, row, (n+1) * sizeof(int), cudaMemcpyHostToDevice);
+  cudaMemcpy(col_d, col, nnz * sizeof(int), cudaMemcpyHostToDevice);
+
+  spmv_parallel<<<numBlocks, blockSize>>>(n, nnz, val_d, row_d, col_d, x_d, y_d);
+
+  cudaMemcpy(y, y_d, n * sizeof(float), cudaMemcpyDeviceToHost);
+
+  cudaFree(val_d);
+  cudaFree(x_d);
+  cudaFree(y_d);
+  cudaFree(row_d);
+  cudaFree(col_d);
+}
+Note that this implementation assumes that the input matrix is stored in Compressed Sparse Row (CSR) format. Also, error checking for CUDA calls is omitted for brevity.
+
+--------------- Output 7 ---------------
+Here is the equivalent function in C with CUDA:
+#include <cuda_runtime.h>
+
+__global__ void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n) {
+    float sum = 0.0;
+    for (int j = row[i]; j < row[i+1]; j++) {
+      sum += val[j] * x[col[j]];
+    }
+    y[i] = sum;
+  }
+}
+
+void spmv_parallel_wrapper(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+  int blockSize = 256;
+  int numBlocks = (n + blockSize - 1) / blockSize;
+  float *val_d, *x_d, *y_d;
+  int *row_d, *col_d;
+
+  cudaMalloc((void **)&val_d, nnz * sizeof(float));
+  cudaMalloc((void **)&x_d, n * sizeof(float));
+  cudaMalloc((void **)&y_d, n * sizeof(float));
+  cudaMalloc((void **)&row_d, (n+1) * sizeof(int));
+  cudaMalloc((void **)&col_d, nnz * sizeof(int));
+
+  cudaMemcpy(val_d, val, nnz * sizeof(float), cudaMemcpyHostToDevice);
+  cudaMemcpy(x_d, x, n * sizeof(float), cudaMemcpyHostToDevice);
+  cudaMemcpy(row_d, row, (n+1) * sizeof(int), cudaMemcpyHostToDevice);
+  cudaMemcpy(col_d, col, nnz * sizeof(int), cudaMemcpyHostToDevice);
+
+  spmv_parallel<<<numBlocks, blockSize>>>(n, nnz, val_d, row_d, col_d, x_d, y_d);
+
+  cudaMemcpy(y, y_d, n * sizeof(float), cudaMemcpyDeviceToHost);
+
+  cudaFree(val_d);
+  cudaFree(x_d);
+  cudaFree(y_d);
+  cudaFree(row_d);
+  cudaFree(col_d);
+}
+Note that this implementation assumes that the input matrix is stored in the Compressed Sparse Row (CSR) format, which is the same format used in the Fortran implementation. Also, error checking for CUDA API calls is omitted for brevity.
+
+--------------- Output 8 ---------------
+Here is the equivalent function in C with CUDA:
+#include <cuda_runtime.h>
+
+__global__ void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n) {
+    float sum = 0.0;
+    for (int j = row[i]; j < row[i+1]; j++) {
+      sum += val[j] * x[col[j]];
+    }
+    y[i] = sum;
+  }
+}
+
+void spmv_cuda(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+  int blockSize = 256;
+  int numBlocks = (n + blockSize - 1) / blockSize;
+  float *val_d, *x_d, *y_d;
+  int *row_d, *col_d;
+
+  cudaMalloc((void **)&val_d, nnz * sizeof(float));
+  cudaMalloc((void **)&x_d, n * sizeof(float));
+  cudaMalloc((void **)&y_d, n * sizeof(float));
+  cudaMalloc((void **)&row_d, (n+1) * sizeof(int));
+  cudaMalloc((void **)&col_d, nnz * sizeof(int));
+
+  cudaMemcpy(val_d, val, nnz * sizeof(float), cudaMemcpyHostToDevice);
+  cudaMemcpy(x_d, x, n * sizeof(float), cudaMemcpyHostToDevice);
+  cudaMemcpy(row_d, row, (n+1) * sizeof(int), cudaMemcpyHostToDevice);
+  cudaMemcpy(col_d, col, nnz * sizeof(int), cudaMemcpyHostToDevice);
+
+  spmv_parallel<<<numBlocks, blockSize>>>(n, nnz, val_d, row_d, col_d, x_d, y_d);
+
+  cudaMemcpy(y, y_d, n * sizeof(float), cudaMemcpyDeviceToHost);
+
+  cudaFree(val_d); cudaFree(x_d); cudaFree(y_d); cudaFree(row_d); cudaFree(col_d);
+}
+Note that this code assumes that the input matrices and vectors are already in the correct format for CUDA (i.e., val, row, col, x, and y are already allocated and copied to the device). You may need to modify the code to fit your specific use case. Additionally, error checking has been omitted for brevity.
+
+--------------- Output 9 ---------------
+Here is the equivalent function in C with CUDA:
+#include <cuda_runtime.h>
+
+__global__ void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n) {
+    float sum = 0.0;
+    for (int j = row[i]; j < row[i+1]; j++) {
+      sum += val[j] * x[col[j]];
+    }
+    y[i] = sum;
+  }
+}
+
+void spmv_parallel_wrapper(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+  int blockSize = 256;
+  int numBlocks = (n + blockSize - 1) / blockSize;
+  float *d_val, *d_x, *d_y;
+  int *d_row, *d_col;
+  cudaMalloc((void **)&d_val, nnz * sizeof(float));
+  cudaMalloc((void **)&d_x, n * sizeof(float));
+  cudaMalloc((void **)&d_y, n * sizeof(float));
+  cudaMalloc((void **)&d_row, (n+1) * sizeof(int));
+  cudaMalloc((void **)&d_col, nnz * sizeof(int));
+  cudaMemcpy(d_val, val, nnz * sizeof(float), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_x, x, n * sizeof(float), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_row, row, (n+1) * sizeof(int), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_col, col, nnz * sizeof(int), cudaMemcpyHostToDevice);
+  spmv_parallel<<<numBlocks, blockSize>>>(n, nnz, d_val, d_row, d_col, d_x, d_y);
+  cudaMemcpy(y, d_y, n * sizeof(float), cudaMemcpyDeviceToHost);
+  cudaFree(d_val); cudaFree(d_x); cudaFree(d_y); cudaFree(d_row); cudaFree(d_col);
+}
+Note that this code assumes that the CUDA runtime API is available, and that the val, row, col, x, and y arrays are already allocated and initialized on the host. The spmv_parallel_wrapper function allocates device memory, copies the data to the device, launches the CUDA kernel, and copies the result back to the host.
+
+--------------- Output 10 ---------------
+Here is the equivalent function in C with CUDA:
+#include <cuda_runtime.h>
+
+__global__ void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n) {
+    float sum = 0.0;
+    for (int j = row[i]; j < row[i+1]; j++) {
+      sum += val[j] * x[col[j]];
+    }
+    y[i] = sum;
+  }
+}
+
+void spmv_parallel_wrapper(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+  int blockSize = 256;
+  int numBlocks = (n + blockSize - 1) / blockSize;
+  float *val_d, *x_d, *y_d;
+  int *row_d, *col_d;
+  cudaMalloc((void **)&val_d, nnz * sizeof(float));
+  cudaMalloc((void **)&x_d, n * sizeof(float));
+  cudaMalloc((void **)&y_d, n * sizeof(float));
+  cudaMalloc((void **)&row_d, (n+1) * sizeof(int));
+  cudaMalloc((void **)&col_d, nnz * sizeof(int));
+  cudaMemcpy(val_d, val, nnz * sizeof(float), cudaMemcpyHostToDevice);
+  cudaMemcpy(x_d, x, n * sizeof(float), cudaMemcpyHostToDevice);
+  cudaMemcpy(row_d, row, (n+1) * sizeof(int), cudaMemcpyHostToDevice);
+  cudaMemcpy(col_d, col, nnz * sizeof(int), cudaMemcpyHostToDevice);
+  spmv_parallel<<<numBlocks, blockSize>>>(n, nnz, val_d, row_d, col_d, x_d, y_d);
+  cudaMemcpy(y, y_d, n * sizeof(float), cudaMemcpyDeviceToHost);
+  cudaFree(val_d); cudaFree(x_d); cudaFree(y_d); cudaFree(row_d); cudaFree(col_d);
+}
+Note that this implementation assumes that the input matrix is stored in Compressed Sparse Row (CSR) format, which is the same format used in the Fortran implementation. Also, error checking for CUDA API calls is omitted for brevity.
+

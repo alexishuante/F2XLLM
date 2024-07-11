@@ -1,0 +1,139 @@
+--------------- Code Block 1 ---------------
+void gemv_parallel(const int n, const Kokkos::View<float**> A, const Kokkos::View<float*> x, Kokkos::View<float*> y) {
+    // Ensure the default execution space used by Kokkos is initialized and finalized properly
+    Kokkos::parallel_for("gemv_parallel", Kokkos::RangePolicy<>(0, n), KOKKOS_LAMBDA(const int i) {
+        float sum = 0.0;
+        for (int j = 0; j < n; ++j) {
+            sum += A(i, j) * x(j);
+        }
+        y(i) = sum;
+    });
+}
+
+--------------- Code Block 2 ---------------
+void gemv_parallel(int n, Kokkos::View<const double**> A, Kokkos::View<const double*> x, Kokkos::View<double*> y) {
+  Kokkos::parallel_for("GEMV_kernel", Kokkos::RangePolicy<>(0, n), GEMV(n, A, x, y));
+}
+
+--------------- Code Block 3 ---------------
+void gemv_parallel(int n, const Kokkos::View<double**> A, const Kokkos::View<double*> x, Kokkos::View<double*> y) {
+    Kokkos::parallel_for("GEMV", n, KOKKOS_LAMBDA(int i) {
+        double sum = 0.0;
+        for (int j = 0; j < n; ++j) {
+            sum += A(i, j) * x(j);
+        }
+        y(i) = sum;
+    });
+}
+
+--------------- Code Block 4 ---------------
+void gemv_parallel(int n, Kokkos::View<double**> A, Kokkos::View<double*> x, Kokkos::View<double*> y) {
+    // Perform a GEMV operation
+    Kokkos::parallel_for("GEMV", Kokkos::RangePolicy<>(0, n), KOKKOS_LAMBDA(int i) {
+        double sum = 0.0;
+        for (int j = 0; j < n; ++j) {
+            sum += A(i, j) * x(j);
+        }
+        y(i) = sum;
+    });
+}
+
+--------------- Code Block 5 ---------------
+void gemv_parallel(int n, const std::vector<double>& A, const std::vector<double>& x, std::vector<double>& y) {
+    // Wrap raw pointers around Kokkos Views
+    auto A_view = Kokkos::View<const double**>("A", n, n);
+    auto x_view = Kokkos::View<const double*>("x", n);
+    auto y_view = Kokkos::View<double*>("y", n);
+  
+    // Populate the Kokkos Views with host data
+    Kokkos::parallel_for("fill_A", n, KOKKOS_LAMBDA(const int i){
+        for(int j = 0; j < n; ++j){
+            A_view(i, j) = A[i * n + j];
+        }
+    });
+    Kokkos::parallel_for("fill_x", n, KOKKOS_LAMBDA(const int i){
+        x_view(i) = x[i];
+    });
+  
+    // Perform the GEMV operation
+    Kokkos::parallel_for("gemv_parallel", n, KOKKOS_LAMBDA(const int i) {
+        double sum = 0.0;
+        for (int j = 0; j < n; ++j) {
+            sum += A_view(i, j) * x_view(j);
+        }
+        y_view(i) = sum;
+    });
+  
+    // Copy the results back to the host data
+    Kokkos::parallel_for("copy_y", n, KOKKOS_LAMBDA(const int i){
+        y[i] = y_view(i);
+    });
+}
+
+--------------- Code Block 6 ---------------
+void gemv_parallel(int n, const float* A_data, const float* x_data, float* y_data) {
+    // Initialize Kokkos (If not already initialized)
+    Kokkos::initialize();
+    {
+        // Create Kokkos views
+        Kokkos::View<const float**> A(A_data, n, n);
+        Kokkos::View<const float*> x(x_data, n);
+        Kokkos::View<float*> y(y_data, n);
+
+        // Run the GEMV operation in parallel
+        Kokkos::parallel_for("gemv_parallel", n, GEMV(n, A, x, y));
+    }
+    // Finalize Kokkos (If not finalized elsewhere in your program)
+    Kokkos::finalize();
+}
+
+--------------- Code Block 7 ---------------
+void gemv_parallel(int n, Kokkos::View<double**> A, Kokkos::View<double*> x, Kokkos::View<double*> y) {
+    Kokkos::parallel_for("GEMV", n, KOKKOS_LAMBDA(int i) {
+        double sum = 0.0;
+        for (int j = 0; j < n; ++j) {
+            sum += A(i, j) * x(j);
+        }
+        y(i) = sum;
+    });
+}
+
+--------------- Code Block 8 ---------------
+void gemv_parallel(int n, const Kokkos::View<const float**> A, const Kokkos::View<const float*> x, Kokkos::View<float*> y) {
+    Kokkos::parallel_for("gemv", n, KOKKOS_LAMBDA(int i) {
+        float sum = 0.0f;
+        for (int j = 0; j < n; ++j) {
+            sum += A(i, j) * x(j);
+        }
+        y(i) = sum;
+    });
+}
+
+--------------- Code Block 9 ---------------
+void gemv_parallel(const int n, const Kokkos::View<const double**> A, const Kokkos::View<const double*> x, Kokkos::View<double*> y) {
+    // Parallel for loop over the rows
+    Kokkos::parallel_for("gemv_parallel", n, KOKKOS_LAMBDA(const int i) {
+        double sum = 0.0;
+        for (int j = 0; j < n; ++j) {
+            sum += A(i, j) * x(j);
+        }
+        y(i) = sum;
+    });
+}
+
+--------------- Code Block 10 ---------------
+void gemv_parallel(const int n, const Kokkos::View<double**>& A, const Kokkos::View<double*>& x, Kokkos::View<double*>& y) {
+    // Ensure the dimensions match
+    assert(A.extent(0) == n && A.extent(1) == n);
+    assert(x.extent(0) == n);
+    assert(y.extent(0) == n);
+
+    Kokkos::parallel_for("GEMV", Kokkos::RangePolicy<>(0, n), KOKKOS_LAMBDA(const int i) {
+        double sum = 0.0;
+        for (int j = 0; j < n; ++j) {
+            sum += A(i, j) * x(j);
+        }
+        y(i) = sum;
+    });
+}
+

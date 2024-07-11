@@ -1,38 +1,43 @@
 program main
-    implicit none
-    integer, parameter :: m = 3, n = 3, k = 3, lda = 3, ldb = 3, ldc = 3
-    real(kind=8), dimension(lda, k) :: a
-    real(kind=8), dimension(ldb, n) :: b
-    real(kind=8), dimension(ldc, n) :: c
-    real(kind=8) :: alpha, beta
-    integer :: i
-    real(kind=8) :: start, finish, total_time, average_time
-    external :: system_clock
+  USE iso_c_binding, ONLY: C_LONG_LONG
+  implicit none
+  integer, parameter :: m = 25027, n = 25027, k = 25027
+  integer, parameter :: lda = m, ldb = k, ldc = m
+  real(kind=8), allocatable :: a(:,:), b(:,:), c(:,:)
+  real(kind=8) :: alpha, beta
+  INTEGER :: count_max
+  INTEGER(C_LONG_LONG) :: start_count, end_count, count_diff, count_rate
+  REAL :: wall_time
+  INTEGER :: i
+
+  ! Allocate the matrices
+  allocate(a(lda, k), b(ldb, n), c(ldc, n))
 
     ! Initialize alpha, beta, a, b, and c here...
     alpha = 1.0
     beta = 0.0
-    a = reshape([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0], [lda, k])
-    b = reshape([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0], [ldb, n])
+    a = 1.0
+    b = 1.0
     c = 0.0
 
     ! Warmup call
     call gemm_parallel(m, n, k, alpha, a, lda, b, ldb, beta, c, ldc)
 
-    total_time = 0.0
-    do i = 1, 10
-        call system_clock(start)
+    ! Find average per call time
+    count_max = 10
+    count_diff = 0
+    i = 0
+    DO i = 1, count_max
+        CALL system_clock(count_rate=count_rate)
+        CALL system_clock(start_count)
         call gemm_parallel(m, n, k, alpha, a, lda, b, ldb, beta, c, ldc)
-        call system_clock(finish)
-        total_time = total_time + (finish - start)
-    end do
+        CALL system_clock(end_count)
+        count_diff = count_diff + (end_count - start_count)
+    END DO
 
-    average_time = total_time / 10.0
+    wall_time = REAL(count_diff) / REAL(count_rate) / REAL(count_max)
+    PRINT *, "Average time of ", count_max, " calls: ", wall_time, " seconds"
 
-    ! Print the result
-    print *, 'Result matrix C:'
-    print *, c
-    print *, 'Average time for 10 calls:', average_time, 'clock ticks.'
 end program main
 
 subroutine gemm_parallel(m, n, k, alpha, a, lda, b, ldb, beta, c, ldc)

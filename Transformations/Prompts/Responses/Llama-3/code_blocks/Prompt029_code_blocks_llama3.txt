@@ -1,0 +1,258 @@
+--------------- Code Block 1 ---------------
+void spmv_hip(int *n, int *nnz, double *val, int *row, int *col, double *x, double *y) {
+  double *val_d, *x_d, *y_d;
+  int *row_d, *col_d;
+
+  // Allocate memory on the device
+  hipMalloc((void **)&val_d, (*nnz) * sizeof(double));
+  hipMalloc((void **)&x_d, (*n) * sizeof(double));
+  hipMalloc((void **)&y_d, (*n) * sizeof(double));
+  hipMalloc((void **)&row_d, (*n + 1) * sizeof(int));
+  hipMalloc((void **)&col_d, (*nnz) * sizeof(int));
+
+  // Copy data from host to device
+  hipMemcpy(val_d, val, (*nnz) * sizeof(double), hipMemcpyHostToDevice);
+  hipMemcpy(x_d, x, (*n) * sizeof(double), hipMemcpyHostToDevice);
+  hipMemcpy(row_d, row, (*n + 1) * sizeof(int), hipMemcpyHostToDevice);
+  hipMemcpy(col_d, col, (*nnz) * sizeof(int), hipMemcpyHostToDevice);
+
+  // Launch the kernel (call the Fortran subroutine with OpenMP)
+  spmv_parallel_(n, nnz, val_d, row_d, col_d, x_d, y_d);
+
+  // Copy result from device to host
+  hipMemcpy(y, y_d, (*n) * sizeof(double), hipMemcpyDeviceToHost);
+
+  // Free device memory
+  hipFree(val_d);
+  hipFree(x_d);
+  hipFree(y_d);
+  hipFree(row_d);
+  hipFree(col_d);
+}
+
+--------------- Code Block 2 ---------------
+void spmv_parallel_hip(int* n, int* nnz, double* val, int* row, int* col, double* x, double* y, double* y_gpu) {
+  // Transfer data to GPU
+  double *val_gpu, *x_gpu, *y_gpu;
+  hipMalloc((void**)&val_gpu, (*nnz) * sizeof(double));
+  hipMalloc((void**)&x_gpu, (*n) * sizeof(double));
+  hipMalloc((void**)&y_gpu, (*n) * sizeof(double));
+  hipMemcpy(val_gpu, val, (*nnz) * sizeof(double), hipMemcpyHostToDevice);
+  hipMemcpy(x_gpu, x, (*n) * sizeof(double), hipMemcpyHostToDevice);
+  hipMemcpy(y_gpu, y, (*n) * sizeof(double), hipMemcpyHostToDevice);
+
+  // Call Fortran subroutine
+  spmv_parallel_(n, nnz, val_gpu, row, col, x_gpu, y_gpu);
+
+  // Transfer result back to CPU
+  hipMemcpy(y, y_gpu, (*n) * sizeof(double), hipMemcpyDeviceToHost);
+
+  // Free GPU memory
+  hipFree(val_gpu);
+  hipFree(x_gpu);
+  hipFree(y_gpu);
+}
+
+--------------- Code Block 3 ---------------
+void spmv_parallel_hip(int *n, int *nnz, double *val, int *row, int *col, double *x, double *y) {
+  double *val_d, *x_d, *y_d;
+  int *row_d, *col_d;
+
+  // Allocate memory on the device
+  hipMalloc((void **)&val_d, (*nnz) * sizeof(double));
+  hipMalloc((void **)&x_d, (*n) * sizeof(double));
+  hipMalloc((void **)&y_d, (*n) * sizeof(double));
+  hipMalloc((void **)&row_d, (*n + 1) * sizeof(int));
+  hipMalloc((void **)&col_d, (*nnz) * sizeof(int));
+
+  // Copy data from host to device
+  hipMemcpy(val_d, val, (*nnz) * sizeof(double), hipMemcpyHostToDevice);
+  hipMemcpy(x_d, x, (*n) * sizeof(double), hipMemcpyHostToDevice);
+  hipMemcpy(row_d, row, (*n + 1) * sizeof(int), hipMemcpyHostToDevice);
+  hipMemcpy(col_d, col, (*nnz) * sizeof(int), hipMemcpyHostToDevice);
+
+  // Call the Fortran subroutine
+  spmv_parallel_(n, nnz, val_d, row_d, col_d, x_d, y_d);
+
+  // Copy result from device to host
+  hipMemcpy(y, y_d, (*n) * sizeof(double), hipMemcpyDeviceToHost);
+
+  // Free device memory
+  hipFree(val_d);
+  hipFree(x_d);
+  hipFree(y_d);
+  hipFree(row_d);
+  hipFree(col_d);
+}
+
+--------------- Code Block 4 ---------------
+__global__ void spmv_parallel_kernel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n) {
+    y[i] = 0.0;
+    for (int j = row[i]; j < row[i + 1] - 1; j++) {
+      y[i] += val[j] * x[col[j]];
+    }
+  }
+}
+
+void spmv_parallel_hip(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+  hipMemcpyToSymbol(val_d, val, nnz * sizeof(float));
+  hipMemcpyToSymbol(row_d, row, (n + 1) * sizeof(int));
+  hipMemcpyToSymbol(col_d, col, nnz * sizeof(int));
+  hipMemcpyToSymbol(x_d, x, n * sizeof(float));
+  hipMemcpyToSymbol(y_d, y, n * sizeof(float));
+
+  int blockSize = 256;
+  int numBlocks = (n + blockSize - 1) / blockSize;
+  hipLaunchKernelGGL(spmv_parallel_kernel, numBlocks, blockSize, 0, 0, n, nnz, val_d, row_d, col_d, x_d, y_d);
+
+  hipMemcpyFromSymbol(y, y_d, n * sizeof(float));
+}
+
+--------------- Code Block 5 ---------------
+__global__ void spmv_parallel_kernel(int n, int nnz, double *val, int *row, int *col, double *x, double *y) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n) {
+    double sum = 0.0;
+    for (int j = row[i]; j < row[i + 1]; j++) {
+      sum += val[j] * x[col[j]];
+    }
+    y[i] = sum;
+  }
+}
+
+void spmv_parallel_hip(int n, int nnz, double *val, int *row, int *col, double *x, double *y) {
+  hipMemcpyToSymbol(val_d, val, nnz * sizeof(double));
+  hipMemcpyToSymbol(row_d, row, (n + 1) * sizeof(int));
+  hipMemcpyToSymbol(col_d, col, nnz * sizeof(int));
+  hipMemcpyToSymbol(x_d, x, n * sizeof(double));
+  
+  hipLaunchKernelGGL(spmv_parallel_kernel, dim3(n), dim3(256), 0, 0, n, nnz, val_d, row_d, col_d, x_d, y_d);
+  
+  hipMemcpyFromSymbol(y, y_d, n * sizeof(double));
+}
+
+--------------- Code Block 6 ---------------
+void spmv_parallel_hip(int *n, int *nnz, double *val, int *row, int *col, double *x, double *y) {
+  double *val_d, *x_d, *y_d;
+  int *row_d, *col_d;
+
+  // Allocate memory on the device
+  hipMalloc((void **)&val_d, (*nnz) * sizeof(double));
+  hipMalloc((void **)&x_d, (*n) * sizeof(double));
+  hipMalloc((void **)&y_d, (*n) * sizeof(double));
+  hipMalloc((void **)&row_d, (*n + 1) * sizeof(int));
+  hipMalloc((void **)&col_d, (*nnz) * sizeof(int));
+
+  // Copy data from host to device
+  hipMemcpy(val_d, val, (*nnz) * sizeof(double), hipMemcpyHostToDevice);
+  hipMemcpy(x_d, x, (*n) * sizeof(double), hipMemcpyHostToDevice);
+  hipMemcpy(row_d, row, (*n + 1) * sizeof(int), hipMemcpyHostToDevice);
+  hipMemcpy(col_d, col, (*nnz) * sizeof(int), hipMemcpyHostToDevice);
+
+  // Call the Fortran subroutine
+  spmv_parallel_(n, nnz, val_d, row_d, col_d, x_d, y_d);
+
+  // Copy result from device to host
+  hipMemcpy(y, y_d, (*n) * sizeof(double), hipMemcpyDeviceToHost);
+
+  // Free device memory
+  hipFree(val_d);
+  hipFree(x_d);
+  hipFree(y_d);
+  hipFree(row_d);
+  hipFree(col_d);
+}
+
+--------------- Code Block 7 ---------------
+void spmv_parallel_hip(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+  float *val_d;
+  int *row_d;
+  int *col_d;
+  float *x_d;
+  float *y_d;
+
+  // Allocate memory on the device
+  hipMalloc((void **)&val_d, nnz * sizeof(float));
+  hipMalloc((void **)&row_d, (n + 1) * sizeof(int));
+  hipMalloc((void **)&col_d, nnz * sizeof(int));
+  hipMalloc((void **)&x_d, n * sizeof(float));
+  hipMalloc((void **)&y_d, n * sizeof(float));
+
+  // Copy data from host to device
+  hipMemcpy(val_d, val, nnz * sizeof(float), hipMemcpyHostToDevice);
+  hipMemcpy(row_d, row, (n + 1) * sizeof(int), hipMemcpyHostToDevice);
+  hipMemcpy(col_d, col, nnz * sizeof(int), hipMemcpyHostToDevice);
+  hipMemcpy(x_d, x, n * sizeof(float), hipMemcpyHostToDevice);
+
+  // Call the Fortran subroutine
+  spmv_parallel_(&n, &nnz, val_d, row_d, col_d, x_d, y_d);
+
+  // Copy result from device to host
+  hipMemcpy(y, y_d, n * sizeof(float), hipMemcpyDeviceToHost);
+
+  // Free device memory
+  hipFree(val_d);
+  hipFree(row_d);
+  hipFree(col_d);
+  hipFree(x_d);
+  hipFree(y_d);
+}
+
+--------------- Code Block 8 ---------------
+__global__ void spmv_kernel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n) {
+    y[i] = 0.0;
+    for (j = row[i]; j < row[i+1]; j++) {
+      y[i] += val[j] * x[col[j]];
+    }
+  }
+}
+
+void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+  int i, j;
+  hipLaunchKernelGGL((spmv_kernel), dim3(n), dim3(1), 0, 0, n, nnz, val, row, col, x, y);
+}
+
+--------------- Code Block 9 ---------------
+__global__ void spmv_kernel(int n, int nnz, double *val, int *row, int *col, double *x, double *y) {
+  int i = blockIdx.x;
+  if (i < n) {
+    y[i] = 0.0;
+    for (int j = row[i]; j < row[i+1]; j++) {
+      y[i] += val[j] * x[col[j]];
+    }
+  }
+}
+
+void spmv_parallel(int n, int nnz, double *val, int *row, int *col, double *x, double *y) {
+  int i, j;
+  double *y_d;
+  hipMalloc((void **)&y_d, n * sizeof(double));
+  hipMemcpy(y_d, y, n * sizeof(double), hipMemcpyHostToDevice);
+  hipLaunchKernel(HIP_KERNEL_NAME(spmv_kernel), dim3(n), dim3(1), 0, 0, n, nnz, val, row, col, x, y_d);
+  hipMemcpy(y, y_d, n * sizeof(double), hipMemcpyDeviceToHost);
+  hipFree(y_d);
+}
+
+--------------- Code Block 10 ---------------
+void spmv_parallel_hip(int *n, int *nnz, double *val, int *row, int *col, double *x, double *y) {
+  double *val_d, *x_d, *y_d;
+  hipMalloc((void **)&val_d, (*nnz) * sizeof(double));
+  hipMalloc((void **)&x_d, (*n) * sizeof(double));
+  hipMalloc((void **)&y_d, (*n) * sizeof(double));
+  
+  hipMemcpy(val_d, val, (*nnz) * sizeof(double), hipMemcpyHostToDevice);
+  hipMemcpy(x_d, x, (*n) * sizeof(double), hipMemcpyHostToDevice);
+  
+  spmv_parallel_(n, nnz, val_d, row, col, x_d, y_d);
+  
+  hipMemcpy(y, y_d, (*n) * sizeof(double), hipMemcpyDeviceToHost);
+  
+  hipFree(val_d);
+  hipFree(x_d);
+  hipFree(y_d);
+}
+

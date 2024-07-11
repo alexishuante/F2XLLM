@@ -1,0 +1,327 @@
+--------------- Output 1 ---------------
+Here is a C function using HIP that computes a Sparse matrix-vector multiplication (SpMV) operation, with a subroutine implemented in Fortran with OpenMP:
+#include <hip/hip_runtime.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+// Fortran subroutine with OpenMP
+extern void spmv_parallel_(int *n, int *nnz, double *val, int *row, int *col, double *x, double *y);
+
+// C function using HIP
+void spmv_hip(int *n, int *nnz, double *val, int *row, int *col, double *x, double *y) {
+  double *val_d, *x_d, *y_d;
+  int *row_d, *col_d;
+
+  // Allocate memory on the device
+  hipMalloc((void **)&val_d, (*nnz) * sizeof(double));
+  hipMalloc((void **)&x_d, (*n) * sizeof(double));
+  hipMalloc((void **)&y_d, (*n) * sizeof(double));
+  hipMalloc((void **)&row_d, (*n + 1) * sizeof(int));
+  hipMalloc((void **)&col_d, (*nnz) * sizeof(int));
+
+  // Copy data from host to device
+  hipMemcpy(val_d, val, (*nnz) * sizeof(double), hipMemcpyHostToDevice);
+  hipMemcpy(x_d, x, (*n) * sizeof(double), hipMemcpyHostToDevice);
+  hipMemcpy(row_d, row, (*n + 1) * sizeof(int), hipMemcpyHostToDevice);
+  hipMemcpy(col_d, col, (*nnz) * sizeof(int), hipMemcpyHostToDevice);
+
+  // Launch the kernel (call the Fortran subroutine with OpenMP)
+  spmv_parallel_(n, nnz, val_d, row_d, col_d, x_d, y_d);
+
+  // Copy result from device to host
+  hipMemcpy(y, y_d, (*n) * sizeof(double), hipMemcpyDeviceToHost);
+
+  // Free device memory
+  hipFree(val_d);
+  hipFree(x_d);
+  hipFree(y_d);
+  hipFree(row_d);
+  hipFree(col_d);
+}
+Note that this code assumes that the Fortran subroutine spmv_parallel is compiled with OpenMP and linked to a shared library. The C function spmv_hip allocates memory on the device, copies data from host to device, launches the kernel (calls the Fortran subroutine), copies the result from device to host, and frees device memory.
+
+--------------- Output 2 ---------------
+Here is a C function using HIP that calls the Fortran subroutine for Sparse matrix-vector multiplication (SpMV) operation:
+#include <hip/hip_runtime.h>
+#include <stdio.h>
+extern "C" {
+  void spmv_parallel_(int* n, int* nnz, double* val, int* row, int* col, double* x, double* y);
+}
+
+void spmv_parallel_hip(int* n, int* nnz, double* val, int* row, int* col, double* x, double* y, double* y_gpu) {
+  // Transfer data to GPU
+  double *val_gpu, *x_gpu, *y_gpu;
+  hipMalloc((void**)&val_gpu, (*nnz) * sizeof(double));
+  hipMalloc((void**)&x_gpu, (*n) * sizeof(double));
+  hipMalloc((void**)&y_gpu, (*n) * sizeof(double));
+  hipMemcpy(val_gpu, val, (*nnz) * sizeof(double), hipMemcpyHostToDevice);
+  hipMemcpy(x_gpu, x, (*n) * sizeof(double), hipMemcpyHostToDevice);
+  hipMemcpy(y_gpu, y, (*n) * sizeof(double), hipMemcpyHostToDevice);
+
+  // Call Fortran subroutine
+  spmv_parallel_(n, nnz, val_gpu, row, col, x_gpu, y_gpu);
+
+  // Transfer result back to CPU
+  hipMemcpy(y, y_gpu, (*n) * sizeof(double), hipMemcpyDeviceToHost);
+
+  // Free GPU memory
+  hipFree(val_gpu);
+  hipFree(x_gpu);
+  hipFree(y_gpu);
+}
+Note that this code assumes that the Fortran subroutine is compiled with the -fPIC flag to enable interoperability with C code. Also, the hipMemcpy functions are used to transfer data between the host and device, and the hipFree function is used to free the device memory.
+
+--------------- Output 3 ---------------
+Here is a C function using HIP that calls the provided Fortran subroutine for parallel Sparse Matrix-Vector Multiplication (SpMV):
+#include <hip/hip_runtime.h>
+#include <stdio.h>
+extern void spmv_parallel_(int *n, int *nnz, double *val, int *row, int *col, double *x, double *y);
+
+void spmv_parallel_hip(int *n, int *nnz, double *val, int *row, int *col, double *x, double *y) {
+  double *val_d, *x_d, *y_d;
+  int *row_d, *col_d;
+
+  // Allocate memory on the device
+  hipMalloc((void **)&val_d, (*nnz) * sizeof(double));
+  hipMalloc((void **)&x_d, (*n) * sizeof(double));
+  hipMalloc((void **)&y_d, (*n) * sizeof(double));
+  hipMalloc((void **)&row_d, (*n + 1) * sizeof(int));
+  hipMalloc((void **)&col_d, (*nnz) * sizeof(int));
+
+  // Copy data from host to device
+  hipMemcpy(val_d, val, (*nnz) * sizeof(double), hipMemcpyHostToDevice);
+  hipMemcpy(x_d, x, (*n) * sizeof(double), hipMemcpyHostToDevice);
+  hipMemcpy(row_d, row, (*n + 1) * sizeof(int), hipMemcpyHostToDevice);
+  hipMemcpy(col_d, col, (*nnz) * sizeof(int), hipMemcpyHostToDevice);
+
+  // Call the Fortran subroutine
+  spmv_parallel_(n, nnz, val_d, row_d, col_d, x_d, y_d);
+
+  // Copy result from device to host
+  hipMemcpy(y, y_d, (*n) * sizeof(double), hipMemcpyDeviceToHost);
+
+  // Free device memory
+  hipFree(val_d);
+  hipFree(x_d);
+  hipFree(y_d);
+  hipFree(row_d);
+  hipFree(col_d);
+}
+Note that this code assumes that the Fortran subroutine is compiled with the --compile flag to generate a compatible interface for C calling. Additionally, error checking for HIP runtime calls is omitted for brevity.
+
+--------------- Output 4 ---------------
+Here is a C function that calls the Fortran subroutine using HIP (Heterogeneous-Compute Interface for Portability) and OpenMP:
+#include <hip/hip_runtime.h>
+#include <omp.h>
+
+void spmv_parallel_hip(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+  hipMemcpyToSymbol(val_d, val, nnz * sizeof(float));
+  hipMemcpyToSymbol(row_d, row, (n + 1) * sizeof(int));
+  hipMemcpyToSymbol(col_d, col, nnz * sizeof(int));
+  hipMemcpyToSymbol(x_d, x, n * sizeof(float));
+  hipMemcpyToSymbol(y_d, y, n * sizeof(float));
+
+  int blockSize = 256;
+  int numBlocks = (n + blockSize - 1) / blockSize;
+  hipLaunchKernelGGL(spmv_parallel_kernel, numBlocks, blockSize, 0, 0, n, nnz, val_d, row_d, col_d, x_d, y_d);
+
+  hipMemcpyFromSymbol(y, y_d, n * sizeof(float));
+}
+
+__global__ void spmv_parallel_kernel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n) {
+    y[i] = 0.0;
+    for (int j = row[i]; j < row[i + 1] - 1; j++) {
+      y[i] += val[j] * x[col[j]];
+    }
+  }
+}
+Note that this implementation assumes that the Fortran subroutine is compiled with the -fopenmp flag and linked with the OpenMP library. Also, the HIP runtime and OpenMP library need to be initialized and finalized accordingly.
+Also, the hipMemcpyToSymbol and hipMemcpyFromSymbol functions are used to copy data between the host and device, and the hipLaunchKernelGGL function is used to launch the kernel on the GPU.
+Please note that this is a basic implementation and may need to be optimized for performance.
+
+--------------- Output 5 ---------------
+Here is a C function that calls the Fortran subroutine using HIP (Heterogeneous-Compute Interface for Portability) and OpenMP:
+#include <hip/hip_runtime.h>
+#include <omp.h>
+
+void spmv_parallel_hip(int n, int nnz, double *val, int *row, int *col, double *x, double *y) {
+  hipMemcpyToSymbol(val_d, val, nnz * sizeof(double));
+  hipMemcpyToSymbol(row_d, row, (n + 1) * sizeof(int));
+  hipMemcpyToSymbol(col_d, col, nnz * sizeof(int));
+  hipMemcpyToSymbol(x_d, x, n * sizeof(double));
+  
+  hipLaunchKernelGGL(spmv_parallel_kernel, dim3(n), dim3(256), 0, 0, n, nnz, val_d, row_d, col_d, x_d, y_d);
+  
+  hipMemcpyFromSymbol(y, y_d, n * sizeof(double));
+}
+
+__global__ void spmv_parallel_kernel(int n, int nnz, double *val, int *row, int *col, double *x, double *y) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n) {
+    double sum = 0.0;
+    for (int j = row[i]; j < row[i + 1]; j++) {
+      sum += val[j] * x[col[j]];
+    }
+    y[i] = sum;
+  }
+}
+Note that this implementation assumes that the Fortran subroutine is compiled with OpenMP and linked with the HIP runtime library. The C function spmv_parallel_hip copies the input data to the device, launches the kernel, and copies the output data back to the host. The kernel spmv_parallel_kernel performs the SpMV operation in parallel using HIP threads.
+Also, please note that this is a simplified example and may require modifications to work correctly with your specific use case.
+
+--------------- Output 6 ---------------
+Here is a C function using HIP that calls the Fortran subroutine for Sparse matrix-vector multiplication (SpMV):
+#include <hip/hip_runtime.h>
+#include <stdio.h>
+extern void spmv_parallel_(int *n, int *nnz, double *val, int *row, int *col, double *x, double *y);
+
+void spmv_parallel_hip(int *n, int *nnz, double *val, int *row, int *col, double *x, double *y) {
+  double *val_d, *x_d, *y_d;
+  int *row_d, *col_d;
+
+  // Allocate memory on the device
+  hipMalloc((void **)&val_d, (*nnz) * sizeof(double));
+  hipMalloc((void **)&x_d, (*n) * sizeof(double));
+  hipMalloc((void **)&y_d, (*n) * sizeof(double));
+  hipMalloc((void **)&row_d, (*n + 1) * sizeof(int));
+  hipMalloc((void **)&col_d, (*nnz) * sizeof(int));
+
+  // Copy data from host to device
+  hipMemcpy(val_d, val, (*nnz) * sizeof(double), hipMemcpyHostToDevice);
+  hipMemcpy(x_d, x, (*n) * sizeof(double), hipMemcpyHostToDevice);
+  hipMemcpy(row_d, row, (*n + 1) * sizeof(int), hipMemcpyHostToDevice);
+  hipMemcpy(col_d, col, (*nnz) * sizeof(int), hipMemcpyHostToDevice);
+
+  // Call the Fortran subroutine
+  spmv_parallel_(n, nnz, val_d, row_d, col_d, x_d, y_d);
+
+  // Copy result from device to host
+  hipMemcpy(y, y_d, (*n) * sizeof(double), hipMemcpyDeviceToHost);
+
+  // Free device memory
+  hipFree(val_d);
+  hipFree(x_d);
+  hipFree(y_d);
+  hipFree(row_d);
+  hipFree(col_d);
+}
+Note: This code assumes that the Fortran subroutine is compiled to a shared library and linked to the C program. The spmv_parallel_ function is the Fortran subroutine with an underscore appended to its name, which is a common convention when calling Fortran code from C.
+
+--------------- Output 7 ---------------
+Here is a C function using HIP that calls the Fortran subroutine for Sparse matrix-vector multiplication (SpMV) operation:
+#include <hip/hip_runtime.h>
+#include <stdio.h>
+extern "C" void spmv_parallel_(int*, int*, float*, int*, int*, float*, float*);
+
+void spmv_parallel_hip(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+  float *val_d;
+  int *row_d;
+  int *col_d;
+  float *x_d;
+  float *y_d;
+
+  // Allocate memory on the device
+  hipMalloc((void **)&val_d, nnz * sizeof(float));
+  hipMalloc((void **)&row_d, (n + 1) * sizeof(int));
+  hipMalloc((void **)&col_d, nnz * sizeof(int));
+  hipMalloc((void **)&x_d, n * sizeof(float));
+  hipMalloc((void **)&y_d, n * sizeof(float));
+
+  // Copy data from host to device
+  hipMemcpy(val_d, val, nnz * sizeof(float), hipMemcpyHostToDevice);
+  hipMemcpy(row_d, row, (n + 1) * sizeof(int), hipMemcpyHostToDevice);
+  hipMemcpy(col_d, col, nnz * sizeof(int), hipMemcpyHostToDevice);
+  hipMemcpy(x_d, x, n * sizeof(float), hipMemcpyHostToDevice);
+
+  // Call the Fortran subroutine
+  spmv_parallel_(&n, &nnz, val_d, row_d, col_d, x_d, y_d);
+
+  // Copy result from device to host
+  hipMemcpy(y, y_d, n * sizeof(float), hipMemcpyDeviceToHost);
+
+  // Free device memory
+  hipFree(val_d);
+  hipFree(row_d);
+  hipFree(col_d);
+  hipFree(x_d);
+  hipFree(y_d);
+}
+Note that this code assumes that the Fortran subroutine is compiled into a shared library that can be called from C, and that the spmv_parallel_ function is the C-callable name of the Fortran subroutine. Also, this code uses the HIP runtime API to manage memory and data transfer between the host and device.
+
+--------------- Output 8 ---------------
+Here is a possible implementation of the SpMV operation in C with HIP:
+#include <hip/hip_runtime.h>
+
+void spmv_parallel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+  int i, j;
+  hipLaunchKernelGGL((spmv_kernel), dim3(n), dim3(1), 0, 0, n, nnz, val, row, col, x, y);
+}
+
+__global__ void spmv_kernel(int n, int nnz, float *val, int *row, int *col, float *x, float *y) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n) {
+    y[i] = 0.0;
+    for (j = row[i]; j < row[i+1]; j++) {
+      y[i] += val[j] * x[col[j]];
+    }
+  }
+}
+Note that this implementation uses the HIP runtime API to launch a kernel on the GPU. The kernel is executed in parallel by multiple threads, each computing a portion of the output vector y.
+To compile and run this code, you will need to have a HIP-enabled GPU and the HIP runtime installed on your system. You can then compile the code using a command like:
+hipcc -o spmv (link unavailable)
+And run it using:
+./spmv
+This will execute the SpMV operation on the GPU and store the result in the y array.
+Please note that this is just one possible implementation, and there are many other ways to implement SpMV in C with HIP. Additionally, you may need to modify the code to match your specific use case and hardware configuration.
+
+--------------- Output 9 ---------------
+Here is a C function using HIP that computes a Sparse matrix-vector multiplication (SpMV) operation, with the provided Fortran subroutine as a reference:
+#include <hip/hip_runtime.h>
+
+void spmv_parallel(int n, int nnz, double *val, int *row, int *col, double *x, double *y) {
+  int i, j;
+  double *y_d;
+  hipMalloc((void **)&y_d, n * sizeof(double));
+  hipMemcpy(y_d, y, n * sizeof(double), hipMemcpyHostToDevice);
+  hipLaunchKernel(HIP_KERNEL_NAME(spmv_kernel), dim3(n), dim3(1), 0, 0, n, nnz, val, row, col, x, y_d);
+  hipMemcpy(y, y_d, n * sizeof(double), hipMemcpyDeviceToHost);
+  hipFree(y_d);
+}
+
+__global__ void spmv_kernel(int n, int nnz, double *val, int *row, int *col, double *x, double *y) {
+  int i = blockIdx.x;
+  if (i < n) {
+    y[i] = 0.0;
+    for (int j = row[i]; j < row[i+1]; j++) {
+      y[i] += val[j] * x[col[j]];
+    }
+  }
+}
+Note that this implementation uses the HIP (Heterogeneous-Compute Interface for Portability) framework, which allows for parallelization on both CPUs and GPUs. The spmv_kernel function is executed in parallel on the device (GPU or CPU), and the results are copied back to the host.
+
+--------------- Output 10 ---------------
+Here is a C function using HIP that calls the Fortran subroutine for Sparse matrix-vector multiplication (SpMV) operation:
+#include <hip/hip_runtime.h>
+#include <stdio.h>
+extern "C" void spmv_parallel_(int *n, int *nnz, double *val, int *row, int *col, double *x, double *y);
+
+void spmv_parallel_hip(int *n, int *nnz, double *val, int *row, int *col, double *x, double *y) {
+  double *val_d, *x_d, *y_d;
+  hipMalloc((void **)&val_d, (*nnz) * sizeof(double));
+  hipMalloc((void **)&x_d, (*n) * sizeof(double));
+  hipMalloc((void **)&y_d, (*n) * sizeof(double));
+  
+  hipMemcpy(val_d, val, (*nnz) * sizeof(double), hipMemcpyHostToDevice);
+  hipMemcpy(x_d, x, (*n) * sizeof(double), hipMemcpyHostToDevice);
+  
+  spmv_parallel_(n, nnz, val_d, row, col, x_d, y_d);
+  
+  hipMemcpy(y, y_d, (*n) * sizeof(double), hipMemcpyDeviceToHost);
+  
+  hipFree(val_d);
+  hipFree(x_d);
+  hipFree(y_d);
+}
+Note that this code assumes that the Fortran subroutine is compiled with the -fPIC flag and the resulting object file is linked with the C code. Also, the hipMalloc and hipMemcpy functions are used to allocate memory and copy data between the host and device, respectively. The spmv_parallel_ function is the Fortran subroutine with an underscore appended to its name, which is the default name mangling scheme for Fortran compilers.
+

@@ -1,0 +1,134 @@
+--------------- Code Block 1 ---------------
+void gemm_parallel(int m, int n, int k, double alpha, Kokkos::View<double**> a, int lda, Kokkos::View<double**> b, int ldb, double beta, Kokkos::View<double**> c, int ldc)
+{
+    Kokkos::parallel_for("gemm_parallel", Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0,0}, {m,n}), KOKKOS_LAMBDA (const int i, const int j)
+    {
+        double temp = 0.0;
+        for (int l = 0; l < k; ++l)
+        {
+            temp += a(i, l) * b(l, j);
+        }
+        c(i, j) = alpha * temp + beta * c(i, j);
+    });
+}
+
+--------------- Code Block 2 ---------------
+void gemm_parallel(int m, int n, int k, double alpha, double* a, int lda, double* b, int ldb, double beta, double* c, int ldc) {
+    Kokkos::parallel_for(Kokkos::RangePolicy<Kokkos::DefaultExecutionSpace>(0, m), [=] (int i) {
+        for (int j = 0; j < n; j++) {
+            double temp = 0.0;
+            for (int l = 0; l < k; l++) {
+                temp += a[i*lda + l] * b[l*ldb + j];
+            }
+            c[i*ldc + j] = alpha * temp + beta * c[i*ldc + j];
+        }
+    });
+    Kokkos::fence();
+}
+
+--------------- Code Block 3 ---------------
+void gemm_parallel(int m, int n, int k, double alpha, double* a, int lda, double* b, int ldb, double beta, double* c, int ldc) {
+    Kokkos::parallel_for("gemm_parallel", Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {m, n}),
+        KOKKOS_LAMBDA (const int i, const int j) {
+            double temp = 0.0;
+            for (int l = 0; l < k; l++) {
+                temp += a[i*lda + l] * b[l*ldb + j];
+            }
+            c[i*ldc + j] = alpha * temp + beta * c[i*ldc + j];
+        });
+}
+
+--------------- Code Block 4 ---------------
+void gemm_parallel(int m, int n, int k, double alpha, double *a, int lda, double *b, int ldb, double beta, double *c, int ldc) {
+    Kokkos::parallel_for("gemm_parallel", Kokkos::RangePolicy<Kokkos::OpenMP>(0, n), KOKKOS_LAMBDA (int j) {
+        for (int i = 0; i < m; i++) {
+            double temp = 0.0;
+            for (int l = 0; l < k; l++) {
+                temp += a[i*lda + l] * b[l*ldb + j];
+            }
+            c[i*ldc + j] = alpha * temp + beta * c[i*ldc + j];
+        }
+    });
+    Kokkos::fence();
+}
+
+--------------- Code Block 5 ---------------
+void gemm_parallel(int m, int n, int k, double alpha, double* a, int lda, double* b, int ldb, double beta, double* c, int ldc) {
+    Kokkos::parallel_for("gemm_parallel", Kokkos::RangePolicy<Kokkos::DefaultHostExecutionSpace>(0, n), KOKKOS_LAMBDA(int j) {
+        for (int i = 0; i < m; i++) {
+            double temp = 0.0;
+            for (int l = 0; l < k; l++) {
+                temp += a[i*lda + l] * b[l*ldb + j];
+            }
+            c[i*ldc + j] = alpha * temp + beta * c[i*ldc + j];
+        }
+    });
+    Kokkos::fence();
+}
+
+--------------- Code Block 6 ---------------
+void gemm_parallel(int m, int n, int k, double alpha, Kokkos::View<double**> a, Kokkos::View<double**> b, double beta, Kokkos::View<double**> c) {
+  Kokkos::parallel_for("gemm_parallel", Kokkos::RangePolicy<>(0, n), KOKKOS_LAMBDA(int j) {
+    for(int i = 0; i < m; i++) {
+      double temp = 0.0;
+      for(int l = 0; l < k; l++) {
+        temp += a(i, l) * b(l, j);
+      }
+      c(i, j) = alpha * temp + beta * c(i, j);
+    }
+  });
+  Kokkos::fence();
+}
+
+--------------- Code Block 7 ---------------
+void gemm_parallel(int m, int n, int k, double alpha, double* a, int lda, double* b, int ldb, double beta, double* c, int ldc) {
+    Kokkos::parallel_for("gemm_parallel", Kokkos::RangePolicy<>(0, n), KOKKOS_LAMBDA(int j) {
+        for (int i = 0; i < m; i++) {
+            double temp = 0.0;
+            for (int l = 0; l < k; l++) {
+                temp += a[i * lda + l] * b[l * ldb + j];
+            }
+            c[i * ldc + j] = alpha * temp + beta * c[i * ldc + j];
+        }
+    });
+}
+
+--------------- Code Block 8 ---------------
+void gemm_parallel(int m, int n, int k, double alpha, Kokkos::View<double**> a,
+                   Kokkos::View<double**> b, double beta, Kokkos::View<double**> c) {
+    Kokkos::parallel_for("gemm_parallel", Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {m, n}),
+                         KOKKOS_LAMBDA(int i, int j) {
+                             double temp = 0.0;
+                             for (int l = 0; l < k; ++l) {
+                                 temp += a(i, l) * b(l, j);
+                             }
+                             c(i, j) = alpha * temp + beta * c(i, j);
+                         });
+    Kokkos::fence();
+}
+
+--------------- Code Block 9 ---------------
+void gemm_parallel(int m, int n, int k, double alpha, double* a, int lda, double* b, int ldb, double beta, double* c, int ldc) {
+    Kokkos::parallel_for(m * n, KOKKOS_LAMBDA(int index) {
+        int i = index / n;
+        int j = index % n;
+        double temp = 0.0;
+        for(int l = 0; l < k; l++) {
+            temp += a[i*lda + l] * b[l*ldb + j];
+        }
+        c[i*ldc + j] = alpha * temp + beta * c[i*ldc + j];
+    });
+}
+
+--------------- Code Block 10 ---------------
+void gemm_parallel(int m, int n, int k, double alpha, Kokkos::View<double**, Kokkos::LayoutLeft> a, int lda, Kokkos::View<double**, Kokkos::LayoutLeft> b, int ldb, double beta, Kokkos::View<double**, Kokkos::LayoutLeft> c, int ldc) {
+    Kokkos::parallel_for("gemm_parallel", Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0,0}, {m,n}), KOKKOS_LAMBDA (const int i, const int j) {
+        double temp = 0.0;
+        for (int l = 0; l < k; ++l) {
+            temp += a(i, l) * b(l, j);
+        }
+        c(i, j) = alpha * temp + beta * c(i, j);
+    });
+    Kokkos::fence();
+}
+

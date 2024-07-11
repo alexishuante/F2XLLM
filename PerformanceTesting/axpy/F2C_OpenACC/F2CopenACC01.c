@@ -11,7 +11,7 @@ void saxpy_parallel(int n, float a, float *x, float *y) {
 }
 
 int main() {
-    int n = 1000000; // Example size
+    int n = 925000000; // Example size
     float a = 2.0;
     float *x = (float*)malloc(n * sizeof(float));
     float *y = (float*)malloc(n * sizeof(float));

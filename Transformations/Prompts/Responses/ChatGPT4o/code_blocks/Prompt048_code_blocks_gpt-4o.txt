@@ -1,0 +1,171 @@
+--------------- Code Block 1 ---------------
+void jacobi_parallel(Kokkos::View<double****> u, Kokkos::View<double****> unew, int n, int niter) {
+    for (int iter = 0; iter < niter; iter++) {
+        Kokkos::parallel_for("Jacobi_loop", Kokkos::MDRangePolicy<Kokkos::Rank<3>>({2, 2, 2}, {n-1, n-1, n-1}),
+                             KOKKOS_LAMBDA(int k, int j, int i) {
+            unew(i, j, k) = 0.125 * (u(i-1, j, k) + u(i+1, j, k) 
+                                   + u(i, j-1, k) + u(i, j+1, k)
+                                   + u(i, j, k-1) + u(i, j, k+1)
+                                   + u(i, j, k));
+        });
+
+        // Copy unew to u
+        Kokkos::parallel_for("Copy_loop", Kokkos::MDRangePolicy<Kokkos::Rank<3>>({0, 0, 0}, {n, n, n}),
+                             KOKKOS_LAMBDA(int k, int j, int i) {
+            u(i, j, k) = unew(i, j, k);
+        });
+
+        // Barrier to ensure all threads have completed their work on u before next iteration
+        Kokkos::fence();
+    }
+}
+
+--------------- Code Block 2 ---------------
+void jacobi(Kokkos::View<double***> u, Kokkos::View<double***> unew, const int n, const int niter) {
+    using policy_3d = Kokkos::MDRangePolicy<Kokkos::Rank<3>>;
+
+    for (int iter = 0; iter < niter; ++iter) {
+        Kokkos::parallel_for("Jacobi Iteration", policy_3d({2, 2, 2}, {n-1, n-1, n-1}), KOKKOS_LAMBDA(const int i, const int j, const int k) {
+            unew(i, j, k) = 0.125 * (u(i-1, j, k) + u(i+1, j, k) + u(i, j-1, k) + u(i, j+1, k)
+                                    + u(i, j, k-1) + u(i, j, k+1) + u(i, j, k));
+        });
+        
+        Kokkos::deep_copy(u, unew); // Copy unew back to u
+    }
+}
+
+--------------- Code Block 3 ---------------
+void jacobi_parallel(Kokkos::View<Real****> u, Kokkos::View<Real****> unew, int n, int niter) {
+    for (int iter = 0; iter < niter; ++iter) {
+        Kokkos::parallel_for("JacobiIteration", 
+            Kokkos::MDRangePolicy<Kokkos::Rank<3>>({1, 1, 1}, {n-1, n-1, n-1}),
+            KOKKOS_LAMBDA(const int k, const int j, const int i) {
+                unew(k, j, i, 0) = 0.125 * (
+                    u(k-1, j, i, 0) + u(k+1, j, i, 0) +
+                    u(k, j-1, i, 0) + u(k, j+1, i, 0) +
+                    u(k, j, i-1, 0) + u(k, j, i+1, 0) +
+                    u(k, j, i, 0));
+        });
+
+        // Deep copy to make sure u is updated with unew
+        Kokkos::deep_copy(u, unew);
+    }
+}
+
+--------------- Code Block 4 ---------------
+void jacobi(Kokkos::View<double***, Kokkos::LayoutRight, Kokkos::DefaultExecutionSpace> u, 
+            Kokkos::View<double***, Kokkos::LayoutRight, Kokkos::DefaultExecutionSpace> unew, 
+            int n, int niter) {
+    using execution_space = Kokkos::DefaultExecutionSpace;
+    using range_3d = Kokkos::MDRangePolicy<Kokkos::Rank<3>, execution_space>;
+
+    for (int iter = 0; iter < niter; ++iter) {
+        Kokkos::parallel_for("Jacobi Loop", range_3d({2, 2, 2}, {n-1, n-1, n-1}), KOKKOS_LAMBDA (int k, int j, int i) {
+            unew(i, j, k) = 0.125 * (u(i-1, j, k) + u(i+1, j, k) + u(i, j-1, k) + 
+                                     u(i, j+1, k) + u(i, j, k-1) + u(i, j, k+1) + 
+                                     u(i, j, k));
+        });
+
+        Kokkos::deep_copy(u, unew);
+    }
+}
+
+--------------- Code Block 5 ---------------
+void jacobi_parallel(Kokkos::View<double***> u, Kokkos::View<double***> unew, int n, int niter) {
+    for (int iter = 0; iter < niter; ++iter) {
+        Kokkos::parallel_for("Jacobi", 
+            Kokkos::MDRangePolicy<Kokkos::Rank<3>>({1, 1, 1}, {n-1, n-1, n-1}),
+            JacobiKernel(u, unew, n));
+
+        Kokkos::deep_copy(u, unew);
+    }
+}
+
+--------------- Code Block 6 ---------------
+void jacobi_parallel(View3D u, View3D unew, int n, int niter) {
+    for(int iter = 0; iter < niter; ++iter) {
+        Kokkos::parallel_for("Jacobi", 
+                             Kokkos::MDRangePolicy<Kokkos::Rank<3>>({2, 2, 2}, {n-1, n-1, n-1}),
+                             KOKKOS_LAMBDA(int i, int j, int k) {
+            unew(i, j, k) = 0.125 * (u(i-1, j, k) + u(i+1, j, k) +
+                                     u(i, j-1, k) + u(i, j+1, k) +
+                                     u(i, j, k-1) + u(i, j, k+1) + u(i, j, k));
+        });
+        
+        Kokkos::deep_copy(u, unew); // Transfer data back to u
+    }
+}
+
+--------------- Code Block 7 ---------------
+void jacobi_parallel(Kokkos::View<double***> u, Kokkos::View<double***> unew, int n, int niter) {
+    for (int iter = 0; iter < niter; iter++) {
+        // Define the parallel region using Kokkos
+        Kokkos::parallel_for("JacobiLoop", 
+            Kokkos::MDRangePolicy<Kokkos::Rank<3>>({2, 2, 2}, {n-1, n-1, n-1}), 
+            KOKKOS_LAMBDA(const int k, const int j, const int i) {
+                unew(i, j, k) = 0.125 * (u(i-1, j, k) + u(i+1, j, k) + u(i, j-1, k) +
+                                         u(i, j+1, k) + u(i, j, k-1) + u(i, j, k+1) + u(i, j, k));
+        });
+        
+        // Copy unew to u
+        Kokkos::deep_copy(u, unew);
+    }
+}
+
+--------------- Code Block 8 ---------------
+void jacobi_parallel(const int n, const int niter, 
+                     Kokkos::View<double***> u, 
+                     Kokkos::View<double***> unew) {
+  for (int iter = 0; iter < niter; ++iter) {
+    Kokkos::parallel_for("Jacobi", 
+                         Kokkos::MDRangePolicy<Kokkos::Rank<3>>({2, 2, 2}, {n-1, n-1, n-1}), 
+                         KOKKOS_LAMBDA (const int k, const int j, const int i) {
+      unew(i, j, k) = 0.125 * (u(i-1, j, k) + u(i+1, j, k) + 
+                               u(i, j-1, k) + u(i, j+1, k) + 
+                               u(i, j, k-1) + u(i, j, k+1) + u(i, j, k));
+    });
+
+    Kokkos::deep_copy(u, unew);
+  }
+}
+
+--------------- Code Block 9 ---------------
+void jacobi_parallel(Kokkos::View<double***> u, Kokkos::View<double***> unew, int n, int niter) {
+    using execution_space = Kokkos::DefaultExecutionSpace;
+
+    for(int iter = 0; iter < niter; ++iter) {
+        Kokkos::parallel_for("jacobi", Kokkos::MDRangePolicy<Kokkos::Rank<3>>({1,1,1}, {n-1, n-1, n-1}),
+                             KOKKOS_LAMBDA(const int i, const int j, const int k) {
+            unew(i, j, k) = 0.125 * (u(i-1, j, k) + u(i+1, j, k) + 
+                                     u(i, j-1, k) + u(i, j+1, k) + 
+                                     u(i, j, k-1) + u(i, j, k+1) + 
+                                     u(i, j, k));
+        });
+        Kokkos::deep_copy(u, unew);
+    }
+}
+
+--------------- Code Block 10 ---------------
+void jacobi_parallel(Kokkos::View<double***> u, Kokkos::View<double***> unew, int n, int niter) {
+    // Ensure the execution space is properly initialized
+    Kokkos::initialize();
+    {
+        for (int iter = 0; iter < niter; ++iter) {
+            Kokkos::parallel_for(
+                "JacobiLoop", 
+                Kokkos::MDRangePolicy<Kokkos::Rank<3>>({2, 2, 2}, {n-1, n-1, n-1}),
+                KOKKOS_LAMBDA(int k, int j, int i) {
+                    unew(i, j, k) = 0.125 * (
+                        u(i-1, j, k) + u(i+1, j, k) + 
+                        u(i, j-1, k) + u(i, j+1, k) + 
+                        u(i, j, k-1) + u(i, j, k+1) + 
+                        u(i, j, k)
+                    );
+                }
+            );
+            Kokkos::deep_copy(u, unew);
+        }
+    }
+    Kokkos::finalize();
+}
+

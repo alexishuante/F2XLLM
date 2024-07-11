@@ -1,0 +1,1727 @@
+--------------- Output 1 ---------------
+Here is an equivalent implementation of the given Fortran OpenMP code in C using HIP for parallelism on a GPU. HIP (Heterogeneous-Compute Interface for Portability) is an API used to convert CUDA-based code to work on AMD and NVIDIA GPUs.
+
+This transliteration is approximate because the direct translation of an OpenMP-based CPU parallelization to HIP's GPU parallel programming model involves significant changes, mainly due to differences in execution model and memory handling.
+
+Make sure to install HIP and set up your environment before compiling and running the following code.
+
+```c
+#include <hip/hip_runtime.h>
+#include <cmath>
+#include <cstdio>
+
+#define sqrpi2 2.0  // assuming sqrpi2 is a constant
+#define rcut 1.0  // assuming rcut is a constant
+
+__device__ double erf(double x) {
+    // Simple erf approximation for demonstration 
+    // (consider using a more accurate implementation)
+    return erf(x);
+}
+
+__global__ void hartree_fock_kernel(
+    double* fock, const double* dens, const double* coef, const double* xpnt,
+    const double* geom, const double* schwarz, int nnnn, int ngauss, double dtol, int dimension) {
+
+    int ijkl = blockDim.x * blockIdx.x + threadIdx.x;
+
+    if (ijkl >= nnnn) return;
+
+    int ij = sqrt(2 * ijkl);
+    int n = (ij * ij + ij) / 2;
+    while (n < ijkl) {
+        ++ij;
+        n = (ij * ij + ij) / 2;
+    }
+    int kl = ijkl - (ij * ij - ij) / 2;
+
+    if (schwarz[ij] * schwarz[kl] > dtol) {
+        int i = sqrt(2 * ij);
+        n = (i * i + i) / 2;
+        while (n < ij) {
+            ++i;
+            n = (i * i + i) / 2;
+        }
+        int j = ij - (i * i - i) / 2;
+
+        int k = sqrt(2 * kl);
+        n = (k * k + k) / 2;
+        while (n < kl) {
+            ++k;
+            n = (k * k + k) / 2;
+        }
+        int l = kl - (k * k - k) / 2;
+
+        double eri = 0.0;
+        for (int ib = 0; ib < ngauss; ++ib) {
+            for (int jb = 0; jb < ngauss; ++jb) {
+                double aij = 1.0 / (xpnt[ib] + xpnt[jb]);
+                double dij = coef[ib] * coef[jb] * exp(-xpnt[ib] * xpnt[jb] * aij *
+                             ((geom[i * dimension] - geom[j * dimension]) * (geom[i * dimension] - geom[j * dimension]) +
+                              (geom[i * dimension + 1] - geom[j * dimension + 1]) * (geom[i * dimension + 1] - geom[j * dimension + 1]) +
+                              (geom[i * dimension + 2] - geom[j * dimension + 2]) * (geom[i * dimension + 2] - geom[j * dimension + 2]))) * pow(aij, 1.5);
+
+                if (fabs(dij) > dtol) {
+                    double xij = aij * (xpnt[ib] * geom[i * dimension] + xpnt[jb] * geom[j * dimension]);
+                    double yij = aij * (xpnt[ib] * geom[i * dimension + 1] + xpnt[jb] * geom[j * dimension + 1]);
+                    double zij = aij * (xpnt[ib] * geom[i * dimension + 2] + xpnt[jb] * geom[j * dimension + 2]);
+
+                    for (int kb = 0; kb < ngauss; ++kb) {
+                        for (int lb = 0; lb < ngauss; ++lb) {
+                            double akl = 1.0 / (xpnt[kb] + xpnt[lb]);
+                            double dkl = dij * coef[kb] * coef[lb] * exp(-xpnt[kb] * xpnt[lb] * akl *
+                                          ((geom[k * dimension] - geom[l * dimension]) * (geom[k * dimension] - geom[l * dimension]) +
+                                           (geom[k * dimension + 1] - geom[l * dimension + 1]) * (geom[k * dimension + 1] - geom[l * dimension + 1]) +
+                                           (geom[k * dimension + 2] - geom[l * dimension + 2]) * (geom[k * dimension + 2] - geom[l * dimension + 2]))) * pow(akl, 1.5);
+
+                            if (fabs(dkl) > dtol) {
+                                double aijkl = (xpnt[ib] + xpnt[jb]) * (xpnt[kb] + xpnt[lb]) /
+                                               (xpnt[ib] + xpnt[jb] + xpnt[kb] + xpnt[lb]);
+                                double tt = aijkl * ((xij - akl * (xpnt[kb] * geom[k * dimension] + xpnt[lb] * geom[l * dimension])) *
+                                                     (xij - akl * (xpnt[kb] * geom[k * dimension] + xpnt[lb] * geom[l * dimension])) +
+                                                     (yij - akl * (xpnt[kb] * geom[k * dimension + 1] + xpnt[lb] * geom[l * dimension + 1])) *
+                                                     (yij - akl * (xpnt[kb] * geom[k * dimension + 1] + xpnt[lb] * geom[l * dimension + 1])) +
+                                                     (zij - akl * (xpnt[kb] * geom[k * dimension + 2] + xpnt[lb] * geom[l * dimension + 2])) *
+                                                     (zij - akl * (xpnt[kb] * geom[k * dimension + 2] + xpnt[lb] * geom[l * dimension + 2])));
+
+                                double f0t = sqrpi2;
+                                if (tt > rcut)
+                                    f0t = pow(tt, -0.5) * erf(sqrt(tt));
+                                eri = eri + dkl * f0t * sqrt(aijkl);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        __shared__ double fock_shared[6];
+
+        eri = (i == j) ? eri * 0.5 : eri;
+        eri = (k == l) ? eri * 0.5 : eri;
+        eri = (i == k && j == l) ? eri * 0.5 : eri;
+
+        atomicAdd(&fock[(i * dimension) + j], dens[(k * dimension) + l] * eri * 4.0);
+        atomicAdd(&fock[(k * dimension) + l], dens[(i * dimension) + j] * eri * 4.0);
+        atomicAdd(&fock[(i * dimension) + k], dens[(j * dimension) + l] * eri);
+        atomicAdd(&fock[(i * dimension) + l], dens[(j * dimension) + k] * eri);
+        atomicAdd(&fock[(j * dimension) + k], dens[(i * dimension) + l] * eri);
+        atomicAdd(&fock[(j * dimension) + l], dens[(i * dimension) + k] * eri);
+    }
+}
+
+void hartree_fock(
+    double* fock, const double* dens, const double* coef, const double* xpnt,
+    const double* geom, const double* schwarz, int nnnn, int ngauss, double dtol, int dimension) {
+
+    double* d_fock;
+    double* d_dens;
+    double* d_coef;
+    double* d_xpnt;
+    double* d_geom;
+    double* d_schwarz;
+
+    cudaMalloc((void**)&d_fock, dimension * dimension * sizeof(double));
+    cudaMalloc((void**)&d_dens, dimension * dimension * sizeof(double));
+    cudaMalloc((void**)&d_coef, ngauss * sizeof(double));
+    cudaMalloc((void**)&d_xpnt, ngauss * sizeof(double));
+    cudaMalloc((void**)&d_geom, dimension * dimension * sizeof(double));
+    cudaMalloc((void**)&d_schwarz, dimension * sizeof(double));
+
+    hipMemcpy(d_fock, fock, dimension * dimension * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_dens, dens, dimension * dimension * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_coef, coef, ngauss * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_xpnt, xpnt, ngauss * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_geom, geom, dimension * dimension * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_schwarz, schwarz, dimension * sizeof(double), hipMemcpyHostToDevice);
+
+    int blockSize = 256;
+    int numBlocks = (nnnn + blockSize - 1) / blockSize;
+
+    hipLaunchKernelGGL(hartree_fock_kernel, numBlocks, blockSize, 0, 0, d_fock, d_dens, d_coef, d_xpnt, d_geom, d_schwarz, nnnn, ngauss, dtol, dimension);
+
+    hipMemcpy(fock, d_fock, dimension * dimension * sizeof(double), hipMemcpyDeviceToHost);
+
+    hipFree(d_fock);
+    hipFree(d_dens);
+    hipFree(d_coef);
+    hipFree(d_xpnt);
+    hipFree(d_geom);
+    hipFree(d_schwarz);
+}
+
+int main() {
+    // Initialize data (example values)
+    int dimension = 3;
+    int nnnn = 16;  // to be set according to the actual usage
+    int ngauss = 4;  // to be set according to the actual usage
+    double dtol = 0.00001;
+
+    double* fock = (double*)calloc(dimension * dimension, sizeof(double));
+    double* dens = (double*)malloc(dimension * dimension * sizeof(double));
+    double* coef = (double*)malloc(ngauss * sizeof(double));
+    double* xpnt = (double*)malloc(ngauss * sizeof(double));
+    double* geom = (double*)malloc(dimension * dimension * sizeof(double));
+    double* schwarz = (double*)malloc(dimension * sizeof(double));
+
+    // Fill dens, coef, xpnt, geom, and schwarz with actual data...
+
+    // Call hartree_fock function
+    hartree_fock(fock, dens, coef, xpnt, geom, schwarz, nnnn, ngauss, dtol, dimension);
+
+    // Use result in fock...
+
+    free(fock);
+    free(dens);
+    free(coef);
+    free(xpnt);
+    free(geom);
+    free(schwarz);
+
+    return 0;
+}
+```
+
+**Explanation:**
+1. **HIP Kernel:** The `hartree_fock_kernel` function performs the Hartree-Fock calculations on a GPU. `__global__` keyword indicates that this is a GPU kernel function.
+2. **Memory Management:** Variables are allocated in the device (GPU) memory using `hipMalloc`, and data is transferred to/from the device memory using `hipMemcpy`.
+3. **Kernel Launch:** The kernel is launched with a certain number of blocks and threads per block using `hipLaunchKernelGGL`.
+4. **Atomic Operations:** Atomic operations are used to safely update the Fock matrix from multiple threads.
+
+Make sure to adapt the example values and variables `nnnn`, `ngauss`, and `dimension` according to your actual data and problem size. Additionally, fill in the data for `dens`, `coef`, `xpnt`, `geom`, and `schwarz` with actual atomic and molecular orbital data before running the code.
+
+--------------- Output 2 ---------------
+The following C code uses HIP for GPU acceleration to implement the same Hartree-Fock operation described in the Fortran code with OpenMP. The `#pragma omp` directives in Fortran are replaced by equivalent HIP constructs, and the C syntax is used accordingly. Note that some auxiliary functions and definitions (like the functions to calculate indices and the precision constants) may need to be defined according to the actual program logic and data structures.
+
+Before running the HIP code, ensure you have installed the HIP SDK and have a compatible GPU. 
+
+Here's the C implementation with HIP:
+
+```c
+#include <hip/hip_runtime.h>
+#include <stdio.h>
+#include <math.h>
+
+// Constants, define these appropriately
+#define nnnn 1000
+#define ngauss 10
+#define dtol 1e-10
+#define rcut 1e-10
+#define sqrpi2 1.1283791670955125738961589031215 // 2/sqrt(pi)
+
+// Geometry data, coefficients, exponents, etc., should be defined and initialized here
+double schwarz[100][100]; // Schwarz screening matrix
+double coef[ngauss];
+double xpnt[ngauss];
+double geom[3][100]; // Geometry matrix
+double fock[100][100]; // Fock matrix
+double dens[100][100]; // Density matrix
+
+__global__ void hartree_fock_kernel(double* d_fock, const double* coef, const double* xpnt, const double* geom, const double* dens, const double* schwarz) {
+    int ijkl = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    if (ijkl >= nnnn) return;
+
+    int ij = sqrt((double)(2 * ijkl));
+    int n = (ij * ij + ij) / 2;
+    while (n < ijkl) {
+        ij += 1;
+        n = (ij * ij + ij) / 2;
+    }
+    int kl = ijkl - (ij * ij - ij) / 2;
+    if (schwarz[ij * 100 + kl] > dtol) {
+        int i = sqrt((double)(2 * ij));
+        n = (i * i + i) / 2;
+        while (n < ij) {
+            i += 1;
+            n = (i * i + i) / 2;
+        }
+        int j = ij - (i * i - i) / 2;
+        int k = sqrt((double)(2 * kl));
+        n = (k * k + k) / 2;
+        while (n < kl) {
+            k += 1;
+            n = (k * k + k) / 2;
+        }
+        int l = kl - (k * k - k) / 2;
+        double eri = 0.0;
+
+        for (int ib = 1; ib <= ngauss; ++ib) {
+            for (int jb = 1; jb <= ngauss; ++jb) {
+                double aij = 1.0 / (xpnt[ib] + xpnt[jb]);
+                double dij = coef[ib]*coef[jb]*exp(-xpnt[ib]*xpnt[jb]*aij * 
+                          ((geom[0][i] - geom[0][j]) * (geom[0][i] - geom[0][j]) +
+                          (geom[1][i] - geom[1][j]) * (geom[1][i] - geom[1][j]) +
+                          (geom[2][i] - geom[2][j]) * (geom[2][i] - geom[2][j]))) * pow(aij, 1.5);
+                if (abs(dij) > dtol) {
+                    double xij = aij * (xpnt[ib] * geom[0][i] + xpnt[jb] * geom[0][j]);
+                    double yij = aij * (xpnt[ib] * geom[1][i] + xpnt[jb] * geom[1][j]);
+                    double zij = aij * (xpnt[ib] * geom[2][i] + xpnt[jb] * geom[2][j]);
+
+                    for (int kb = 1; kb <= ngauss; ++kb) {
+                        for (int lb = 1; lb <= ngauss; ++lb) {
+                            double akl = 1.0 / (xpnt[kb] + xpnt[lb]);
+                            double dkl = dij * coef[kb] * coef[lb] * exp(-xpnt[kb]*xpnt[lb]*akl * 
+                                    ((geom[0][k] - geom[0][l]) * (geom[0][k] - geom[0][l]) +
+                                     (geom[1][k] - geom[1][l]) * (geom[1][k] - geom[1][l]) +
+                                     (geom[2][k] - geom[2][l]) * (geom[2][k] - geom[2][l]))) * pow(akl, 1.5);
+                            if (abs(dkl) > dtol) {
+                                double aijkl = (xpnt[ib] + xpnt[jb]) * (xpnt[kb] + xpnt[lb]) / 
+                                               (xpnt[ib] + xpnt[jb] + xpnt[kb] + xpnt[lb]);
+                                double tt = aijkl * 
+                                            ((xij - akl * (xpnt[kb] * geom[0][k] + xpnt[lb] * geom[0][l])) *
+                                             (xij - akl * (xpnt[kb] * geom[0][k] + xpnt[lb] * geom[0][l])) +
+                                             (yij - akl * (xpnt[kb] * geom[1][k] + xpnt[lb] * geom[1][l])) *
+                                             (yij - akl * (xpnt[kb] * geom[1][k] + xpnt[lb] * geom[1][l])) +
+                                             (zij - akl * (xpnt[kb] * geom[2][k] + xpnt[lb] * geom[2][l])) *
+                                             (zij - akl * (xpnt[kb] * geom[2][k] + xpnt[lb] * geom[2][l])));
+                                double f0t = sqrpi2;
+                                if (tt > rcut) f0t = pow(tt, -0.5) * erf(sqrt(tt));
+                                eri = eri + dkl * f0t * sqrt(aijkl);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if (i == j) eri *= 0.5;
+        if (k == l) eri *= 0.5;
+        if (i == k && j == l) eri *= 0.5;
+
+        atomicAdd(&d_fock[i * 100 + j], dens[k * 100 + l] * eri * 4.0);
+        atomicAdd(&d_fock[k * 100 + l], dens[i * 100 + j] * eri * 4.0);
+        atomicAdd(&d_fock[i * 100 + k], -dens[j * 100 + l] * eri);
+        atomicAdd(&d_fock[i * 100 + l], -dens[j * 100 + k] * eri);
+        atomicAdd(&d_fock[j * 100 + k], -dens[i * 100 + l] * eri);
+        atomicAdd(&d_fock[j * 100 + l], -dens[i * 100 + k] * eri);
+    }
+}
+
+void hartree_fock() {
+    double* d_fock;
+    double* d_coef;
+    double* d_xpnt;
+    double* d_geom;
+    double* d_dens;
+    double* d_schwarz;
+
+    size_t matrix_size = 100 * 100 * sizeof(double);
+    size_t geom_size = 3 * 100 * sizeof(double);
+    size_t list_size = ngauss * sizeof(double);
+
+    hipMalloc(&d_fock, matrix_size);
+    hipMalloc(&d_coef, list_size);
+    hipMalloc(&d_xpnt, list_size);
+    hipMalloc(&d_geom, geom_size);
+    hipMalloc(&d_dens, matrix_size);
+    hipMalloc(&d_schwarz, matrix_size);
+
+    hipMemcpy(d_fock, fock, matrix_size, hipMemcpyHostToDevice);
+    hipMemcpy(d_coef, coef, list_size, hipMemcpyHostToDevice);
+    hipMemcpy(d_xpnt, xpnt, list_size, hipMemcpyHostToDevice);
+    hipMemcpy(d_geom, geom, geom_size, hipMemcpyHostToDevice);
+    hipMemcpy(d_dens, dens, matrix_size, hipMemcpyHostToDevice);
+    hipMemcpy(d_schwarz, schwarz, matrix_size, hipMemcpyHostToDevice);
+
+    int threadsPerBlock = 256; 
+    int blocksPerGrid = (nnnn + threadsPerBlock - 1) / threadsPerBlock;
+    hipLaunchKernelGGL(hartree_fock_kernel, dim3(blocksPerGrid), dim3(threadsPerBlock), 0, 0, d_fock, d_coef, d_xpnt, d_geom, d_dens, d_schwarz);
+
+    hipMemcpy(fock, d_fock, matrix_size, hipMemcpyDeviceToHost);
+
+    hipFree(d_fock);
+    hipFree(d_coef);
+    hipFree(d_xpnt);
+    hipFree(d_geom);
+    hipFree(d_dens);
+    hipFree(d_schwarz);
+}
+```
+
+Explanation of the Changes/Adaptions:
+1. **Index Calculation:**
+   The original code's logic is used to decompose the indices and variables for the integral computation in the kernel.
+2. **Atomic Operations:**
+   Atomic operations (`atomicAdd`) are used to update the elements of the `fock` matrix atomically.
+3. **Memory Management:**
+   Memory management functions like `hipMalloc`, `hipMemcpy`, and `hipFree` are used to allocate and manage memory on the GPU.
+4. **GPU Kernel Execution:**
+   The `hipLaunchKernelGGL` is used to launch the GPU kernel, computing the Hartree-Fock matrix elements in parallel on the GPU.
+5. **Kernel Logic:**
+   The computational logic inside the kernel is parallelized based on the original Fortran loop structure.
+
+Make sure to appropriately define and initialize the arrays and constants used in this program (`schwarz`, `coef`, `xpnt`, `geom`, `dens`, etc.) to match the context and problem specifics.
+
+--------------- Output 3 ---------------
+Certainly! The following is an equivalent C code utilizing HIP for GPU acceleration for the Hartree-Fock operation you provided:
+
+```c
+#include <hip/hip_runtime.h>
+#include <stdio.h>
+#include <math.h>
+
+#define THREADS_PER_BLOCK 256
+
+__global__ void hf_kernel(double* fock, double* dens, double* schwarz, double* geom, double* coef, double* xpnt, int ngauss, int nnnn, double dtol, double sqrpi2, double rcut) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= nnnn) return;
+
+    int ib, jb, kb, lb, ijkl, ij, i, j, kl, k, l, n;
+    double aij, dij, xij, yij, zij, akl, dkl, aijkl, tt, f0t, eri;
+
+    ijkl = idx + 1; // Fortran index starts at 1
+
+    ij = sqrt(2.0 * ijkl);
+    n = (ij * ij + ij) / 2;
+    while (n < ijkl) {
+        ij = ij + 1;
+        n = (ij * ij + ij) / 2;
+    }
+    kl = ijkl - (ij * ij - ij) / 2;
+
+    if (schwarz[ij - 1] * schwarz[kl - 1] > dtol) {
+        i = sqrt(2.0 * ij);
+        n = (i * i + i) / 2;
+        while (n < ij) {
+            i = i + 1;
+            n = (i * i + i) / 2;
+        }
+        j = ij - (i * i - i) / 2;
+
+        k = sqrt(2.0 * kl);
+        n = (k * k + k) / 2;
+        while (n < kl) {
+            k = k + 1;
+            n = (k * k + k) / 2;
+        }
+        l = kl - (k * k - k) / 2;
+
+        eri = 0.0;
+        for (ib = 0; ib < ngauss; ib++) {
+            for (jb = 0; jb < ngauss; jb++) {
+                aij = 1.0 / (xpnt[ib] + xpnt[jb]);
+                dij = coef[ib] * coef[jb] * exp(-xpnt[ib] * xpnt[jb] * aij * (
+                        (geom[3 * i] - geom[3 * j]) * (geom[3 * i] - geom[3 * j]) +
+                        (geom[3 * i + 1] - geom[3 * j + 1]) * (geom[3 * i + 1] - geom[3 * j + 1]) +
+                        (geom[3 * i + 2] - geom[3 * j + 2]) * (geom[3 * i + 2] - geom[3 * j + 2])
+                    )) * pow(aij, 1.5);
+                if (fabs(dij) > dtol) {
+                    xij = aij*(xpnt[ib] * geom[3 * i] + xpnt[jb] * geom[3 * j]);
+                    yij = aij*(xpnt[ib] * geom[3 * i + 1] + xpnt[jb] * geom[3 * j + 1]);
+                    zij = aij*(xpnt[ib] * geom[3 * i + 2] + xpnt[jb] * geom[3 * j + 2]);
+                    for (kb = 0; kb < ngauss; kb++) {
+                        for (lb = 0; lb < ngauss; lb++) {
+                            akl = 1.0 / (xpnt[kb] + xpnt[lb]);
+                            dkl = dij * coef[kb] * coef[lb] * exp(-xpnt[kb] * xpnt[lb] * akl * (
+                                    (geom[3 * k] - geom[3 * l]) * (geom[3 * k] - geom[3 * l]) +
+                                    (geom[3 * k + 1] - geom[3 * l + 1]) * (geom[3 * k + 1] - geom[3 * l + 1]) +
+                                    (geom[3 * k + 2] - geom[3 * l + 2]) * (geom[3 * k + 2] - geom[3 * l + 2])
+                                )) * pow(akl, 1.5);
+                            if (fabs(dkl) > dtol) {
+                                aijkl = (xpnt[ib] + xpnt[jb]) * (xpnt[kb] + xpnt[lb]) / (xpnt[ib] + xpnt[jb] + xpnt[kb] + xpnt[lb]);
+                                tt = aijkl * (
+                                    (xij - akl * (xpnt[kb] * geom[3 * k] + xpnt[lb] * geom[3 * l])) * (xij - akl * (xpnt[kb] * geom[3 * k] + xpnt[lb] * geom[3 * l])) +
+                                    (yij - akl * (xpnt[kb] * geom[3 * k + 1] + xpnt[lb] * geom[3 * l + 1])) * (yij - akl * (xpnt[kb] * geom[3 * k + 1] + xpnt[lb] * geom[3 * l + 1])) +
+                                    (zij - akl * (xpnt[kb] * geom[3 * k + 2] + xpnt[lb] * geom[3 * l + 2])) * (zij - akl * (xpnt[kb] * geom[3 * k + 2] + xpnt[lb] * geom[3 * l + 2]))
+                                );
+                                f0t = sqrpi2;
+                                if (tt > rcut)
+                                    f0t = pow(tt, -0.5) * erf(sqrt(tt));
+                                eri += dkl * f0t * sqrt(aijkl);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (i == j) eri *= 0.5;
+        if (k == l) eri *= 0.5;
+        if (i == k && j == l) eri *= 0.5;
+
+        atomicAdd(&fock[i * nnnn + j], dens[k * nnnn + l] * eri * 4.0);
+        atomicAdd(&fock[k * nnnn + l], dens[i * nnnn + j] * eri * 4.0);
+        atomicAdd(&fock[i * nnnn + k], -dens[j * nnnn + l] * eri);
+        atomicAdd(&fock[i * nnnn + l], -dens[j * nnnn + k] * eri);
+        atomicAdd(&fock[j * nnnn + k], -dens[i * nnnn + l] * eri);
+        atomicAdd(&fock[j * nnnn + l], -dens[i * nnnn + k] * eri);
+    }
+}
+
+int main() {
+    // Initialize variables such as nnnn, ngauss, dtol, sqrpi2, rcut, and arrays
+    int nnnn = ...;
+    int ngauss = ...;
+    double dtol = ...;
+    double sqrpi2 = ...;
+    double rcut = ...;
+    double* fock = (double*)malloc(nnnn * nnnn * sizeof(double));
+    double* dens = ...;
+    double* schwarz = ...;
+    double* geom = ...;
+    double* coef = ...;
+    double* xpnt = ...;
+
+    // Allocate memory on GPU
+    double *d_fock, *d_dens, *d_schwarz, *d_geom, *d_coef, *d_xpnt;
+    hipMalloc(&d_fock, nnnn * nnnn * sizeof(double));
+    hipMalloc(&d_dens, ...); // Proper size allocation
+    hipMalloc(&d_schwarz, ...);
+    hipMalloc(&d_geom, ...);
+    hipMalloc(&d_coef, ...);
+    hipMalloc(&d_xpnt, ...);
+
+    // Copy data to GPU
+    hipMemcpy(d_fock, fock, nnnn * nnnn * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_dens, dens, ...);
+    hipMemcpy(d_schwarz, schwarz, ...);
+    hipMemcpy(d_geom, geom, ...);
+    hipMemcpy(d_coef, coef, ...);
+    hipMemcpy(d_xpnt, xpnt, ...);
+
+    // Launch kernel
+    int blocks = (nnnn + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+    hipLaunchKernelGGL(hf_kernel, dim3(blocks), dim3(THREADS_PER_BLOCK), 0, 0, d_fock, d_dens, d_schwarz, d_geom, d_coef, d_xpnt, ngauss, nnnn, dtol, sqrpi2, rcut);
+
+    // Copy results back to host
+    hipMemcpy(fock, d_fock, nnnn * nnnn * sizeof(double), hipMemcpyDeviceToHost);
+
+    // Free GPU memory
+    hipFree(d_fock);
+    hipFree(d_dens);
+    hipFree(d_schwarz);
+    hipFree(d_geom);
+    hipFree(d_coef);
+    hipFree(d_xpnt);
+
+    // Further processing and cleanup
+    free(fock);
+    // ...
+
+    return 0;
+}
+```
+
+Note: This code serves as an adaptation, and certain parts such as `...` would require the proper initialization or allocation as per your specific requirements. This adaptation utilizes HIP's atomic operations to maintain harmony with the OpenMP atomic directives in the original Fortran code. Additionally, error-checking and memory management are essential but are not included here for brevity.
+
+--------------- Output 4 ---------------
+Below is a C implementation with HIP that mimics the Fortran code using OpenMP you provided.
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <hip/hip_runtime.h>
+#include <omp.h>
+
+// Use your own constants and function declarations
+#define dtol 1e-12
+#define rcut 10.0
+
+#define NGAUSS 10 // Example constant, replace with actual value
+#define NNNN 10000 // Example constant, replace with actual value
+
+double coef[NGAUSS];
+double geom[3][NNNN]; // Example 3D geom array, replace with actual value
+double xpnt[NGAUSS];
+double schwarz[NNNN];
+double dens[NNNN][NNNN];
+double fock[NNNN][NNNN];
+const double sqrpi2 = sqrt(M_PI / 2.0);
+
+// Error handling macro for HIP API
+#define HIP_CHECK(call)                                                      \
+    {                                                                        \
+        hipError_t err = (call);                                             \
+        if (err != hipSuccess)                                               \
+        {                                                                    \
+            fprintf(stderr, "HIP error at %s:%d: %s\n", __FILE__, __LINE__, \
+                    hipGetErrorString(err));                                 \
+            exit(EXIT_FAILURE);                                              \
+        }                                                                    \
+    }
+
+// Kernel function
+__global__ void hartree_fock_kernel(double *fock, double *dens, double *geom, double *coef, double *xpnt, double *schwarz, int ngauss, int nnnn)
+{
+    int ijkl = blockDim.x * blockIdx.x + threadIdx.x;
+    if (ijkl >= nnnn)
+        return;
+
+    int ij = sqrt(2.0 * ijkl);
+    int n = (ij * ij + ij) / 2;
+    while (n < ijkl)
+    {
+        ij++;
+        n = (ij * ij + ij) / 2;
+    }
+    int kl = ijkl - (ij * ij - ij) / 2;
+    if (schwarz[ij] * schwarz[kl] > dtol)
+    {
+        int i = sqrt(2.0 * ij);
+        n = (i * i + i) / 2;
+        while (n < ij)
+        {
+            i++;
+            n = (i * i + i) / 2;
+        }
+        int j = ij - (i * i - i) / 2;
+        int k = sqrt(2.0 * kl);
+        n = (k * k + k) / 2;
+        while (n < kl)
+        {
+            k++;
+            n = (k * k + k) / 2;
+        }
+        int l = kl - (k * k - k) / 2;
+        double eri = 0.0;
+
+        for (int ib = 0; ib < ngauss; ib++)
+        {
+            for (int jb = 0; jb < ngauss; jb++)
+            {
+                double aij = 1.0 / (xpnt[ib] + xpnt[jb]);
+                double dij = coef[ib] * coef[jb] * exp(-xpnt[ib] * xpnt[jb] * aij *
+                                                        ((geom[3 * i] - geom[3 * j]) * (geom[3 * i] - geom[3 * j]) +
+                                                         (geom[3 * i + 1] - geom[3 * j + 1]) * (geom[3 * i + 1] - geom[3 * j + 1]) +
+                                                         (geom[3 * i + 2] - geom[3 * j + 2]) * (geom[3 * i + 2] - geom[3 * j + 2]))) *
+                             pow(aij, 1.5);
+                if (fabs(dij) > dtol)
+                {
+                    double xij = aij * (xpnt[ib] * geom[3 * i] + xpnt[jb] * geom[3 * j]);
+                    double yij = aij * (xpnt[ib] * geom[3 * i + 1] + xpnt[jb] * geom[3 * j + 1]);
+                    double zij = aij * (xpnt[ib] * geom[3 * i + 2] + xpnt[jb] * geom[3 * j + 2]);
+
+                    for (int kb = 0; kb < ngauss; kb++)
+                    {
+                        for (int lb = 0; lb < ngauss; lb++)
+                        {
+                            double akl = 1.0 / (xpnt[kb] + xpnt[lb]);
+                            double dkl = dij * coef[kb] * coef[lb] * exp(-xpnt[kb] * xpnt[lb] * akl *
+                                                                         ((geom[3 * k] - geom[3 * l]) * (geom[3 * k] - geom[3 * l]) +
+                                                                          (geom[3 * k + 1] - geom[3 * l + 1]) * (geom[3 * k + 1] - geom[3 * l + 1]) +
+                                                                          (geom[3 * k + 2] - geom[3 * l + 2]) * (geom[3 * k + 2] - geom[3 * l + 2]))) *
+                                      pow(akl, 1.5);
+                            if (fabs(dkl) > dtol)
+                            {
+                                double aijkl = (xpnt[ib] + xpnt[jb]) * (xpnt[kb] + xpnt[lb]) /
+                                               (xpnt[ib] + xpnt[jb] + xpnt[kb] + xpnt[lb]);
+                                double tt = aijkl * ((xij - akl * (xpnt[kb] * geom[3 * k] + xpnt[lb] * geom[3 * l])) *
+                                                         (xij - akl * (xpnt[kb] * geom[3 * k] + xpnt[lb] * geom[3 * l])) +
+                                                     (yij - akl * (xpnt[kb] * geom[3 * k + 1] + xpnt[lb] * geom[3 * l + 1])) *
+                                                         (yij - akl * (xpnt[kb] * geom[3 * k + 1] + xpnt[lb] * geom[3 * l + 1])) +
+                                                     (zij - akl * (xpnt[kb] * geom[3 * k + 2] + xpnt[lb] * geom[3 * l + 2])) *
+                                                         (zij - akl * (xpnt[kb] * geom[3 * k + 2] + xpnt[lb] * geom[3 * l + 2])));
+                                double f0t = sqrpi2;
+                                if (tt > rcut)
+                                    f0t = pow(tt, -0.5) * erf(sqrt(tt));
+                                eri += dkl * f0t * sqrt(aijkl);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if (i == j)
+            eri *= 0.5;
+        if (k == l)
+            eri *= 0.5;
+        if (i == k && j == l)
+            eri *= 0.5;
+
+        // Atomic operations for thread safety
+        atomicAdd(&fock[i * NNNN + j], dens[k * NNNN + l] * eri * 4.0);
+        atomicAdd(&fock[k * NNNN + l], dens[i * NNNN + j] * eri * 4.0);
+        atomicAdd(&fock[i * NNNN + k], -dens[j * NNNN + l] * eri);
+        atomicAdd(&fock[i * NNNN + l], -dens[j * NNNN + k] * eri);
+        atomicAdd(&fock[j * NNNN + k], -dens[i * NNNN + l] * eri);
+        atomicAdd(&fock[j * NNNN + l], -dens[i * NNNN + k] * eri);
+    }
+}
+
+void hartree_fock_gpu(double *fock, double *dens, double *geom, double *coef, double *xpnt, double *schwarz, int ngauss, int nnnn)
+{
+    double *d_fock, *d_dens, *d_geom, *d_coef, *d_xpnt, *d_schwarz;
+
+    HIP_CHECK(hipMalloc((void **)&d_fock, nnnn * nnnn * sizeof(double)));
+    HIP_CHECK(hipMalloc((void **)&d_dens, nnnn * nnnn * sizeof(double)));
+    HIP_CHECK(hipMalloc((void **)&d_geom, 3 * nnnn * sizeof(double)));
+    HIP_CHECK(hipMalloc((void **)&d_coef, ngauss * sizeof(double)));
+    HIP_CHECK(hipMalloc((void **)&d_xpnt, ngauss * sizeof(double)));
+    HIP_CHECK(hipMalloc((void **)&d_schwarz, nnnn * sizeof(double)));
+
+    HIP_CHECK(hipMemcpy(d_fock, fock, nnnn * nnnn * sizeof(double), hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(d_dens, dens, nnnn * nnnn * sizeof(double), hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(d_geom, geom, 3 * nnnn * sizeof(double), hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(d_coef, coef, ngauss * sizeof(double), hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(d_xpnt, xpnt, ngauss * sizeof(double), hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(d_schwarz, schwarz, nnnn * sizeof(double), hipMemcpyHostToDevice));
+
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (nnnn + threadsPerBlock - 1) / threadsPerBlock;
+
+    hipLaunchKernelGGL(hartree_fock_kernel, dim3(blocksPerGrid), dim3(threadsPerBlock), 
+                       0, 0, d_fock, d_dens, d_geom, d_coef, d_xpnt, d_schwarz, ngauss, nnnn);
+
+    HIP_CHECK(hipMemcpy(fock, d_fock, nnnn * nnnn * sizeof(double), hipMemcpyDeviceToHost));
+
+    HIP_CHECK(hipFree(d_fock));
+    HIP_CHECK(hipFree(d_dens));
+    HIP_CHECK(hipFree(d_geom));
+    HIP_CHECK(hipFree(d_coef));
+    HIP_CHECK(hipFree(d_xpnt));
+    HIP_CHECK(hipFree(d_schwarz));
+}
+
+int main()
+{
+    // Initialize arrays and variables
+    // For demonstration purposes, use some example initialization here
+
+    // Call the GPU function
+    hartree_fock_gpu((double *)fock, (double *)dens, (double *)geom, (double *)coef, (double *)xpnt, (double *)schwarz, NGAUSS, NNNN);
+
+    // Print or use the results
+    printf("Fock matrix (truncated):\n");
+    for (int i = 0; i < 10; ++i)
+    {
+        for (int j = 0; j < 10; ++j)
+        {
+            printf("%f ", fock[i][j]);
+        }
+        printf("\n");
+    }
+
+    return 0;
+}
+```
+
+### Important Points:
+1. **Parallelization Strategy**: The entire block of nested for-loops is represented in one HIP kernel. Each thread processes a single `ijkl` index.
+   
+2. **HIP Atomics**: Atomic operations ensure thread safety when updating the `fock` matrix.
+
+3. **Memory Handling**: All necessary arrays are copied to the GPU at the start, and the results are copied back to the CPU at the end.
+
+This code assumes specific matrix sizes and initialization values, which would need to be adapted to your actual problem size and data.
+
+--------------- Output 5 ---------------
+To translate the given Fortran code using OpenMP into C with HIP (Heterogeneous-compute Interface for Portability), one needs to adjust the structure and syntax while preserving the logic of the original code. Below is the equivalent C code with HIP implementation:
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <hip/hip_runtime.h>
+
+#define BLOCK_SIZE 256 // Adjust as needed
+
+__global__
+void hartreeFockKernel(int nnn, int ngauss, double dtol, double rcut, double sqrpi2, 
+    double *xpnt, double *coef, double *geom, double *schwarz, double *dens, double *fock) {
+
+    int ijkl = blockDim.x * blockIdx.x + threadIdx.x;
+
+    if (ijkl >= nnn) return;
+
+    int ij, kl, ijkl_ind, i, j, k, l, ib, jb, kb, lb, n;
+    double aij, dij, xij, yij, zij, akl, dkl, aijkl, tt, f0t, eri;
+
+    ij = sqrt(2.0 * ijkl);
+    n = (ij * ij + ij) / 2;
+    while (n < ijkl) {
+        ij++;
+        n = (ij * ij + ij) / 2;
+    }
+    kl = ijkl - (ij * ij - ij) / 2;
+
+    if (schwarz[ij] * schwarz[kl] > dtol) {
+        i = sqrt(2.0 * ij);
+        n = (i * i + i) / 2;
+        while (n < ij) {
+            i++;
+            n = (i * i + i) / 2;
+        }
+        j = ij - (i * i - i) / 2;
+        
+        k = sqrt(2.0 * kl);
+        n = (k * k + k) / 2;
+        while (n < kl) {
+            k++;
+            n = (k * k + k) / 2;
+        }
+        l = kl - (k * k - k) / 2;
+        
+        eri = 0.0;
+        for (ib = 0; ib < ngauss; ib++) {
+            for (jb = 0; jb < ngauss; jb++) {
+                aij = 1.0 / (xpnt[ib] + xpnt[jb]);
+                double geom_diff_ij = pow(geom[3*i] - geom[3*j], 2) + pow(geom[3*i+1] - geom[3*j+1], 2) + pow(geom[3*i+2] - geom[3*j+2], 2);
+                dij = coef[ib] * coef[jb] * exp(-xpnt[ib] * xpnt[jb] * aij * geom_diff_ij) * pow(aij, 1.5);
+                if (fabs(dij) > dtol) {
+                    xij = aij * (xpnt[ib] * geom[3*i] + xpnt[jb] * geom[3*j]);
+                    yij = aij * (xpnt[ib] * geom[3*i+1] + xpnt[jb] * geom[3*j+1]);
+                    zij = aij * (xpnt[ib] * geom[3*i+2] + xpnt[jb] * geom[3*j+2]);
+                    for (kb = 0; kb < ngauss; kb++) {
+                        for (lb = 0; lb < ngauss; lb++) {
+                            akl = 1.0 / (xpnt[kb] + xpnt[lb]);
+                            double geom_diff_kl = pow(geom[3*k] - geom[3*l], 2) + pow(geom[3*k+1] - geom[3*l+1], 2) + pow(geom[3*k+2] - geom[3*l+2], 2);
+                            dkl = dij * coef[kb] * coef[lb] * exp(-xpnt[kb] * xpnt[lb] * akl * geom_diff_kl) * pow(akl, 1.5);
+                            if (fabs(dkl) > dtol) {
+                                aijkl = (xpnt[ib] + xpnt[jb]) * (xpnt[kb] + xpnt[lb]) / (xpnt[ib] + xpnt[jb] + xpnt[kb] + xpnt[lb]);
+                                tt = aijkl * (pow(xij - akl * (xpnt[kb] * geom[3*k] + xpnt[lb] * geom[3*l]), 2) 
+                                             +pow(yij - akl * (xpnt[kb] * geom[3*k+1] + xpnt[lb] * geom[3*l+1]), 2) 
+                                             +pow(zij - akl * (xpnt[kb] * geom[3*k+2] + xpnt[lb] * geom[3*l+2]), 2));
+                                f0t = sqrpi2;
+                                if (tt > rcut) f0t = pow(tt, -0.5) * erf(sqrt(tt));
+                                eri += dkl * f0t * sqrt(aijkl);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if (i == j) eri *= 0.5;
+        if (k == l) eri *= 0.5;
+        if (i == k && j == l) eri *= 0.5;
+
+        atomicAdd(&fock[i*ngauss+j], dens[k*ngauss+l] * eri * 4.0);
+        atomicAdd(&fock[k*ngauss+l], dens[i*ngauss+j] * eri * 4.0);
+        atomicAdd(&fock[i*ngauss+k], -dens[j*ngauss+l] * eri);
+        atomicAdd(&fock[i*ngauss+l], -dens[j*ngauss+k] * eri);
+        atomicAdd(&fock[j*ngauss+k], -dens[i*ngauss+l] * eri);
+        atomicAdd(&fock[j*ngauss+l], -dens[i*ngauss+k] * eri);
+    }
+}
+
+int main() {
+    // Define relevant constants and variables (this part of code should implement necessary initialization)
+    // ...
+    int nnn = ...; // the value of nnn
+    int ngauss = ...; // the value of ngauss
+    double dtol = ...; // the value of dtol
+    double rcut = ...; // the value of rcut
+    double sqrpi2 = ...; // the value of sqrpi2
+    double *xpnt, *coef, *geom, *schwarz, *dens, *fock;
+    
+    // Initialize and allocate memory for the variables appropriately
+    // ...
+
+    int size = ...; // size of your data arrays
+    double *d_xpnt, *d_coef, *d_geom, *d_schwarz, *d_dens, *d_fock;
+
+    hipMalloc(&d_xpnt, sizeof(double) * size);
+    hipMalloc(&d_coef, sizeof(double) * size);
+    hipMalloc(&d_geom, sizeof(double) * size * 3);
+    hipMalloc(&d_schwarz, sizeof(double) * size);
+    hipMalloc(&d_dens, sizeof(double) * size * size);
+    hipMalloc(&d_fock, sizeof(double) * size * size);
+
+    hipMemcpy(d_xpnt, xpnt, sizeof(double) * size, hipMemcpyHostToDevice);
+    hipMemcpy(d_coef, coef, sizeof(double) * size, hipMemcpyHostToDevice);
+    hipMemcpy(d_geom, geom, sizeof(double) * size * 3, hipMemcpyHostToDevice);
+    hipMemcpy(d_schwarz, schwarz, sizeof(double) * size, hipMemcpyHostToDevice);
+    hipMemcpy(d_dens, dens, sizeof(double) * size * size, hipMemcpyHostToDevice);
+    hipMemset(d_fock, 0, sizeof(double) * size * size);
+
+    dim3 blocks((nnn + BLOCK_SIZE - 1) / BLOCK_SIZE);
+    dim3 threads(BLOCK_SIZE);
+
+    hipLaunchKernelGGL(hartreeFockKernel, blocks, threads, 0, 0, nnn, ngauss, dtol, rcut, sqrpi2, d_xpnt, d_coef, d_geom, d_schwarz, d_dens, d_fock);
+
+    hipMemcpy(fock, d_fock, sizeof(double) * size * size, hipMemcpyDeviceToHost);
+
+    // Cleanup
+    // ...
+
+    hipFree(d_xpnt);
+    hipFree(d_coef);
+    hipFree(d_geom);
+    hipFree(d_schwarz);
+    hipFree(d_dens);
+    hipFree(d_fock);
+
+    return 0;
+}
+```
+
+### Note:
+
+1. Ensure that the data structures (`xpnt`, `coef`, `geom`, `schwarz`, `dens`, `fock`) are correctly initialized and allocated based on the problem's requirements.
+2. You need to properly initialize `xpnt`, `coef`, `geom`, `schwarz`, `dens`, and `fock` with appropriate values before copying them to the device.
+3. The `nnn`, `ngauss`, `dtol`, `rcut`, and `sqrpi2` values need to be correctly defined or computed according to the specific use case and input data.
+4. Make sure to include the necessary HIP headers and compile the code with HIP compiler commands appropriate for your development setup.
+
+Adapting the given Fortran code to HIP in C requires paying attention to how data is handled and ensuring that kernel launches are correctly configured for parallel execution.
+
+--------------- Output 6 ---------------
+Sure, I'll provide you with a C code that uses HIP (Heterogeneous-computing Interface for Portability) to achieve similar functionality to the Fortran code with OpenMP you provided. This code will perform the same Hartree-Fock operation, but please note it will be an adaptation, not a direct line-by-line port.
+
+This HIP implementation will assume that you have installed the HIP runtime and development environment (such as ROCm) on your system. This code will execute on a GPU. 
+
+```c
+#include <hip/hip_runtime.h>
+#include <math.h>
+#include <stdio.h>
+
+#define ngauss 10
+#define nnnn 1000
+#define dtol 1e-10
+#define rcut 1e-4
+#define sqrpi2 2.50662827463100050241576528481  // sqrt(pi)
+
+__global__ void hartree_fock_kernel(double* fock, double* dens, double* coef, 
+                                    double* xpnt, double* geom, double* schwarz, int nnnn) {
+    int ijkl = blockIdx.x * blockDim.x + threadIdx.x;
+    if (ijkl >= nnnn) return;
+
+    double eri = 0.0;
+    int ij = sqrt((double)(2*ijkl));
+    int n = (ij*ij + ij)/2;
+    while (n < ijkl) {
+        ij++;
+        n = (ij*ij + ij)/2;
+    }
+    int kl = ijkl - (ij*ij - ij)/2;
+    if (schwarz[ij] * schwarz[kl] > dtol) {
+        int i = sqrt((double)(2*ij));
+        n = (i*i + i)/2;
+        while (n < ij) {
+            i++;
+            n = (i*i + i)/2;
+        }
+        int j = ij - (i*i - i)/2;
+        int k = sqrt((double)(2*kl));
+        n = (k*k + k)/2;
+        while (n < kl) {
+            k++;
+            n = (k*k + k)/2;
+        }
+        int l = kl - (k*k - k)/2;
+
+        for (int ib = 0; ib < ngauss; ib++) {
+            for (int jb = 0; jb < ngauss; jb++) {
+                double aij = 1.0 / (xpnt[ib] + xpnt[jb]);
+                double dij = coef[ib] * coef[jb] * exp(-xpnt[ib] * xpnt[jb] * aij * 
+                    ((geom[i * 3] - geom[j * 3]) * (geom[i * 3] - geom[j * 3]) +
+                     (geom[i * 3 + 1] - geom[j * 3 + 1]) * (geom[i * 3 + 1] - geom[j * 3 + 1]) +
+                     (geom[i * 3 + 2] - geom[j * 3 + 2]) * (geom[i * 3 + 2] - geom[j * 3 + 2]))) *
+                    pow(aij, 1.5);
+                if (fabs(dij) > dtol) {
+                    double xij = aij * (xpnt[ib] * geom[i * 3] + xpnt[jb] * geom[j * 3]);
+                    double yij = aij * (xpnt[ib] * geom[i * 3 + 1] + xpnt[jb] * geom[j * 3 + 1]);
+                    double zij = aij * (xpnt[ib] * geom[i * 3 + 2] + xpnt[jb] * geom[j * 3 + 2]);
+                    for (int kb = 0; kb < ngauss; kb++) {
+                        for (int lb = 0; lb < ngauss; lb++) {
+                            double akl = 1.0 / (xpnt[kb] + xpnt[lb]);
+                            double dkl = dij * coef[kb] * coef[lb] * exp(-xpnt[kb] * xpnt[lb] * akl *
+                                ((geom[k * 3] - geom[l * 3]) * (geom[k * 3] - geom[l * 3]) +
+                                 (geom[k * 3 + 1] - geom[l * 3 + 1]) * (geom[k * 3 + 1] - geom[l * 3 + 1]) +
+                                 (geom[k * 3 + 2] - geom[l * 3 + 2]) * (geom[k * 3 + 2] - geom[l * 3 + 2]))) *
+                                pow(akl, 1.5);
+                            if (fabs(dkl) > dtol) {
+                                double aijkl = (xpnt[ib] + xpnt[jb]) * (xpnt[kb] + xpnt[lb]) / (xpnt[ib] + xpnt[jb] + xpnt[kb] + xpnt[lb]);
+                                double tt = aijkl * ((xij - akl * (xpnt[kb] * geom[k * 3] + xpnt[lb] * geom[l * 3])) * (xij - akl * (xpnt[kb] * geom[k * 3] + xpnt[lb] * geom[l * 3])) +
+                                                     (yij - akl * (xpnt[kb] * geom[k * 3 + 1] + xpnt[lb] * geom[l * 3 + 1])) * (yij - akl * (xpnt[kb] * geom[k * 3 + 1] + xpnt[lb] * geom[l * 3 + 1])) +
+                                                     (zij - akl * (xpnt[kb] * geom[k * 3 + 2] + xpnt[lb] * geom[l * 3 + 2])) * (zij - akl * (xpnt[kb] * geom[k * 3 + 2] + xpnt[lb] * geom[l * 3 + 2])));
+                                double f0t = sqrpi2;
+                                if (tt > rcut) f0t = pow(tt, -0.5) * erf(sqrt(tt));
+                                eri += dkl * f0t * sqrt(aijkl);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if (i == j) eri *= 0.5;
+        if (k == l) eri *= 0.5;
+        if (i == k && j == l) eri *= 0.5;
+
+        atomicAdd(&fock[i*n + j], dens[k*n + l] * eri * 4.0);
+        atomicAdd(&fock[k*n + l], dens[i*n + j] * eri * 4.0);
+        atomicAdd(&fock[i*n + k], -dens[j*n + l] * eri);
+        atomicAdd(&fock[i*n + l], -dens[j*n + k] * eri);
+        atomicAdd(&fock[j*n + k], -dens[i*n + l] * eri);
+        atomicAdd(&fock[j*n + l], -dens[i*n + k] * eri);
+    }
+}
+
+int main() {
+
+    // Memory allocation on host
+    size_t size = ngauss * ngauss * sizeof(double);
+    double* h_coef = (double*)malloc(size);
+    double* h_xpnt = (double*)malloc(size);
+    double* h_geom = (double*)malloc(size);
+    double* h_schwarz = (double*)malloc(size);
+    double* h_fock = (double*)malloc(size);
+    double* h_dens = (double*)malloc(size);
+
+    // Initialize arrays (dummy values for illustration)
+    for(int i=0; i < ngauss*ngauss; i++) {
+        h_coef[i] = 1.0;
+        h_xpnt[i] = 1.0;
+        h_geom[i] = 1.0;
+        h_schwarz[i] = 1.0;
+        h_fock[i] = 0.0;
+    }
+
+    // Memory allocation on GPU
+    double *d_coef, *d_xpnt, *d_geom, *d_schwarz, *d_fock, *d_dens;
+    hipMalloc(&d_coef, size);
+    hipMalloc(&d_xpnt, size);
+    hipMalloc(&d_geom, size);
+    hipMalloc(&d_schwarz, size);
+    hipMalloc(&d_fock, size);
+    hipMalloc(&d_dens, size);
+
+    // Copy data to GPU
+    hipMemcpy(d_coef, h_coef, size, hipMemcpyHostToDevice);
+    hipMemcpy(d_xpnt, h_xpnt, size, hipMemcpyHostToDevice);
+    hipMemcpy(d_geom, h_geom, size, hipMemcpyHostToDevice);
+    hipMemcpy(d_schwarz, h_schwarz, size, hipMemcpyHostToDevice);
+    hipMemcpy(d_fock, h_fock, size, hipMemcpyHostToDevice);
+    hipMemcpy(d_dens, h_dens, size, hipMemcpyHostToDevice);
+
+    // Launch the kernel
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (nnnn + threadsPerBlock - 1) / threadsPerBlock;
+    hipLaunchKernelGGL(hartree_fock_kernel, dim3(blocksPerGrid), dim3(threadsPerBlock), 0, 0, d_fock, d_dens, d_coef, d_xpnt, d_geom, d_schwarz, nnnn);
+
+    // Copy results back to host
+    hipMemcpy(h_fock, d_fock, size, hipMemcpyDeviceToHost);
+
+    // Clean up
+    hipFree(d_coef);
+    hipFree(d_xpnt);
+    hipFree(d_geom);
+    hipFree(d_schwarz);
+    hipFree(d_fock);
+    hipFree(d_dens);
+    free(h_coef);
+    free(h_xpnt);
+    free(h_geom);
+    free(h_schwarz);
+    free(h_fock);
+    free(h_dens);
+
+    return 0;
+}
+```
+
+This code initializes and launches a GPU kernel that performs the Hartree-Fock operation using HIP. The atomic operations are used to ensure that updates to the `fock` array are thread-safe. Make sure to replace the data initialization step with actual data.
+
+To compile the program, you would typically use a HIP-enabled compiler like so:
+
+```sh
+hipcc -o hartree_fock hartree_fock.c
+```
+
+Run the compiled program to execute the Hartree-Fock operation on the GPU:
+
+```sh
+./hartree_fock
+```
+
+--------------- Output 7 ---------------
+The code you've provided is a Fortran program using OpenMP to parallelize the computation of Hartree-Fock integrals. To convert this code to C using HIP, we'll need to make several changes. First, I'll outline the structure of the program and then provide the implementation.
+
+Notice that HIP (Heterogeneous-compute Interface for Portability) is used for running parallel code on AMD GPUs, similar to how CUDA is used for NVIDIA GPUs. The following C code will use HIP to achieve similar functionality.
+
+Here's the necessary transformation of the Fortran code into C with HIP, assuming some helper arrays `xpnt`, `coef`, `geom`, `schwarz`, `fock`, `dens` and variables `nnnn`, `ngauss`, `dtol`, `sqrpi2`, `rcut` are defined and initialized elsewhere in your program.
+
+```c
+#include <stdio.h>
+#include <math.h>
+#include <hip/hip_runtime.h>
+
+#define ngauss 10 // Example definition - adjust as needed
+#define nnnn 100 // Example definition - adjust as needed
+#define dtol 1.0E-5
+#define sqrpi2 1.1283791670955126 // 2/sqrt(pi)
+#define rcut 1e-10
+
+__global__ void hartree_fock_gpu(double *fock, double *dens, double *xpnt, double *coef, double *geom, double *schwarz) {
+    int ijkl = blockIdx.x * blockDim.x + threadIdx.x;
+    if (ijkl >= nnnn) return;
+    
+    int ij, kl, i, j, k, l, n;
+    double aij, dij, xij, yij, zij, akl, dkl, aijkl, tt, f0t, eri;
+    
+    ij = (int) sqrt((double)(2 * ijkl));
+    n = (ij * ij + ij) / 2;
+    while (n < ijkl) {
+        ij++;
+        n = (ij * ij + ij) / 2;
+    }
+    kl = ijkl - (ij * ij - ij) / 2;
+    
+    if (schwarz[ij] * schwarz[kl] > dtol) {
+        i = (int) sqrt((double)(2 * ij));
+        n = (i * i + i) / 2;
+        while (n < ij) {
+            i++;
+            n = (i * i + i) / 2;
+        }
+        j = ij - (i * i - i) / 2;
+        
+        k = (int) sqrt((double)(2 * kl));
+        n = (k * k + k) / 2;
+        while (n < kl) {
+            k++;
+            n = (k * k + k) / 2;
+        }
+        l = kl - (k * k - k) / 2;
+        
+        eri = 0.0;
+        for (int ib = 0; ib < ngauss; ib++) {
+            for (int jb = 0; jb < ngauss; jb++) {
+                aij = 1.0 / (xpnt[ib] + xpnt[jb]);
+                dij = coef[ib] * coef[jb] * exp(-xpnt[ib] * xpnt[jb] * aij * (
+                    pow(geom[3 * i] - geom[3 * j], 2) +
+                    pow(geom[3 * i + 1] - geom[3 * j + 1], 2) +
+                    pow(geom[3 * i + 2] - geom[3 * j + 2], 2))) * pow(aij, 1.5);
+                if (fabs(dij) > dtol) {
+                    xij = aij * (xpnt[ib] * geom[3 * i] + xpnt[jb] * geom[3 * j]);
+                    yij = aij * (xpnt[ib] * geom[3 * i + 1] + xpnt[jb] * geom[3 * j + 1]);
+                    zij = aij * (xpnt[ib] * geom[3 * i + 2] + xpnt[jb] * geom[3 * j + 2]);
+                    for (int kb = 0; kb < ngauss; kb++) {
+                        for (int lb = 0; lb < ngauss; lb++) { 
+                            akl = 1.0 / (xpnt[kb] + xpnt[lb]);
+                            dkl = dij * coef[kb] * coef[lb] * exp(-xpnt[kb] * xpnt[lb] * akl * (
+                                pow(geom[3 * k] - geom[3 * l], 2) +
+                                pow(geom[3 * k + 1] - geom[3 * l + 1], 2) +
+                                pow(geom[3 * k + 2] - geom[3 * l + 2], 2))) * pow(akl, 1.5);
+                            if (fabs(dkl) > dtol) {
+                                aijkl = (xpnt[ib] + xpnt[jb]) * (xpnt[kb] + xpnt[lb]) / 
+                                    (xpnt[ib] + xpnt[jb] + xpnt[kb] + xpnt[lb]);
+                                tt = aijkl * (pow(xij - akl * (xpnt[kb] * geom[3 * k] + xpnt[lb] * geom[3 * l]), 2) + 
+                                              pow(yij - akl * (xpnt[kb] * geom[3 * k + 1] + xpnt[lb] * geom[3 * l + 1]), 2) + 
+                                              pow(zij - akl * (xpnt[kb] * geom[3 * k + 2] + xpnt[lb] * geom[3 * l + 2]), 2));
+                                f0t = sqrpi2;
+                                if (tt > rcut) f0t = pow(tt, -0.5) * erf(sqrt(tt));
+                                eri += dkl * f0t * sqrt(aijkl);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (i == j) eri *= 0.5;
+        if (k == l) eri *= 0.5;
+        if (i == k && j == l) eri *= 0.5;
+        
+        // Use atomicAdd to prevent race conditions
+        atomicAdd(&fock[i * n + j], dens[k * n + l] * eri * 4.0);
+        atomicAdd(&fock[k * n + l], dens[i * n + j] * eri * 4.0);
+        atomicAdd(&fock[i * n + k], -dens[j * n + l] * eri);
+        atomicAdd(&fock[i * n + l], -dens[j * n + k] * eri);
+        atomicAdd(&fock[j * n + k], -dens[i * n + l] * eri);
+        atomicAdd(&fock[j * n + l], -dens[i * n + k] * eri);
+    }
+}
+
+int main() {
+    // Assuming the arrays and their sizes are properly defined and allocated.
+    double *d_fock, *d_dens, *d_xpnt, *d_coef, *d_geom, *d_schwarz;
+    size_t size_fock = nnnn * sizeof(double);
+    size_t size_dens = nnnn * sizeof(double);
+    size_t size_xpnt = ngauss * sizeof(double);
+    size_t size_coef = ngauss * sizeof(double);
+    size_t size_geom = 3 * ngauss * sizeof(double);
+    size_t size_schwarz = nnnn * sizeof(double);
+
+    // Allocate device memory
+    hipMalloc(&d_fock, size_fock);
+    hipMalloc(&d_dens, size_dens);
+    hipMalloc(&d_xpnt, size_xpnt);
+    hipMalloc(&d_coef, size_coef);
+    hipMalloc(&d_geom, size_geom);
+    hipMalloc(&d_schwarz, size_schwarz);
+
+    // Copy data to device
+    hipMemcpy(d_fock, fock, size_fock, hipMemcpyHostToDevice);
+    hipMemcpy(d_dens, dens, size_dens, hipMemcpyHostToDevice);
+    hipMemcpy(d_xpnt, xpnt, size_xpnt, hipMemcpyHostToDevice);
+    hipMemcpy(d_coef, coef, size_coef, hipMemcpyHostToDevice);
+    hipMemcpy(d_geom, geom, size_geom, hipMemcpyHostToDevice);
+    hipMemcpy(d_schwarz, schwarz, size_schwarz, hipMemcpyHostToDevice);
+
+    // Define grid and block sizes
+    dim3 blockSize(256);
+    dim3 gridSize((nnnn + blockSize.x - 1) / blockSize.x);
+    
+    // Launch the kernel
+    hipLaunchKernelGGL(hartree_fock_gpu, gridSize, blockSize, 0, 0, d_fock, d_dens, d_xpnt, d_coef, d_geom, d_schwarz);
+
+    // Copy the result back to host
+    hipMemcpy(fock, d_fock, size_fock, hipMemcpyDeviceToHost);
+
+    // Free device memory
+    hipFree(d_fock);
+    hipFree(d_dens);
+    hipFree(d_xpnt);
+    hipFree(d_coef);
+    hipFree(d_geom);
+    hipFree(d_schwarz);
+
+    return 0;
+}
+```
+
+### Important Points
+
+1. **Atomic Operations:** The `atomicAdd` function in CUDA/HIP is used to handle atomic operations to avoid race conditions. Ensure all atomic additions to `fock` arrays are managed correctly for thread safety.
+
+2. **Error Handling:** Incorporate appropriate error handling for HIP API calls (e.g., `hipMalloc`, `hipMemcpy`, `hipLaunchKernelGGL`).
+
+3. **Grid and Block Size:** The grid and block sizes are set to 256 threads per block and sufficient blocks to cover all `nnnn` iterations.
+
+4. **Performance Tuning:** Further performance optimization may be required based on the specific hardware and problem size (e.g., memory access patterns, shared memory usage).
+
+5. **Memory Management:** Proper memory allocation and deallocation (on both host and device) are crucial to prevent memory leaks.
+
+This C code uses HIP to parallelize the computation of the Hartree-Fock method, which should be run on an AMD GPU. Be sure to adapt the data structures and initialization according to your actual use case.
+
+--------------- Output 8 ---------------
+Below is the implementation of the described Fortran code in C, using HIP for GPU acceleration. The code aims to compute a Hartree-Fock operation. The focus is on managing parallel computation using HIP, a GPU programming framework similar to CUDA but specifically designed for AMD GPUs.
+
+Before running the following code, ensure you have the HIP runtime and development tools installed on your system.
+
+```c
+#include <hip/hip_runtime.h>
+#include <math.h>
+#include <stdio.h>
+
+#define nguass 10  // Placeholder values; replace with actual
+#define nnnn 1000 // Placeholder values; replace with actual
+#define dtol 1e-10
+#define rcut 1e-10
+#define sqrpi2 2.0 // Placeholder values; replace with actual
+
+__global__ void hartree_fock(double *geom, double *xpnt, double *coef, double *schwarz,
+                            double *dens, double *fock, int nnnn, int ngauss) {
+    int ijkl = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (ijkl >= nnnn) return;
+
+    double eri;
+    int ib, jb, kb, lb, ij, i, j, kl, k, l, n;
+    double aij, dij, xij, yij, zij, akl, dkl, aijkl, tt, f0t;
+
+    ij = sqrt((double)(2 * ijkl));
+    n = (ij * ij + ij) / 2;
+    while (n < ijkl) {
+        ij++;
+        n = (ij * ij + ij) / 2;
+    }
+    kl = ijkl - (ij * ij - ij) / 2;
+
+    if (schwarz[ij] * schwarz[kl] > dtol) {
+        i = sqrt((double)(2 * ij));
+        n = (i * i + i) / 2;
+        while (n < ij) {
+            i++;
+            n = (i * i + i) / 2;
+        }
+        j = ij - (i * i - i) / 2;
+
+        k = sqrt((double)(2 * kl));
+        n = (k * k + k) / 2;
+        while (n < kl) {
+            k++;
+            n = (k * k + k) / 2;
+        }
+        l = kl - (k * k - k) / 2;
+
+        eri = 0.0;
+
+        for (ib = 0; ib < ngauss; ib++) {
+            for (jb = 0; jb < ngauss; jb++) {
+                aij = 1.0 / (xpnt[ib] + xpnt[jb]);
+                dij = coef[ib] * coef[jb] * exp(-xpnt[ib] * xpnt[jb] * aij *
+                        (pow(geom[3 * i] - geom[3 * j], 2) +
+                         pow(geom[3 * i + 1] - geom[3 * j + 1], 2) +
+                         pow(geom[3 * i + 2] - geom[3 * j + 2], 2))) * pow(aij, 1.5);
+
+                if (fabs(dij) > dtol) {
+                    xij = aij * (xpnt[ib] * geom[3 * i] + xpnt[jb] * geom[3 * j]);
+                    yij = aij * (xpnt[ib] * geom[3 * i + 1] + xpnt[jb] * geom[3 * j + 1]);
+                    zij = aij * (xpnt[ib] * geom[3 * i + 2] + xpnt[jb] * geom[3 * j + 2]);
+
+                    for (kb = 0; kb < ngauss; kb++) {
+                        for (lb = 0; lb < ngauss; lb++) {
+                            akl = 1.0 / (xpnt[kb] + xpnt[lb]);
+                            dkl = dij * coef[kb] * coef[lb] * exp(-xpnt[kb] * xpnt[lb] * akl *
+                                    (pow(geom[3 * k] - geom[3 * l], 2) +
+                                     pow(geom[3 * k + 1] - geom[3 * l + 1], 2) +
+                                     pow(geom[3 * k + 2] - geom[3 * l + 2], 2))) * pow(akl, 1.5);
+
+                            if (fabs(dkl) > dtol) {
+                                aijkl = (xpnt[ib] + xpnt[jb]) * (xpnt[kb] + xpnt[lb]) /
+                                         (xpnt[ib] + xpnt[jb] + xpnt[kb] + xpnt[lb]);
+                                tt = aijkl * (pow(xij - akl * (xpnt[kb] * geom[3 * k] + xpnt[lb] * geom[3 * l]), 2) +
+                                              pow(yij - akl * (xpnt[kb] * geom[3 * k + 1] + xpnt[lb] * geom[3 * l + 1]), 2) +
+                                              pow(zij - akl * (xpnt[kb] * geom[3 * k + 2] + xpnt[lb] * geom[3 * l + 2]), 2));
+
+                                f0t = sqrpi2;
+                                if (tt > rcut)
+                                    f0t = pow(tt, -0.5) * erff(sqrt(tt));
+
+                                eri += dkl * f0t * sqrt(aijkl);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (i == j) eri *= 0.5;
+        if (k == l) eri *= 0.5;
+        if (i == k && j == l) eri *= 0.5;
+
+        atomicAdd(&fock[i * nnnn + j], dens[k * nnnn + l] * eri * 4.0);
+        atomicAdd(&fock[k * nnnn + l], dens[i * nnnn + j] * eri * 4.0);
+        atomicAdd(&fock[i * nnnn + k], -dens[j * nnnn + l] * eri);
+        atomicAdd(&fock[i * nnnn + l], -dens[j * nnnn + k] * eri);
+        atomicAdd(&fock[j * nnnn + k], -dens[i * nnnn + l] * eri);
+        atomicAdd(&fock[j * nnnn + l], -dens[i * nnnn + k] * eri);
+    }
+}
+
+int main() {
+    // Allocate and initialize host and device arrays
+
+    // Placeholder declarations; replace with actual sizes and initialization
+    double *h_geom, *h_xpnt, *h_coef, *h_schwarz, *h_dens, *h_fock;
+    int nnnn = 1000; // Example value
+    int ngauss = 10; // Example value
+    size_t geom_size = 3 * nnnn * sizeof(double);
+    size_t xpnt_size = ngauss * sizeof(double);
+    size_t coef_size = ngauss * sizeof(double);
+    size_t schwarz_size = nnnn * sizeof(double);
+    size_t dens_size = nnnn * nnnn * sizeof(double);
+    size_t fock_size = nnnn * nnnn * sizeof(double);
+
+    // Allocate memory on host
+    h_geom = (double*)malloc(geom_size);
+    h_xpnt = (double*)malloc(xpnt_size);
+    h_coef = (double*)malloc(coef_size);
+    h_schwarz = (double*)malloc(schwarz_size);
+    h_dens = (double*)malloc(dens_size);
+    h_fock = (double*)malloc(fock_size);
+
+    // Initialize host arrays with your data
+    // ...
+
+    // Device arrays
+    double *d_geom, *d_xpnt, *d_coef, *d_schwarz, *d_dens, *d_fock;
+
+    // Allocate memory on device
+    hipMalloc(&d_geom, geom_size);
+    hipMalloc(&d_xpnt, xpnt_size);
+    hipMalloc(&d_coef, coef_size);
+    hipMalloc(&d_schwarz, schwarz_size);
+    hipMalloc(&d_dens, dens_size);
+    hipMalloc(&d_fock, fock_size);
+
+    // Copy data from host to device
+    hipMemcpy(d_geom, h_geom, geom_size, hipMemcpyHostToDevice);
+    hipMemcpy(d_xpnt, h_xpnt, xpnt_size, hipMemcpyHostToDevice);
+    hipMemcpy(d_coef, h_coef, coef_size, hipMemcpyHostToDevice);
+    hipMemcpy(d_schwarz, h_schwarz, schwarz_size, hipMemcpyHostToDevice);
+    hipMemcpy(d_dens, h_dens, dens_size, hipMemcpyHostToDevice);
+    hipMemcpy(d_fock, h_fock, fock_size, hipMemcpyHostToDevice);
+
+    // Launch kernel
+    int blockSize = 256;
+    int gridSize = (nnnn + blockSize - 1) / blockSize;
+    hipLaunchKernelGGL(hartree_fock, gridSize, blockSize, 0, 0, d_geom, d_xpnt, d_coef, d_schwarz, d_dens, d_fock, nnnn, ngauss);
+
+    // Copy results back to host
+    hipMemcpy(h_fock, d_fock, fock_size, hipMemcpyDeviceToHost);
+
+    // Free device memory
+    hipFree(d_geom);
+    hipFree(d_xpnt);
+    hipFree(d_coef);
+    hipFree(d_schwarz);
+    hipFree(d_dens);
+    hipFree(d_fock);
+
+    // Free host memory
+    free(h_geom);
+    free(h_xpnt);
+    free(h_coef);
+    free(h_schwarz);
+    free(h_dens);
+    free(h_fock);
+
+    return 0;
+}
+```
+
+In this code:
+- The HIP kernel `hartree_fock` is used to parallelize the Hartree-Fock computation across GPU threads.
+- Atomic operations (`atomicAdd`) are used to handle concurrent updates to the `fock` matrix.
+- The host applications handle memory allocation, data transfer between host and device, and kernel invocation.
+
+Make sure to adjust placeholder values and initialize the arrays correctly according to your specific data.
+
+To compile and run this program, you would typically use the HIP compiler `hipcc`. For example:
+```bash
+hipcc -o hartree_fock hartree_fock.c -lm
+./hartree_fock
+```
+
+Additional libraries may be required based on your environment and the specifics of your system setup.
+
+--------------- Output 9 ---------------
+To translate the given Fortran code using OpenMP to C with HIP, we need to follow these steps:
+1. **Decompose triangular indices** calculation in C.
+2. **Preserve parallelization logic** with HIP.
+3. Utilize HIP-specific constructs for parallel loops and atomic operations.
+
+The HIP API provides similar functionality to OpenMP in terms of handling parallel loops and atomic operations. Here’s a translation of your given Fortran code to C with HIP:
+
+```c
+#include <hip/hip_runtime.h>
+#include <math.h>
+#include <stdio.h>
+
+// Define device function for error function
+__device__ double erf(double x) {
+    // Approximation of error function (can use a more accurate one)
+    // This implementation uses a series approximation.
+    // For the CUDA or ROCm environment, consider using the intrinsic __erf
+    double t = 1.0 / (1.0 + 0.5 * fabs(x));
+    double tau = t * exp(-x * x - 1.26551223 + t * (1.00002368 +
+              t * (0.37409196 + t * (0.09678418 + t * (-0.18628806 +
+              t * (0.27886807 + t * (-1.13520398 + t * (1.48851587 +
+              t * (-0.82215223 + t * 0.17087277)))))))));
+    if (x >= 0.0) {
+        return 1.0 - tau;
+    } else {
+        return tau - 1.0;
+    }
+}
+
+// HIP kernel function to compute the Fock matrix
+__global__ void computeFockMatrix(int nnnn, int ngauss, double dtol, double rcut, double sqrpi2, 
+                                  double *schwarz, double *xpnt, double *coef, double *geom, 
+                                  double *fock, double *dens) {
+    int ijkl = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    if (ijkl < nnnn) {
+        int ij = (int)sqrt(2.0 * ijkl);
+        int n = (ij * ij + ij) / 2;
+        while (n < ijkl) {
+            ij++;
+            n = (ij * ij + ij) / 2;
+        }
+        int kl = ijkl - (ij * ij - ij) / 2;
+
+        if (schwarz[ij] * schwarz[kl] > dtol) {
+            int i = (int)sqrt(2.0 * ij);
+            n = (i * i + i) / 2;
+            while (n < ij) {
+                i++;
+                n = (i * i + i) / 2;
+            }
+            int j = ij - (i * i - i) / 2;
+
+            int k = (int)sqrt(2.0 * kl);
+            n = (k * k + k) / 2;
+            while (n < kl) {
+                k++;
+                n = (k * k + k) / 2;
+            }
+            int l = kl - (k * k - k) / 2;
+
+            double eri = 0.0;
+            for (int ib = 0; ib < ngauss; ib++) {
+                for (int jb = 0; jb < ngauss; jb++) {
+                    double aij = 1.0 / (xpnt[ib] + xpnt[jb]);
+                    double dij = coef[ib] * coef[jb] * exp(-xpnt[ib] * xpnt[jb] * aij * 
+                                  ((geom[i*3] - geom[j*3]) * (geom[i*3] - geom[j*3]) + 
+                                   (geom[i*3+1] - geom[j*3+1]) * (geom[i*3+1] - geom[j*3+1]) + 
+                                   (geom[i*3+2] - geom[j*3+2]) * (geom[i*3+2] - geom[j*3+2]))) * 
+                                  pow(aij, 1.5);
+                    if (fabs(dij) > dtol) {
+                        double xij = aij * (xpnt[ib] * geom[i*3] + xpnt[jb] * geom[j*3]);
+                        double yij = aij * (xpnt[ib] * geom[i*3+1] + xpnt[jb] * geom[j*3+1]);
+                        double zij = aij * (xpnt[ib] * geom[i*3+2] + xpnt[jb] * geom[j*3+2]);
+                        for (int kb = 0; kb < ngauss; kb++) {
+                            for (int lb = 0; lb < ngauss; lb++) {
+                                double akl = 1.0 / (xpnt[kb] + xpnt[lb]);
+                                double dkl = dij * coef[kb] * coef[lb] * exp(-xpnt[kb] * xpnt[lb] * akl * 
+                                         ((geom[k*3] - geom[l*3]) * (geom[k*3] - geom[l*3]) + 
+                                          (geom[k*3+1] - geom[l*3+1]) * (geom[k*3+1] - geom[l*3+1]) + 
+                                          (geom[k*3+2] - geom[l*3+2]) * (geom[k*3+2] - geom[l*3+2]))) * 
+                                         pow(akl, 1.5);
+                                if (fabs(dkl) > dtol) {
+                                    double aijkl = (xpnt[ib] + xpnt[jb]) * (xpnt[kb] + xpnt[lb]) / 
+                                                   (xpnt[ib] + xpnt[jb] + xpnt[kb] + xpnt[lb]);
+                                    double tt = aijkl * ((xij - akl * (xpnt[kb] * geom[k*3] + xpnt[lb] * geom[l*3])) * 
+                                                         (xij - akl * (xpnt[kb] * geom[k*3] + xpnt[lb] * geom[l*3])) + 
+                                                         (yij - akl * (xpnt[kb] * geom[k*3+1] + xpnt[lb] * geom[l*3+1])) * 
+                                                         (yij - akl * (xpnt[kb] * geom[k*3+1] + xpnt[lb] * geom[l*3+1])) + 
+                                                         (zij - akl * (xpnt[kb] * geom[k*3+2] + xpnt[lb] * geom[l*3+2])) * 
+                                                         (zij - akl * (xpnt[kb] * geom[k*3+2] + xpnt[lb] * geom[l*3+2])));
+                                    double f0t = sqrpi2;
+                                    if (tt > rcut) {
+                                        f0t = pow(tt, -0.5) * erf(sqrt(tt));
+                                    }
+                                    eri += dkl * f0t * sqrt(aijkl);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if (i == j) eri *= 0.5;
+            if (k == l) eri *= 0.5;
+            if (i == k && j == l) eri *= 0.5;
+            
+            atomicAdd(&fock[i * 3 + j], dens[k * 3 + l] * eri * 4.0);
+            atomicAdd(&fock[k * 3 + l], dens[i * 3 + j] * eri * 4.0);
+            atomicAdd(&fock[i * 3 + k], -dens[j * 3 + l] * eri);
+            atomicAdd(&fock[i * 3 + l], -dens[j * 3 + k] * eri);
+            atomicAdd(&fock[j * 3 + k], -dens[i * 3 + l] * eri);
+            atomicAdd(&fock[j * 3 + l], -dens[i * 3 + k] * eri);
+        }
+    }
+}
+
+int main() {
+    int nnnn = 1000; // Example value
+    int ngauss = 100; // Example value
+    double dtol = 1e-8;
+    double rcut = 20.0;
+    double sqrpi2 = 2.0 / sqrt(M_PI); // Example value
+
+    // Allocate and initialize arrays
+    double *h_schwarz = (double *)malloc(nnnn * sizeof(double));
+    double *h_xpnt = (double *)malloc(ngauss * sizeof(double));
+    double *h_coef = (double *)malloc(ngauss * sizeof(double));
+    double *h_geom = (double *)malloc(3 * 100 * sizeof(double)); // Example value
+    double *h_fock = (double *)calloc(100, sizeof(double)); // Example value
+    double *h_dens = (double *)malloc(100 * sizeof(double)); // Example value
+
+    // Initialize arrays with values (example initialization, actual values needed)
+    for (int i = 0; i < nnnn; i++) h_schwarz[i] = 1.0;
+    for (int i = 0; i < ngauss; i++) h_xpnt[i] = 1.0;
+    for (int i = 0; i < ngauss; i++) h_coef[i] = 1.0;
+    for (int i = 0; i < 3 * 100; i++) h_geom[i] = 1.0;
+    for (int i = 0; i < 100; i++) h_dens[i] = 1.0;
+
+    // Allocate device memory
+    double *d_schwarz, *d_xpnt, *d_coef, *d_geom, *d_fock, *d_dens;
+    hipMalloc(&d_schwarz, nnnn * sizeof(double));
+    hipMalloc(&d_xpnt, ngauss * sizeof(double));
+    hipMalloc(&d_coef, ngauss * sizeof(double));
+    hipMalloc(&d_geom, 3 * 100 * sizeof(double));
+    hipMalloc(&d_fock, 100 * sizeof(double));
+    hipMalloc(&d_dens, 100 * sizeof(double));
+
+    // Copy data to device
+    hipMemcpy(d_schwarz, h_schwarz, nnnn * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_xpnt, h_xpnt, ngauss * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_coef, h_coef, ngauss * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_geom, h_geom, 3 * 100 * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_fock, h_fock, 100 * sizeof(double), hipMemcpyHostToDevice);
+    hipMemcpy(d_dens, h_dens, 100 * sizeof(double), hipMemcpyHostToDevice);
+
+    // Define CUDA block and grid sizes
+    int blockSize = 256;
+    int gridSize = (nnnn + blockSize - 1) / blockSize;
+
+    // Launch the HIP kernel
+    hipLaunchKernelGGL(computeFockMatrix, dim3(gridSize), dim3(blockSize), 0, 0,
+                       nnnn, ngauss, dtol, rcut, sqrpi2, 
+                       d_schwarz, d_xpnt, d_coef, d_geom, d_fock, d_dens);
+
+    // Copy results back to host
+    hipMemcpy(h_fock, d_fock, 100 * sizeof(double), hipMemcpyDeviceToHost);
+
+    // Free device memory
+    hipFree(d_schwarz);
+    hipFree(d_xpnt);
+    hipFree(d_coef);
+    hipFree(d_geom);
+    hipFree(d_fock);
+    hipFree(d_dens);
+
+    // Free host memory
+    free(h_schwarz);
+    free(h_xpnt);
+    free(h_coef);
+    free(h_geom);
+    free(h_fock);
+    free(h_dens);
+
+    return 0;
+}
+```
+
+In this rewrite, the Hartree-Fock operation is implemented as a CUDA/HIP kernel that is launched with parallel threads. The `erf` function is implemented as a device function since there isn't a native support in HIP. In a real implementation, a more accurate approximation or available library function should be used.
+
+Make sure to review this code carefully. It requires proper initialization of arrays to their actual values and dimensions. Additionally, CUDA device intrinsics and libraries can be used for improved performance and accuracy.
+
+--------------- Output 10 ---------------
+To implement the given Fortran code in C using HIP (Heterogeneous Interface for Portability), we need to follow the same computational logic but translate it into C. HIP allows kernel execution on both NVIDIA and AMD GPUs, and we'll use HIP-specific directives to parallelize the code.
+
+Here's the code:
+
+```c
+#include <hip/hip_runtime.h>
+#include <math.h>
+#include <stdio.h>
+
+#define dtol 1e-6
+#define rcut 1e-12
+#define sqrpi2 2.0/sqrt(M_PI)
+
+__global__ void hartree_fock(double* fock, const double* schwarz, const double* xpnt, 
+                             const double* coef, const double* geom, const double* dens, 
+                             int nnnn, int ngauss) {
+    int ijkl = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (ijkl < nnnn) {
+        int ib, jb, kb, lb, ij, i, j, kl, k, l, n;
+        double aij, dij, xij, yij, zij, akl, dkl, aijkl, tt, f0t, eri;
+        
+        ij = sqrt((double)(2 * ijkl));
+        n = (ij * ij + ij) / 2;
+        while (n < ijkl) {
+            ij += 1;
+            n = (ij * ij + ij) / 2;
+        }
+        kl = ijkl - (ij * ij - ij) / 2;
+        if (schwarz[ij] * schwarz[kl] > dtol) {
+            // Decomposing triangular ij index into i >= j
+            i = sqrt((double)(2 * ij));
+            n = (i * i + i) / 2;
+            while (n < ij) {
+                i += 1;
+                n = (i * i + i) / 2;
+            }
+            j = ij - (i * i - i) / 2;
+            
+            // Decomposing triangular kl index into k >= l
+            k = sqrt((double)(2 * kl));
+            n = (k * k + k) / 2;
+            while (n < kl) {
+                k += 1;
+                n = (k * k + k) / 2;
+            }
+            l = kl - (k * k - k) / 2;
+            
+            eri = 0.0;
+            for (ib = 0; ib < ngauss; ++ib) {
+                for (jb = 0; jb < ngauss; ++jb) {
+                    aij = 1.0 / (xpnt[ib] + xpnt[jb]);
+                    dij = coef[ib] * coef[jb] * exp(-xpnt[ib] * xpnt[jb] * aij * 
+                           ((geom[3*i] - geom[3*j]) * (geom[3*i] - geom[3*j]) +
+                            (geom[3*i + 1] - geom[3*j + 1]) * (geom[3*i + 1] - geom[3*j + 1]) +
+                            (geom[3*i + 2] - geom[3*j + 2]) * (geom[3*i + 2] - geom[3*j + 2]))) * pow(aij, 1.5);
+                    if (fabs(dij) > dtol) {
+                        xij = aij * (xpnt[ib] * geom[3*i] + xpnt[jb] * geom[3*j]);
+                        yij = aij * (xpnt[ib] * geom[3*i + 1] + xpnt[jb] * geom[3*j + 1]);
+                        zij = aij * (xpnt[ib] * geom[3*i + 2] + xpnt[jb] * geom[3*j + 2]);
+                        for (kb = 0; kb < ngauss; ++kb) {
+                            for (lb = 0; lb < ngauss; ++lb) {
+                                akl = 1.0 / (xpnt[kb] + xpnt[lb]);
+                                dkl = dij * coef[kb] * coef[lb] * exp(-xpnt[kb] * xpnt[lb] * akl *
+                                          ((geom[3*k] - geom[3*l]) * (geom[3*k] - geom[3*l]) +
+                                           (geom[3*k + 1] - geom[3*l + 1]) * (geom[3*k + 1] - geom[3*l + 1]) +
+                                           (geom[3*k + 2] - geom[3*l + 2]) * (geom[3*k + 2] - geom[3*l + 2]))) *
+                                      pow(akl, 1.5);
+                                if (fabs(dkl) > dtol) {
+                                    aijkl = (xpnt[ib] + xpnt[jb]) * (xpnt[kb] + xpnt[lb]) / 
+                                            (xpnt[ib] + xpnt[jb] + xpnt[kb] + xpnt[lb]);
+                                    tt = aijkl * ((xij - akl * (xpnt[kb] * geom[3*k] + xpnt[lb] * geom[3*l])) * 
+                                               (xij - akl * (xpnt[kb] * geom[3*k] + xpnt[lb] * geom[3*l])) +
+                                               (yij - akl * (xpnt[kb] * geom[3*k + 1] + xpnt[lb] * geom[3*l + 1])) *
+                                               (yij - akl * (xpnt[kb] * geom[3*k + 1] + xpnt[lb] * geom[3*l + 1])) +
+                                               (zij - akl * (xpnt[kb] * geom[3*k + 2] + xpnt[lb] * geom[3*l + 2])) *
+                                               (zij - akl * (xpnt[kb] * geom[3*k + 2] + xpnt[lb] * geom[3*l + 2])));
+                                    f0t = sqrpi2;
+                                    if (tt > rcut)
+                                        f0t = pow(tt, -0.5) * erfc(sqrt(tt));
+                                    eri += dkl * f0t * sqrt(aijkl);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            if (i == j) eri *= 0.5;
+            if (k == l) eri *= 0.5;
+            if (i == k && j == l) eri *= 0.5;
+
+            atomicAdd(&fock[i * ngauss + j], dens[k * ngauss + l] * eri * 4.0);
+            atomicAdd(&fock[k * ngauss + l], dens[i * ngauss + j] * eri * 4.0);
+            atomicAdd(&fock[i * ngauss + k], -dens[j * ngauss + l] * eri);
+            atomicAdd(&fock[i * ngauss + l], -dens[j * ngauss + k] * eri);
+            atomicAdd(&fock[j * ngauss + k], -dens[i * ngauss + l] * eri);
+            atomicAdd(&fock[j * ngauss + l], -dens[i * ngauss + k] * eri);
+        }
+    }
+}
+
+int main() {
+    // Define your variables and allocate memory here
+    // ...
+    
+    // Assuming these variables are defined and filled appropriately:
+    // double *fock, *schwarz, *xpnt, *coef, *geom, *dens;
+    // int nnnn = ..., ngauss = ...;
+
+    // HIP specific parameters
+    int num_threads = 256;
+    int num_blocks = (nnnn + num_threads - 1) / num_threads;
+
+    // Memory allocation and copying
+    double *d_fock, *d_schwarz, *d_xpnt, *d_coef, *d_geom, *d_dens;
+    hipMalloc((void**)&d_fock, sizeof(double) * ...);
+    hipMalloc((void**)&d_schwarz, sizeof(double) * ...);
+    hipMalloc((void**)&d_xpnt, sizeof(double) * ...);
+    hipMalloc((void**)&d_coef, sizeof(double) * ...);
+    hipMalloc((void**)&d_geom, sizeof(double) * ...);
+    hipMalloc((void**)&d_dens, sizeof(double) * ...);
+
+    hipMemcpy(d_fock, fock, sizeof(double) * ..., hipMemcpyHostToDevice);
+    hipMemcpy(d_schwarz, schwarz, sizeof(double) * ..., hipMemcpyHostToDevice);
+    hipMemcpy(d_xpnt, xpnt, sizeof(double) * ..., hipMemcpyHostToDevice);
+    hipMemcpy(d_coef, coef, sizeof(double) * ..., hipMemcpyHostToDevice);
+    hipMemcpy(d_geom, geom, sizeof(double) * ..., hipMemcpyHostToDevice);
+    hipMemcpy(d_dens, dens, sizeof(double) * ..., hipMemcpyHostToDevice);
+    
+    // Launch kernel
+    hipLaunchKernelGGL(hartree_fock, dim3(num_blocks), dim3(num_threads), 0, 0, d_fock, d_schwarz, d_xpnt, d_coef, d_geom, d_dens, nnnn, ngauss);
+
+    // Copy the result back to host
+    hipMemcpy(fock, d_fock, sizeof(double) * ..., hipMemcpyDeviceToHost);
+
+    // Free device memory
+    hipFree(d_fock);
+    hipFree(d_schwarz);
+    hipFree(d_xpnt);
+    hipFree(d_coef);
+    hipFree(d_geom);
+    hipFree(d_dens);
+
+    // Print or use the `fock` matrix
+    // ...
+
+    return 0;
+}
+```
+
+Make sure you properly define and allocate memory for `fock`, `schwarz`, `xpnt`, `coef`, `geom`, and `dens` arrays before using them in `hipMalloc` and `hipMemcpy`.
+
+This C code employs HIP for parallel computations and should work on systems supporting HIP (like machines with AMD and NVIDIA GPUs). The parallelization is enabled by launching a HIP kernel and using atomic operations to ensure correctness while updating shared arrays.
+

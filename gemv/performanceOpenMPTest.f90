@@ -1,27 +1,41 @@
 PROGRAM main
+    USE iso_c_binding, ONLY: C_LONG_LONG
     IMPLICIT NONE
-    INTEGER, PARAMETER :: n = 1400
-    REAL, DIMENSION(n, n) :: A
-    REAL, DIMENSION(n) :: x, y
-    INTEGER :: i, j, k
-    INTEGER :: start, finish, rate
-    REAL :: total_time, average_time
-    REAL :: startTime, endTime, totalTime, averageTime
-    total_time = 0.0
+    INTEGER, PARAMETER :: n = 44720 
+    REAL(KIND=8), ALLOCATABLE :: A(:,:), x(:), y(:)
+    INTEGER :: i
+    INTEGER :: count_max
+    INTEGER(C_LONG_LONG) :: start_count, end_count, count_diff, count_rate
+    REAL :: wall_time
 
-    ! Call the gemv_parallel subroutine 10 times and record the time
-    DO k = 1, 10
-        ! CALL system_clock(start)
-        CALL CPU_TIME(startTime)
+    ! Allocate the arrays dynamically
+    ALLOCATE(A(n, n), x(n), y(n))
+    A = 1.0
+    x = 1.0
+    y = 0.0
+
+    ! Do a warmup run to ensure fair timing
+    CALL gemv_parallel(n, A, x, y)
+
+    ! Reset y for the actual runs
+    y = 0.0
+
+    ! Find average per call time
+    count_max = 10
+    count_diff = 0
+    i = 0
+    DO i = 1, count_max
+        CALL system_clock(count_rate=count_rate)
+        CALL system_clock(start_count)
         CALL gemv_parallel(n, A, x, y)
-        CALL CPU_TIME(endTime)
-        totalTime = totalTime + (endTime - startTime)
+        CALL system_clock(end_count)
+        count_diff = count_diff + (end_count - start_count)
     END DO
 
-    average_time = totalTime / 10.0
+    wall_time = REAL(count_diff) / REAL(count_rate) / REAL(count_max)
+    PRINT *, "Average time of ", count_max, " calls: ", wall_time, " seconds"
 
-    ! Print the average execution time
-    PRINT *, "Average execution time: ", average_time, " seconds."
+    DEALLOCATE(A, x, y)
 
 END PROGRAM main
 
@@ -30,9 +44,9 @@ END PROGRAM main
 subroutine gemv_parallel(n, A, x, y)
     implicit none
     integer, intent(in) :: n
-    real, intent(in) :: A(n, n)
-    real, intent(in) :: x(n)
-    real, intent(out) :: y(n)
+    real(KIND=8), intent(in) :: A(n, n)
+    real(KIND=8), intent(in) :: x(n)
+    real(KIND=8), intent(out) :: y(n)
     integer :: i, j
     real :: sum
 
