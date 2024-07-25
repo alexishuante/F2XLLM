@@ -9,7 +9,7 @@ nvc -acc  -Minfo=accel -o outputFileName cFileName -lm
 
 For C OpenACC on milan0:
 ```shell
-nvcc cFile.c -o outputFileName
+nvc -acc  -Minfo=accel -o outputFileName cFileName -lm
 ```
 
 Command to run OpenACC fortran with cousteau:
