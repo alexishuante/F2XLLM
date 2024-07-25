@@ -12,6 +12,11 @@ For C OpenACC on milan0:
 nvc -acc  -Minfo=accel -o outputFileName cFileName -lm
 ```
 
+For C CUDA on milan0:
+```shell
+nvcc -arch=sm_60 cFileName -o outputFileName
+```
+
 Command to run OpenACC fortran with cousteau:
 ```shell
 gfortran -fopenacc -fopt-info-optimized file_name -o outputFileName
