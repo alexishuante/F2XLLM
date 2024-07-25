@@ -1,6 +1,6 @@
 Command to run OpenMP fortran: 
 ```shell
- gfortran -fopenmp -O3 f90FileName -o outputFileName
+gfortran -fopenmp -O3 f90FileName -o outputFileName
 ```
 Command to run OpenACC fortran with milan0: 
 ```shell
