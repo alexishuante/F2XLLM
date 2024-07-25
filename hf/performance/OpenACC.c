@@ -191,7 +191,7 @@ void ssss(int i, int j, int k, int l, int ngauss, double* xpnt, double* coef, do
 
 int main() {
     //int natom = 8192, ngauss = 3;
-    int natom = 1024, ngauss = 3;
+    int natom = 8192, ngauss = 3;
     //double erep = 0.0;
     double txpnt[3] = {6.3624214, 1.1589230, 0.3136498};
     double tcoef[3] = {0.154328967295, 0.535328142282, 0.4446345421855};
