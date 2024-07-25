@@ -4,7 +4,7 @@ gfortran -fopenmp file_name -o outputFileName
 ```
 Command to run OpenACC fortran with milan0: 
 ```shell
-nvfortran -fast -Minfo=all -acc=gpu -gpu=cc70 file_name -o outputFileName
+nvc -acc  -Minfo=accel -o outputFileName cFileName -lm
 ```
 
 For C OpenACC on milan0:
