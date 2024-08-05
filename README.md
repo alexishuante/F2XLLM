@@ -27,5 +27,3 @@ For C CUDA on milan0:
 ```shell
 nvcc -arch=sm_60 cFileName -o outputFileName
 ```
-
-Command to run 
